@@ -15,7 +15,7 @@ const crypto = require('crypto');
 const PORT = Number(process.env.PORT) || 3000;
 // Find the casino pages: normally in public/, but also works when they were uploaded
 // next to server.js or inside an extra folder (GitHub's upload page sometimes does that).
-const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'blackjack-live.html', 'roulette-live.html'];
+const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
   const preferred = [path.join(__dirname, 'public'), __dirname];
@@ -137,7 +137,24 @@ function checkToken(id, token) {
   return true;
 }
 const cleanName = n => String(n || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18) || 'Player';
-const live = require('./live')({ checkToken, cleanName });
+// live tables: money owed to players and poker stacks are saved (Upstash or data/live.json)
+const LIVE_FILE = path.join(DATA_DIR, 'live.json'), LIVE_KEY = 'miguels-casino:live';
+let liveState = null, liveDirty = false;
+const live = require('./live')({ checkToken, cleanName, saveState: s => { liveState = s; liveDirty = true; } });
+async function loadLive() {
+  if (USE_REDIS) { const raw = await redis(['GET', LIVE_KEY]); return raw ? JSON.parse(raw) : null; }
+  return fs.existsSync(LIVE_FILE) ? JSON.parse(fs.readFileSync(LIVE_FILE, 'utf8')) : null;
+}
+async function flushLive() {
+  if (!liveDirty || !liveState) return;
+  liveDirty = false;
+  const body = JSON.stringify(liveState);
+  try {
+    if (USE_REDIS) await redis(['SET', LIVE_KEY, body]);
+    else { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(LIVE_FILE + '.tmp', body); fs.renameSync(LIVE_FILE + '.tmp', LIVE_FILE); }
+  } catch (e) { liveDirty = true; console.error('Could not save the live tables:', e.message); }
+}
+setInterval(flushLive, 5000).unref();
 
 /* ---------------- live updates (server-sent events) ---------------- */
 const streams = new Set();
@@ -231,10 +248,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/live/stream') return live.stream(req, res, url);
     if (p === '/api/live/summary') return send(res, 200, live.summary());
-    if ((p === '/api/live/bj' || p === '/api/live/rl' || p === '/api/live/claim') && req.method === 'POST') {
+    if ((p === '/api/live/bj' || p === '/api/live/rl' || p === '/api/live/pk' || p === '/api/live/claim') && req.method === 'POST') {
       let body;
       try { body = JSON.parse(await readBody(req)); } catch (e) { return send(res, 400, { error: 'Send JSON.' }); }
-      const r = p === '/api/live/claim' ? live.claim(body) : live.action(p.endsWith('bj') ? 'bj' : 'rl', body);
+      const r = p === '/api/live/claim' ? live.claim(body) : live.action(p.endsWith('bj') ? 'bj' : p.endsWith('pk') ? 'pk' : 'rl', body);
       return send(res, r.code, r.body);
     }
     if (p.startsWith('/api/')) return send(res, 404, { error: 'Unknown address.' });
@@ -248,6 +265,7 @@ const server = http.createServer(async (req, res) => {
 
 async function shutdown() {
   await flush();
+  await flushLive();
   process.exit(0);
 }
 process.on('SIGTERM', shutdown);
@@ -255,8 +273,9 @@ process.on('SIGINT', shutdown);
 
 load()
   .catch(e => console.error('Could not load the saved leaderboard:', e.message))
+  .then(() => loadLive().then(s => live.restore(s)).catch(e => console.error('Could not load the live tables:', e.message)))
   .finally(() => server.listen(PORT, '0.0.0.0', () => {
     console.log(`Miguel's Casino is open on http://localhost:${PORT}`);
     console.log(PUBLIC_DIR ? `Casino pages found in ${PUBLIC_DIR}` : 'WARNING: casino pages not found. Upload index.html, blackjack.html, roulette.html and craps.html.');
-    console.log(`Leaderboard saved in ${USE_REDIS ? 'Upstash Redis' : DATA_FILE} Â· ${players.size} player${players.size === 1 ? "" : "s"} loaded`);
+    console.log(`Leaderboard saved in ${USE_REDIS ? 'Upstash Redis' : DATA_FILE} · ${players.size} player${players.size === 1 ? "" : "s"} loaded`);
   }));

@@ -6,18 +6,30 @@ const crypto = require('crypto');
 const rnd = n => crypto.randomInt(n);
 const F = Number(process.env.LIVE_TIME_SCALE) || 1;   // for automated tests only
 
-module.exports = function createLive({ checkToken, cleanName }) {
+const { createPoker } = require('./poker');
+
+module.exports = function createLive({ checkToken, cleanName, saveState }) {
   /* ---------------- connections & payouts ---------------- */
   const conns = new Set();                 // { res, game, pid, name }
   const unclaimed = new Map();             // pid -> [{ id, game, payout, staked, net }]
   const lastSeen = new Map();              // pid -> ms
   const online = (game, pid) => { for (const c of conns) if (c.game === game && c.pid === pid) return true; return false; };
   const recentlySeen = (pid, ms) => Date.now() - (lastSeen.get(pid) || 0) < ms;
+  // money owed to players is saved, so a server restart (Render going to sleep) never loses it
+  let pokerSeated = {};
+  function persist() {
+    if (!saveState) return;
+    const owed = {};
+    for (const [pid, list] of unclaimed) { const money = list.filter(e => e.payout > 0); if (money.length) owed[pid] = money; }
+    saveState({ owed, pokerSeated });
+  }
   function owe(pid, entry) {
     const list = unclaimed.get(pid) || [];
     list.push(entry);
-    while (list.length > 60) list.shift();
+    // trim old stats-only entries first; never drop money that is still owed
+    while (list.length > 80) { const k = list.findIndex(e => !(e.payout > 0)); list.splice(k >= 0 ? k : 0, 1); }
     unclaimed.set(pid, list);
+    if (entry.payout > 0) persist();
   }
   const dirty = new Set();
   let flushTimer = null;
@@ -31,7 +43,7 @@ module.exports = function createLive({ checkToken, cleanName }) {
     }, 40);
   }
   function push(c) {
-    const view = c.game === 'bj' ? bjView(c.pid) : rlView(c.pid);
+    const view = c.game === 'bj' ? bjView(c.pid) : c.game === 'pk' ? pkView(c.pid) : rlView(c.pid);
     c.res.write(`event: state\ndata: ${JSON.stringify(view)}\n\n`);
   }
   setInterval(() => {
@@ -383,10 +395,24 @@ module.exports = function createLive({ checkToken, cleanName }) {
     };
   }
 
+  /* =============== TEXAS HOLD'EM =============== */
+  const PK = createPoker({
+    owe, rnd, timeScale: F,
+    changed: () => changed('pk'),
+    online: pid => online('pk', pid),
+    persist: st => { pokerSeated = st.seated || {}; persist(); },
+  });
+  function pkView(pid) {
+    const v = PK.view(pid);
+    v.me.unclaimed = (unclaimed.get(pid) || []).filter(e => e.game === 'pk');
+    return v;
+  }
+  setInterval(() => { PK.tick(); for (const c of conns) if (c.game === 'pk') PK.seen(c.pid); }, 5000).unref();
+
   /* =============== http =============== */
   function stream(req, res, url) {
     const game = url.searchParams.get('game'), pid = url.searchParams.get('id') || '', token = url.searchParams.get('token') || '';
-    if (game !== 'bj' && game !== 'rl') { res.writeHead(400); return res.end(); }
+    if (game !== 'bj' && game !== 'rl' && game !== 'pk') { res.writeHead(400); return res.end(); }
     if (!checkToken(pid, token)) { res.writeHead(403); return res.end(); }
     const c = { res, game, pid, name: cleanName(url.searchParams.get('name')) };
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
@@ -402,7 +428,7 @@ module.exports = function createLive({ checkToken, cleanName }) {
     if (!checkToken(pid, token)) return { code: 403, body: { error: 'This seat belongs to another browser.' } };
     lastSeen.set(pid, Date.now());
     const name = cleanName(body.name);
-    return game === 'bj' ? bjAction(pid, name, body) : rlAction(pid, name, body);
+    return game === 'bj' ? bjAction(pid, name, body) : game === 'pk' ? PK.action(pid, name, body) : rlAction(pid, name, body);
   }
   function claim(body) {
     const pid = String(body.id || ''), token = String(body.token || '');
@@ -412,7 +438,8 @@ module.exports = function createLive({ checkToken, cleanName }) {
     const keep = list.filter(e => !ids.has(e.id));
     if (keep.length !== list.length) {
       unclaimed.set(pid, keep);
-      changed('bj'); changed('rl');
+      changed('bj'); changed('rl'); changed('pk');
+      if (list.some(e => ids.has(e.id) && e.payout > 0)) persist();
     }
     return { code: 200, body: { ok: true } };
   }
@@ -422,7 +449,15 @@ module.exports = function createLive({ checkToken, cleanName }) {
     return {
       bj: { seated: BJ.seats.filter(Boolean).length, seats: 5, phase: BJ.phase },
       rl: { players: rlPlayers.size, phase: RL.phase },
+      pk: PK.summary(),
     };
   }
-  return { stream, action, claim, summary, _test: { BJ, RL, total, SPOTS } };
+  // after a restart: pay back what was owed, and return poker stacks that were on the table
+  function restore(saved) {
+    if (!saved) return;
+    for (const [pid, list] of Object.entries(saved.owed || {})) for (const e of list) if (e && e.payout > 0) owe(pid, e);
+    PK.restore({ seated: saved.pokerSeated || {} });
+    persist();
+  }
+  return { stream, action, claim, summary, restore, _test: { BJ, RL, total, SPOTS, PK } };
 };

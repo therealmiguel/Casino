@@ -74,12 +74,13 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
 .live-sec .head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px}
 .live-sec h2{margin:6px 0 0;font:400 clamp(30px,5vw,44px)/1 var(--display);color:var(--gold-2)}
 .live-sec p{margin:6px 0 0;color:var(--muted);font-size:14.5px}
-.lives{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.lives{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px}
 .lt{display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:18px;text-decoration:none;color:inherit;background:linear-gradient(135deg,#27101A,#1A0910);
   box-shadow:0 0 0 1px rgba(232,193,112,.25),0 14px 30px rgba(0,0,0,.4);transition:transform .2s,box-shadow .2s}
 .lt:hover{transform:translateY(-3px);box-shadow:0 0 0 1px var(--gold-dim),0 20px 40px rgba(0,0,0,.5),0 0 30px rgba(232,193,112,.12)}
 .lt .ic{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;flex:none;font-size:28px}
 .lt .ic.bj{background:radial-gradient(circle at 40% 30%,#1B4D57,#0A2227);color:#F0CD85}
+.lt .ic.pk{background:radial-gradient(circle at 40% 30%,#1C6B45,#0A2E1D);color:#F7F2E7}
 .lt .ic.rl{background:radial-gradient(circle at 40% 30%,#1D2230,#08090E);color:#FFD447}
 .lt .tx{flex:1;min-width:0}
 .lt h3{margin:0;font:400 22px/1.15 var(--display);color:var(--ivory)}
@@ -290,7 +291,7 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
 
   <section class="live-sec" id="liveSec" hidden aria-labelledby="liveTitle">
     <div class="head">
-      <div><div class="eyebrow">Play together</div><h2 id="liveTitle">Live tables</h2><p>Sit down with everyone online right now. One dealer, one wheel, same cards for all.</p></div>
+      <div><div class="eyebrow">Play together</div><h2 id="liveTitle">Live tables</h2><p>Sit down with everyone online right now. One dealer, one wheel, one poker table, same cards for all.</p></div>
       <div class="live" id="liveNow"><i></i><span>Open</span></div>
     </div>
     <div class="lives">
@@ -302,6 +303,11 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
       <a class="lt" href="roulette-live.html">
         <div class="ic rl"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" fill="currentColor"/></svg></div>
         <div class="tx"><h3>Voltage Roulette Live</h3><div class="now" id="ltRl">Shared wheel · open</div></div>
+        <span class="play">Join</span>
+      </a>
+      <a class="lt" href="poker-live.html">
+        <div class="ic pk">&#9827;&#xFE0E;</div>
+        <div class="tx"><h3>Hold'em Live</h3><div class="now" id="ltPk">6 seats · $5/$10 no limit</div><div class="seatdots" id="ltPkDots"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
         <span class="play">Join</span>
       </a>
     </div>
@@ -443,7 +449,7 @@ window.CasinoBoard = (() => {
     const bst = bj.stats || {}, rst = rl.stats || {}, cst = cr.stats || {}, lv = get('miguels-live-stats') || {};
     let joined = 0;
     try { joined = +localStorage.getItem(JOIN_KEY) || 0; if (!joined) { joined = Date.now(); localStorage.setItem(JOIN_KEY, String(joined)); } } catch (e) { joined = Date.now(); }
-    const cash = w.cents + riding;
+    const cash = w.cents + riding + Math.max(0, +get('miguels-live-poker-stack') || 0);
     return {
       name: n.slice(0, 18),
       cash, peak: Math.max(w.peak || 0, cash), resets: w.resets || 0,
@@ -720,6 +726,7 @@ window.CasinoBoard = (() => {
           const s = await (await fetch('api/live/summary', { cache: 'no-store' })).json();
           $('ltBj').innerHTML = s.bj.seated ? `<b>${s.bj.seated} of 5 seats taken</b> · ${PH[s.bj.phase] || ''}` : '5 seats · all open';
           [...$('ltBjDots').children].forEach((d, i) => d.classList.toggle('on', i < s.bj.seated));
+          if (s.pk) { $('ltPk').innerHTML = s.pk.seated ? `<b>${s.pk.seated} of 6 seats taken</b> · ${['waiting'].includes(s.pk.street) ? 'waiting for players' : 'hand in progress'}` : '6 seats · $5/$10 no limit'; [...$('ltPkDots').children].forEach((d, i) => d.classList.toggle('on', i < s.pk.seated)); }
           $('ltRl').innerHTML = s.rl.players ? `<b>${s.rl.players} at the wheel</b> · ${PH[s.rl.phase] || ''}` : 'Shared wheel · nobody yet';
         } catch (e) {}
       };

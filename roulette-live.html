@@ -454,7 +454,7 @@ window.CasinoBoard = (() => {
     const bst = bj.stats || {}, rst = rl.stats || {}, cst = cr.stats || {}, lv = get('miguels-live-stats') || {};
     let joined = 0;
     try { joined = +localStorage.getItem(JOIN_KEY) || 0; if (!joined) { joined = Date.now(); localStorage.setItem(JOIN_KEY, String(joined)); } } catch (e) { joined = Date.now(); }
-    const cash = w.cents + riding;
+    const cash = w.cents + riding + Math.max(0, +get('miguels-live-poker-stack') || 0);
     return {
       name: n.slice(0, 18),
       cash, peak: Math.max(w.peak || 0, cash), resets: w.resets || 0,
