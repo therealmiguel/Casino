@@ -6,7 +6,8 @@ What's in this folder
   live.js        the live tables: shared blackjack (5 seats) and roulette
   poker.js       the live Texas Hold'em table (6 seats, no limit)
   package.json   tells the hosting service how to start the server
-  public/        the casino itself (lobby, blackjack, roulette, craps and
+  public/        the casino itself (lobby, blackjack, roulette, craps, the
+                 Dynamite Diggers slot and
                  the three live tables)
 
 You need three free accounts. It takes about 20 minutes the first time.
@@ -37,7 +38,7 @@ STEP 2: GITHUB (where the files live)
      .html files in directly instead. The server finds them either way.
   4. Click "Commit changes".
   5. Check the file list on GitHub: you should see server.js, live.js, poker.js and
-     index.html, blackjack.html, roulette.html, craps.html,
+     index.html, blackjack.html, roulette.html, craps.html, slots.html,
      blackjack-live.html, roulette-live.html, poker-live.html (either inside public/ or on
      their own).
 

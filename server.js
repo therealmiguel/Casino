@@ -15,7 +15,7 @@ const crypto = require('crypto');
 const PORT = Number(process.env.PORT) || 3000;
 // Find the casino pages: normally in public/, but also works when they were uploaded
 // next to server.js or inside an extra folder (GitHub's upload page sometimes does that).
-const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html'];
+const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
   const preferred = [path.join(__dirname, 'public'), __dirname];
