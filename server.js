@@ -13,7 +13,40 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
-const PUBLIC_DIR = path.join(__dirname, 'public');
+// Find the casino pages: normally in public/, but also works when they were uploaded
+// next to server.js or inside an extra folder (GitHub's upload page sometimes does that).
+const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html'];
+function findPublicDir() {
+  const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
+  const preferred = [path.join(__dirname, 'public'), __dirname];
+  for (const d of preferred) if (hasPages(d)) return d;
+  const queue = [[__dirname, 0]];
+  while (queue.length) {
+    const [dir, depth] = queue.shift();
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { continue; }
+    for (const e of entries) {
+      if (!e.isDirectory() || e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      const sub = path.join(dir, e.name);
+      if (hasPages(sub)) return sub;
+      if (depth < 3) queue.push([sub, depth + 1]);
+    }
+  }
+  return null;
+}
+function listFiles(dir, depth = 0, out = []) {
+  let entries = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return out; }
+  for (const e of entries) {
+    if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+    const full = path.join(dir, e.name), rel = path.relative(__dirname, full) || e.name;
+    if (e.isDirectory()) { out.push(rel + '/'); if (depth < 3) listFiles(full, depth + 1, out); }
+    else out.push(rel);
+    if (out.length > 60) break;
+  }
+  return out;
+}
+const PUBLIC_DIR = findPublicDir();
 const REDIS_URL = (process.env.UPSTASH_REDIS_REST_URL || '').replace(/\/+$/, '');
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || '';
 const USE_REDIS = Boolean(REDIS_URL && REDIS_TOKEN);
@@ -136,11 +169,28 @@ async function handleUpdate(req, res) {
   broadcast();
   send(res, 200, { ok: true });
 }
+function missingPagesPage(res) {
+  const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+  const files = listFiles(__dirname);
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Miguel's Casino setup</title>
+<style>body{margin:0;background:#16080E;color:#F5EBDD;font:16px/1.6 system-ui,sans-serif;padding:32px 20px}main{max-width:640px;margin:0 auto}h1{color:#F7DFA3;font-size:26px;margin:0 0 8px}
+code,li{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px}ul{background:#0B0407;border-radius:12px;padding:14px 14px 14px 34px}b{color:#F7DFA3}</style></head><body><main>
+<h1>The server is running, but the casino pages are missing</h1>
+<p>It looked for <b>index.html</b> (plus blackjack.html, roulette.html and craps.html) and couldn't find them. Upload those four files to your GitHub repository, either inside a folder named <b>public</b> or next to server.js. Render updates the site by itself a minute later.</p>
+<p>Files the server can see right now:</p><ul>${files.length ? files.map(f => `<li>${esc(f)}</li>`).join('') : '<li>(none)</li>'}</ul>
+</main></body></html>`;
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(html);
+}
 function serveFile(req, res, urlPath) {
+  if (!PUBLIC_DIR) return missingPagesPage(res);
   let rel = decodeURIComponent(urlPath);
   if (rel === '/' || rel === '') rel = '/index.html';
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
-  if (!file.startsWith(PUBLIC_DIR + path.sep)) return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
+  // only web pages and images, never the server's own files or the saved leaderboard
+  const allowed = /\.(html|css|svg|png|jpe?g|webp|ico)$/i.test(file);
+  const inData = file.startsWith(path.resolve(DATA_DIR) + path.sep);
+  if (!file.startsWith(PUBLIC_DIR + path.sep) || !allowed || inData) return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
   fs.readFile(file, (err, buf) => {
     if (err) return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
@@ -151,7 +201,11 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     const p = url.pathname;
-    if (p === '/api/health') return send(res, 200, { ok: true, storage: USE_REDIS ? 'upstash' : 'file', players: players.size });
+    if (p === '/api/health') return send(res, 200, {
+      ok: true, storage: USE_REDIS ? 'upstash' : 'file', players: players.size,
+      pagesFolder: PUBLIC_DIR ? (path.relative(__dirname, PUBLIC_DIR) || '(next to server.js)') : 'NOT FOUND',
+      pages: PAGES.map(f => `${f}: ${PUBLIC_DIR && fs.existsSync(path.join(PUBLIC_DIR, f)) ? 'found' : 'missing'}`),
+    });
     if (p === '/api/players' && req.method === 'GET') return send(res, 200, publicList());
     if (p === '/api/players' && req.method === 'POST') return handleUpdate(req, res);
     if (p === '/api/stream') {
@@ -181,5 +235,6 @@ load()
   .catch(e => console.error('Could not load the saved leaderboard:', e.message))
   .finally(() => server.listen(PORT, '0.0.0.0', () => {
     console.log(`Miguel's Casino is open on http://localhost:${PORT}`);
-    console.log(`Leaderboard saved in ${USE_REDIS ? 'Upstash Redis' : DATA_FILE} · ${players.size} player${players.size === 1 ? "" : "s"} loaded`);
+    console.log(PUBLIC_DIR ? `Casino pages found in ${PUBLIC_DIR}` : 'WARNING: casino pages not found. Upload index.html, blackjack.html, roulette.html and craps.html.');
+    console.log(`Leaderboard saved in ${USE_REDIS ? 'Upstash Redis' : DATA_FILE} Â· ${players.size} player${players.size === 1 ? "" : "s"} loaded`);
   }));
