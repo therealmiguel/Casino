@@ -1,0 +1,13 @@
+{
+  "name": "miguels-casino",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Miguel's Casino: blackjack, lightning roulette and bubble craps with a shared bankroll and a live leaderboard.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
