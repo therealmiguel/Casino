@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Voltage Roulette</title>
+<title>Voltage Roulette Live</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Figtree:wght@400;500;600;700;800&family=Chivo+Mono:wght@500;700&display=swap">
@@ -265,6 +265,18 @@ kbd{font:600 10px var(--mono);padding:2px 5px;border-radius:5px;background:rgba(
 .lobbylink:hover{background:rgba(232,193,112,.14)}
 .lobbylink svg{width:15px;height:15px}
 @media (max-width:640px){.lobbylink span{display:none}.lobbylink{padding:0 9px}}
+.atwheel{display:flex;flex-direction:column;gap:8px;width:100%;max-width:390px}
+.atwheel .row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.pl{display:inline-flex;align-items:center;gap:7px;padding:5px 10px 5px 5px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line-2);font-size:12.5px;max-width:100%}
+.pl i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:800 11px var(--body);font-style:normal;color:#14161C;flex:none}
+.pl b{font-weight:700;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl span{font:700 12px var(--mono);color:var(--muted)}
+.pl.me{border-color:var(--volt)}
+.pl .up{color:var(--win)} .pl .down{color:var(--lose)}
+.livebadge{display:inline-flex;align-items:center;gap:6px;color:var(--win)!important}
+.livebadge::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--win);box-shadow:0 0 8px var(--win)}
+.spin.count{font-size:11.5px;line-height:1.15}
+.spin.count b{display:block;font-size:22px}
 </style>
 </head>
 <body>
@@ -273,7 +285,7 @@ kbd{font:600 10px var(--mono);padding:2px 5px;border-radius:5px;background:rgba(
     <a href="index.html" class="lobbylink" title="Back to Miguel's Casino" aria-label="Back to Miguel's Casino lobby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Lobby</span></a>
     <div class="brand">
       <span class="mark"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></span>
-      <span class="bname">Voltage</span><small>Roulette</small>
+      <span class="bname">Voltage</span><small class="livebadge">Live table</small>
     </div>
     <div class="meters">
       <div class="meter"><span class="label">Balance</span><span class="val" id="mBal">$1,000</span></div>
@@ -297,6 +309,7 @@ kbd{font:600 10px var(--mono);padding:2px 5px;border-radius:5px;background:rgba(
         </div>
         <div class="lightbar" id="lightbar"></div>
         <div class="histwrap"><span class="label">Last results</span><div class="hist" id="hist"></div></div>
+        <div class="atwheel" id="atWheel"></div>
       </section>
       <section class="boardcol">
         <div class="callbar">
@@ -568,7 +581,7 @@ S.balance = CasinoWallet.cents() / 100;
   const saveTable = save;
   save = function () { saveTable(); CasinoWallet.sync(); };
   CasinoWallet.bind(
-    () => Math.round((S.balance + totalBet()) * 100),
+    () => Math.round(S.balance * 100),   // live: chips on the table are already with the dealer
     d => { S.balance = Math.max(0, Math.round((S.balance + d / 100) * 100) / 100); render(); }
   );
 }
@@ -907,6 +920,7 @@ function endRound() {
 }
 function onSpinBtn() {
   unlockAudio();
+  if (typeof Live !== 'undefined') { toast('The wheel spins for everyone', 'It spins by itself when the betting timer runs out', 'dim'); return; }
   if (S.autoLeft > 0) { S.autoLeft = 0; toast('Auto play stopped', 'Finishing this spin', 'dim'); render(); return; }
   if (S.phase === 'result') { endRound(); if (!S.bets.size) rebet(); if (S.bets.size) spin(); return; }
   if (S.phase !== 'bet') return;
@@ -1308,7 +1322,7 @@ function renderDock() {
   board.classList.toggle('locked', !bet);
   board.classList.toggle('nb', S.nbMode);
 }
-function render() { renderHeader(); renderChips(); renderLightbar(); renderHist(); renderStatus(); renderDock(); }
+function render() { renderHeader(); renderChips(); renderLightbar(); renderHist(); renderStatus(); renderDock(); if (typeof Live !== 'undefined') Live.dock(); }
 
 /* ---------------- sheets ---------------- */
 let sheetOpen = null, confirmReset = false;
@@ -1476,6 +1490,174 @@ function onResize() {
 addEventListener('resize', onResize);
 if (window.ResizeObserver) { new ResizeObserver(onResize).observe($('#wheelwrap')); new ResizeObserver(() => sizeBoard()).observe(board); }
 
+
+/* ---------------- live table (shared wheel on the casino server) ---------------- */
+const Live = (() => {
+  const store = { get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+  const applied = new Set(store.get('miguels-live-applied', []));
+  const saveApplied = () => store.set('miguels-live-applied', [...applied].slice(-300));
+  let st = null, offset = 0, me = null, pname = '', lastSent = '', sendTimer = null, sending = false, lastSpun = 0, first = true, claiming = false, connected = false;
+  const COLORS = ['#E8C170', '#E07A5F', '#81B29A', '#9C89B8', '#F2CC8F', '#6FB1D6', '#E5989B', '#B5E48C'];
+  const tint = s => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
+  const left = () => (st && st.deadline ? Math.max(0, st.deadline - (Date.now() + offset)) : 0);
+  const canon = o => JSON.stringify(Object.keys(o).sort().reduce((a, k) => { a[k] = o[k]; return a; }, {}));
+  const open = () => connected && st && st.phase === 'betting' && left() > 700 && S.phase === 'bet';
+  function closedMsg() {
+    if (!connected) return 'Connecting to the wheel…';
+    if (st && (st.phase === 'spinning' || st.phase === 'result')) return 'No more bets. The next round opens in a moment.';
+    return 'Bets are closed. The next round opens in a moment.';
+  }
+  function queueSend() { clearTimeout(sendTimer); sendTimer = setTimeout(send, 220); }
+  async function send() {
+    if (!me) return;
+    const bets = {}; for (const [k, v] of S.bets) bets[k] = Math.round(v * 100);
+    const body = canon(bets);
+    if (body === lastSent) return;
+    if (sending) { queueSend(); return; }
+    sending = true;
+    try {
+      const r = await fetch('api/live/rl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: me.id, token: me.token, name: pname, action: 'bets', bets }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) lastSent = body;
+      else toast(r.status === 409 ? 'Bets are closed' : (j.error || 'Bet not accepted'), 'Chips that missed the cut-off come back to you', 'dim');
+    } catch (e) { toast('No connection to the wheel', 'Chips that do not reach the table come back to you', 'dim'); }
+    sending = false;
+  }
+  // bets the server never received are refunded before the spin
+  function reconcile(serverBets) {
+    let refund = 0;
+    for (const [k, v] of [...S.bets]) {
+      const a = (serverBets[k] || 0) / 100;
+      if (a < v) { refund += v - a; if (a > 0) S.bets.set(k, a); else S.bets.delete(k); }
+    }
+    if (refund > 0) { S.balance = Math.round((S.balance + refund) * 100) / 100; toast('Some chips came back', `${fmt(refund)} arrived after bets closed`, 'dim'); }
+  }
+  async function spinRound(round) {
+    lastSpun = round.roundId;
+    if (S.phase === 'result') endRound();
+    reconcile(round.me.bets || {});
+    const staked = totalBet();
+    if (staked) { S.lastBets = Object.fromEntries(S.bets); S.stats.spins++; S.stats.wagered += staked; }
+    S.phase = 'strike'; S.undo = []; S.nbMode = false; setHover(null);
+    S.strikes = round.strikes.map(x => ({ n: x.n, m: x.m }));
+    $('#result').hidden = true;
+    render(); save();
+    await sleep(350);
+    for (const s of S.strikes) { strike(s); await sleep(650); }
+    await sleep(400);
+    S.phase = 'spin'; render();
+    await spinTo(round.n);
+    applied.add('rl-' + round.roundId); saveApplied();
+    settle(round.n, staked);
+    if (staked) {
+      const ls = store.get('miguels-live-stats', { hands: 0, spins: 0, bigWin: 0 });
+      ls.spins = (ls.spins || 0) + 1;
+      ls.bigWin = Math.max(ls.bigWin || 0, Math.round((S.lastWin - staked) * 100));
+      store.set('miguels-live-stats', ls);
+    }
+    lastSent = '';
+    claim();
+  }
+  async function claim() {
+    if (!st || claiming || !me) return;
+    const list = st.me.unclaimed || [];
+    const ids = [];
+    let credited = 0;
+    for (const e of list) {
+      if (e.id === 'rl-' + lastSpun && !applied.has(e.id)) continue;   // still on the wheel here
+      if (!applied.has(e.id)) { applied.add(e.id); credited += e.payout; }
+      ids.push(e.id);
+    }
+    if (credited) { S.balance = Math.round((S.balance + credited / 100) * 100) / 100; saveApplied(); render(); save(); toast(`${fmt(credited / 100)} paid out`, 'From a spin that finished while you were away', 'win'); }
+    if (!ids.length) return;
+    claiming = true;
+    try { await fetch('api/live/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: me.id, token: me.token, ids }) }); } catch (e) {}
+    claiming = false;
+  }
+  function onState(next) {
+    st = next; offset = st.now - Date.now(); connected = true;
+    S.settings.mode = 'lightning'; S.settings.turbo = false; S.auto = 0; S.autoLeft = 0;
+    if (first) {
+      first = false;
+      const mine = st.me.bets || {};
+      if ((st.phase === 'betting' || st.phase === 'spinning') && !S.bets.size && Object.keys(mine).length) {
+        S.bets = new Map(Object.entries(mine).map(([k, v]) => [k, v / 100]));
+        lastSent = canon(mine);
+      }
+      if (st.history.length) { S.hist = st.history.map(h => ({ n: h.n, m: h.m })); }
+    }
+    if (st.phase === 'spinning' && st.roundId !== lastSpun && (S.phase === 'bet' || S.phase === 'result')) spinRound(st);
+    else if (st.phase === 'betting' && S.phase === 'result') endRound();
+    if (st.phase === 'result' && st.history.length) {
+      const h = st.history[st.history.length - 1];
+      if (!S.hist.length || S.hist[S.hist.length - 1].n !== h.n || S.phase === 'bet') { /* history is synced when this page spun it */ }
+    }
+    claim();
+    renderPlayers();
+    render();
+  }
+  function renderPlayers() {
+    const box = $('#atWheel');
+    if (!box || !st) return;
+    box.innerHTML = '';
+    const lab = document.createElement('span'); lab.className = 'label'; lab.style.textAlign = 'center';
+    lab.textContent = `At the wheel · ${st.players.length}`;
+    const row = document.createElement('div'); row.className = 'row';
+    st.players.forEach(p => {
+      const el = document.createElement('span'); el.className = 'pl' + (p.me ? ' me' : '');
+      const i = document.createElement('i'); i.style.background = tint(p.name); i.textContent = p.name.slice(0, 1).toUpperCase();
+      const b = document.createElement('b'); b.textContent = p.me ? 'You' : p.name;
+      const v = document.createElement('span');
+      if (p.net !== null && p.net !== undefined) { v.textContent = fmt(p.net / 100, true); v.className = p.net > 0 ? 'up' : p.net < 0 ? 'down' : ''; }
+      else v.textContent = p.bet ? fmt(p.bet / 100) : '—';
+      el.append(i, b, v); row.appendChild(el);
+    });
+    box.append(lab, row);
+  }
+  function dock() {
+    const sp = $('#bSpin'), au = $('#bAuto');
+    au.disabled = true; au.textContent = 'Live table';
+    sp.classList.remove('stop', 'small'); sp.classList.add('count'); sp.disabled = true;
+    const secs = Math.ceil(left() / 1000);
+    if (!connected) sp.innerHTML = 'LIVE';
+    else if (st.phase === 'betting') sp.innerHTML = `BETS CLOSE<b>${secs}</b>`;
+    else if (st.phase === 'spinning') sp.innerHTML = 'NO MORE<b>BETS</b>';
+    else if (st.phase === 'result') sp.innerHTML = `NEXT ROUND<b>${secs}</b>`;
+    else sp.innerHTML = 'PLACE A<b>BET</b>';
+    if (!S.hover && !S.nbMode && S.phase === 'bet') {
+      const n = st ? st.players.length : 0;
+      const status = $('#status');
+      if (!connected) status.textContent = 'Connecting to the live wheel…';
+      else if (st.phase === 'betting') status.innerHTML = `<span class="livebadge">Live</span> · bets close in <b>${secs}s</b> · ${n} at the wheel` + (S.bets.size ? ` · your bet <b>${fmt(totalBet())}</b>` : '');
+      else if (st.phase === 'idle') status.innerHTML = '<span class="livebadge">Live</span> · place a bet to start the countdown';
+      else status.innerHTML = '<span class="livebadge">Live</span> · the next round opens in a moment';
+    }
+    board.classList.toggle('locked', S.phase !== 'bet' || !open());
+  }
+  setInterval(() => { if (st) dock(); }, 250);
+  async function start() {
+    pname = CasinoBoard.name();
+    if (!pname) { location.href = 'index.html'; return; }
+    const ok = await CasinoBoard.connect();
+    if (!ok || CasinoBoard.mode !== 'server' || !window.EventSource) {
+      $('#status').textContent = 'Live roulette runs on the online casino server. Head back to the lobby to play the regular table.';
+      return;
+    }
+    me = CasinoBoard.identity();
+    const es = new EventSource(`api/live/stream?game=rl&id=${encodeURIComponent(me.id)}&token=${encodeURIComponent(me.token)}&name=${encodeURIComponent(pname)}`);
+    es.addEventListener('state', e => onState(JSON.parse(e.data)));
+    es.onerror = () => { connected = false; };
+    CasinoBoard.push();
+  }
+  return { open, closedMsg, queueSend, dock, start };
+})();
+{
+  const saveLive = save;
+  save = function () { saveLive(); if (S.phase === 'bet') Live.queueSend(); };
+  const placeLocal = place;
+  place = function (list, label) { if (!Live.open()) { toast(Live.closedMsg(), '', 'dim'); return false; } return placeLocal(list, label); };
+}
+
 /* ---------------- boot ---------------- */
 for (const c of Object.values(CALL)) for (const [t, n] of c.parts) if (!SPOT.has(key(t, n))) console.warn('Missing spot', t, n);
 buildBoard();
@@ -1485,6 +1667,7 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { bu
 if (S.hist.length) { const last = S.hist[S.hist.length - 1]; W.ballOn = true; W.rel = IDX.get(last.n) * SEG - Math.PI / 2; }
 render();
 requestAnimationFrame(frame);
+Live.start();
 })();
 </script>
 </body>

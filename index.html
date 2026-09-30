@@ -69,6 +69,26 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
 .note b{color:var(--ivory);font-weight:500}
 
 
+/* ---------- live tables ---------- */
+.live-sec{margin-top:40px}
+.live-sec .head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.live-sec h2{margin:6px 0 0;font:400 clamp(30px,5vw,44px)/1 var(--display);color:var(--gold-2)}
+.live-sec p{margin:6px 0 0;color:var(--muted);font-size:14.5px}
+.lives{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.lt{display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:18px;text-decoration:none;color:inherit;background:linear-gradient(135deg,#27101A,#1A0910);
+  box-shadow:0 0 0 1px rgba(232,193,112,.25),0 14px 30px rgba(0,0,0,.4);transition:transform .2s,box-shadow .2s}
+.lt:hover{transform:translateY(-3px);box-shadow:0 0 0 1px var(--gold-dim),0 20px 40px rgba(0,0,0,.5),0 0 30px rgba(232,193,112,.12)}
+.lt .ic{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;flex:none;font-size:28px}
+.lt .ic.bj{background:radial-gradient(circle at 40% 30%,#1B4D57,#0A2227);color:#F0CD85}
+.lt .ic.rl{background:radial-gradient(circle at 40% 30%,#1D2230,#08090E);color:#FFD447}
+.lt .tx{flex:1;min-width:0}
+.lt h3{margin:0;font:400 22px/1.15 var(--display);color:var(--ivory)}
+.lt .now{margin-top:4px;font-size:13.5px;color:var(--muted)}
+.lt .now b{color:#8EF0B4;font-weight:600}
+.seatdots{display:flex;gap:5px;margin-top:8px}
+.seatdots i{width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
+.seatdots i.on{background:#E8C170;box-shadow:0 0 8px rgba(232,193,112,.6)}
+@media (max-width:760px){ .lives{grid-template-columns:minmax(0,1fr)} }
 /* ---------- leaderboard ---------- */
 .board{margin-top:56px;padding:28px 26px 26px;border-radius:26px;position:relative;overflow:hidden;
   background:radial-gradient(120% 90% at 50% 0%,#2E0F1B 0%,#1C0910 60%,#150710 100%);box-shadow:0 0 0 1px rgba(232,193,112,.22),0 24px 60px rgba(0,0,0,.5)}
@@ -268,6 +288,25 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
   </main>
 
 
+  <section class="live-sec" id="liveSec" hidden aria-labelledby="liveTitle">
+    <div class="head">
+      <div><div class="eyebrow">Play together</div><h2 id="liveTitle">Live tables</h2><p>Sit down with everyone online right now. One dealer, one wheel, same cards for all.</p></div>
+      <div class="live" id="liveNow"><i></i><span>Open</span></div>
+    </div>
+    <div class="lives">
+      <a class="lt" href="blackjack-live.html">
+        <div class="ic bj">&#9824;&#xFE0E;</div>
+        <div class="tx"><h3>Brass Table Live</h3><div class="now" id="ltBj">5 seats · open</div><div class="seatdots" id="ltBjDots"><i></i><i></i><i></i><i></i><i></i></div></div>
+        <span class="play">Join</span>
+      </a>
+      <a class="lt" href="roulette-live.html">
+        <div class="ic rl"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" fill="currentColor"/></svg></div>
+        <div class="tx"><h3>Voltage Roulette Live</h3><div class="now" id="ltRl">Shared wheel · open</div></div>
+        <span class="play">Join</span>
+      </a>
+    </div>
+  </section>
+
   <section class="board" aria-labelledby="boardTitle">
     <div class="board-head">
       <div>
@@ -401,15 +440,15 @@ window.CasinoBoard = (() => {
     const w = CasinoWallet.info();
     const bj = get('brass-table-blackjack-v1') || {}, rl = get('voltage-roulette-v1') || {}, cr = get('bubble-dome-craps-v1') || {};
     const riding = cr.bets ? Object.values(cr.bets).reduce((a, b) => a + (+b || 0), 0) : 0;
-    const bst = bj.stats || {}, rst = rl.stats || {}, cst = cr.stats || {};
+    const bst = bj.stats || {}, rst = rl.stats || {}, cst = cr.stats || {}, lv = get('miguels-live-stats') || {};
     let joined = 0;
     try { joined = +localStorage.getItem(JOIN_KEY) || 0; if (!joined) { joined = Date.now(); localStorage.setItem(JOIN_KEY, String(joined)); } } catch (e) { joined = Date.now(); }
     const cash = w.cents + riding;
     return {
       name: n.slice(0, 18),
       cash, peak: Math.max(w.peak || 0, cash), resets: w.resets || 0,
-      hands: bst.hands || 0, spins: rst.spins || 0, rolls: cst.rolls || 0,
-      bigWin: Math.max(Math.round((bst.bestWin || 0) * 100), Math.round((rst.biggestWin || 0) * 100), cst.bigWin || 0),
+      hands: (bst.hands || 0) + (lv.hands || 0), spins: (rst.spins || 0) + (lv.spins || 0), rolls: cst.rolls || 0,
+      bigWin: Math.max(Math.round((bst.bestWin || 0) * 100), Math.round((rst.biggestWin || 0) * 100), cst.bigWin || 0, lv.bigWin || 0),
       blackjacks: bst.blackjacks || 0, bestMult: rst.bestMult || 0, pointsMade: cst.made || 0,
       joined,
     };
@@ -462,7 +501,8 @@ window.CasinoBoard = (() => {
     }
     return () => {};
   }
-  return { name, setName, connect, push, schedule, snapshot, subscribe, get db() { return db; }, get uid() { return uid; }, get mode() { return mode; }, get denied() { return denied; } };
+  const identity = () => seat();
+  return { name, setName, connect, push, schedule, snapshot, subscribe, identity, get db() { return db; }, get uid() { return uid; }, get mode() { return mode; }, get denied() { return denied; } };
 })();
 </script>
 <script>
@@ -671,6 +711,20 @@ window.CasinoBoard = (() => {
       $('liveTxt').textContent = 'Offline'; renderBoard(); return;
     }
     connected = true;
+    if (CasinoBoard.mode === 'server') {
+      $('liveSec').hidden = false;
+      const PH = { waiting: 'waiting for bets', betting: 'taking bets', playing: 'hand in progress', dealer: 'dealer playing', settle: 'paying out', idle: 'waiting for players', spinning: 'wheel spinning', result: 'paying out' };
+      const poll = async () => {
+        if (document.hidden) return;
+        try {
+          const s = await (await fetch('api/live/summary', { cache: 'no-store' })).json();
+          $('ltBj').innerHTML = s.bj.seated ? `<b>${s.bj.seated} of 5 seats taken</b> · ${PH[s.bj.phase] || ''}` : '5 seats · all open';
+          [...$('ltBjDots').children].forEach((d, i) => d.classList.toggle('on', i < s.bj.seated));
+          $('ltRl').innerHTML = s.rl.players ? `<b>${s.rl.players} at the wheel</b> · ${PH[s.rl.phase] || ''}` : 'Shared wheel · nobody yet';
+        } catch (e) {}
+      };
+      poll(); setInterval(poll, 5000);
+    }
     if (CasinoBoard.mode === 'claude') { try { userNs = await claude.use('user'); } catch (e) { userNs = null; } }
     $('live').classList.remove('off'); $('liveTxt').textContent = 'Live';
     await CasinoBoard.push();

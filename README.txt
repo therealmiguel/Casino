@@ -3,8 +3,10 @@ MIGUEL'S CASINO: PUTTING IT ON THE INTERNET
 
 What's in this folder
   server.js      the server: shows the casino and keeps the live leaderboard
+  live.js        the live tables: shared blackjack (5 seats) and roulette
   package.json   tells the hosting service how to start the server
-  public/        the casino itself (lobby, blackjack, roulette, craps)
+  public/        the casino itself (lobby, blackjack, roulette, craps and
+                 the two live tables)
 
 You need three free accounts. It takes about 20 minutes the first time.
   Upstash  keeps the leaderboard saved
@@ -28,10 +30,15 @@ STEP 2: GITHUB (where the files live)
   2. Click "New repository". Name it miguels-casino and click
      "Create repository".
   3. Click "uploading an existing file". Drag in everything inside this
-     folder: server.js, package.json, README.txt and the public folder.
-     Check that the list shows public/index.html, public/blackjack.html,
-     public/roulette.html and public/craps.html.
+     folder: server.js, live.js, package.json, README.txt and the public
+     folder.
+     If the public folder doesn't come through, open it and drag the four
+     .html files in directly instead. The server finds them either way.
   4. Click "Commit changes".
+  5. Check the file list on GitHub: you should see server.js, live.js and
+     index.html, blackjack.html, roulette.html, craps.html,
+     blackjack-live.html, roulette-live.html (either inside public/ or on
+     their own).
 
 
 STEP 3: RENDER (puts it online)
@@ -53,7 +60,8 @@ STEP 3: RENDER (puts it online)
 
 CHECK IT WORKS
   Open  https://YOUR-ADDRESS/api/health
-  You should see  "ok":true  and  "storage":"upstash".
+  You should see  "ok":true,  "storage":"upstash"  and all four pages
+  marked "found". If a page says "missing", upload that file to GitHub.
   If it says "file" instead, the two Upstash values are missing or
   misspelled in Render's Environment Variables; fix them and redeploy.
 
@@ -67,6 +75,9 @@ GOOD TO KNOW
     they start a new seat.
   - To change the casino later, upload the new files to the same GitHub
     repository. Render updates the site automatically.
+  - Live tables: a hand or spin that is in progress when the server
+    restarts (for example during an update) is cancelled, and the chips
+    on it are lost. Update the site when nobody is mid-hand.
 
 
 PLAY ON YOUR OWN COMPUTER INSTEAD

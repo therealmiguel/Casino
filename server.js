@@ -15,7 +15,7 @@ const crypto = require('crypto');
 const PORT = Number(process.env.PORT) || 3000;
 // Find the casino pages: normally in public/, but also works when they were uploaded
 // next to server.js or inside an extra folder (GitHub's upload page sometimes does that).
-const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html'];
+const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'blackjack-live.html', 'roulette-live.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
   const preferred = [path.join(__dirname, 'public'), __dirname];
@@ -126,6 +126,19 @@ function sanitize(b) {
 const publicList = () => [...players.entries()].map(([id, p]) => Object.assign({ id }, p.data)).sort((a, b) => b.cash - a.cash);
 const hash = t => crypto.createHash('sha256').update(String(t)).digest('hex');
 
+/* ---------------- live tables ---------------- */
+// the same browser seat (id + secret token) is used for the leaderboard and the live tables
+const liveAuth = new Map();
+function checkToken(id, token) {
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(id) || token.length < 16 || token.length > 128) return false;
+  const known = players.has(id) ? players.get(id).tokenHash : liveAuth.get(id);
+  if (known) return known === hash(token);
+  liveAuth.set(id, hash(token));
+  return true;
+}
+const cleanName = n => String(n || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18) || 'Player';
+const live = require('./live')({ checkToken, cleanName });
+
 /* ---------------- live updates (server-sent events) ---------------- */
 const streams = new Set();
 let broadcastTimer = null;
@@ -162,6 +175,7 @@ async function handleUpdate(req, res) {
   if (now - (lastWrite.get(id) || 0) < MIN_WRITE_GAP_MS) return send(res, 429, { error: 'Too many updates. Try again in a second.' });
   const existing = players.get(id);
   if (existing && existing.tokenHash !== hash(token)) return send(res, 403, { error: 'This seat belongs to another browser.' });
+  if (!existing && liveAuth.has(id) && liveAuth.get(id) !== hash(token)) return send(res, 403, { error: 'This seat belongs to another browser.' });
   if (!existing && players.size >= MAX_PLAYERS) return send(res, 507, { error: 'The leaderboard is full.' });
   lastWrite.set(id, now);
   players.set(id, { tokenHash: hash(token), data: sanitize(body) });
@@ -199,7 +213,7 @@ function serveFile(req, res, urlPath) {
 }
 const server = http.createServer(async (req, res) => {
   try {
-    const url = new URL(req.url, 'http://localhost');
+    const url = new URL(String(req.url || '/').replace(/^\/+/, '/'), 'http://localhost');
     const p = url.pathname;
     if (p === '/api/health') return send(res, 200, {
       ok: true, storage: USE_REDIS ? 'upstash' : 'file', players: players.size,
@@ -214,6 +228,14 @@ const server = http.createServer(async (req, res) => {
       streams.add(res);
       req.on('close', () => streams.delete(res));
       return;
+    }
+    if (p === '/api/live/stream') return live.stream(req, res, url);
+    if (p === '/api/live/summary') return send(res, 200, live.summary());
+    if ((p === '/api/live/bj' || p === '/api/live/rl' || p === '/api/live/claim') && req.method === 'POST') {
+      let body;
+      try { body = JSON.parse(await readBody(req)); } catch (e) { return send(res, 400, { error: 'Send JSON.' }); }
+      const r = p === '/api/live/claim' ? live.claim(body) : live.action(p.endsWith('bj') ? 'bj' : 'rl', body);
+      return send(res, r.code, r.body);
     }
     if (p.startsWith('/api/')) return send(res, 404, { error: 'Unknown address.' });
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed', 'text/plain; charset=utf-8');
@@ -236,5 +258,5 @@ load()
   .finally(() => server.listen(PORT, '0.0.0.0', () => {
     console.log(`Miguel's Casino is open on http://localhost:${PORT}`);
     console.log(PUBLIC_DIR ? `Casino pages found in ${PUBLIC_DIR}` : 'WARNING: casino pages not found. Upload index.html, blackjack.html, roulette.html and craps.html.');
-    console.log(`Leaderboard saved in ${USE_REDIS ? 'Upstash Redis' : DATA_FILE} Â· ${players.size} player${players.size === 1 ? "" : "s"} loaded`);
+    console.log(`Leaderboard saved in ${USE_REDIS ? 'Upstash Redis' : DATA_FILE} · ${players.size} player${players.size === 1 ? "" : "s"} loaded`);
   }));
