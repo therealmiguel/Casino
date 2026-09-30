@@ -72,6 +72,8 @@ function describe(r) {
 /* ================= table ================= */
 function createPoker(opts) {
   const { owe, changed, online, persist, rnd } = opts;
+  // chips come from and go back to the player's casino bankroll, which the server keeps
+  const take = opts.take || (() => true), give = opts.give || (() => {}), handDone = opts.handDone || (() => {});
   const now = opts.now || (() => Date.now());
   const schedule = opts.schedule || ((ms, fn) => setTimeout(fn, ms));
   const cancel = opts.cancel || (t => clearTimeout(t));
@@ -103,11 +105,11 @@ function createPoker(opts) {
   function restore(saved) {
     if (!saved || !saved.seated) return;
     for (const [pid, v] of Object.entries(saved.seated)) {
-      if (v && v.stack > 0) owe(pid, { id: `pk-restore-${now()}-${cashId++}`, game: 'pk', payout: Math.round(v.stack), staked: 0, net: 0, cashout: true });
+      if (v && v.stack > 0) { give(pid, Math.round(v.stack), 'Poker chips returned after a server restart'); owe(pid, { id: `pk-restore-${now()}-${cashId++}`, game: 'pk', payout: Math.round(v.stack), staked: 0, net: 0, cashout: true, notice: true }); }
     }
   }
   function cashOut(s, why) {
-    if (s.stack > 0) owe(s.pid, { id: `pk-out-${now()}-${cashId++}`, game: 'pk', payout: s.stack, staked: 0, net: 0, cashout: true, why });
+    if (s.stack > 0) { give(s.pid, s.stack, 'Poker cash-out'); owe(s.pid, { id: `pk-out-${now()}-${cashId++}`, game: 'pk', payout: s.stack, staked: 0, net: 0, cashout: true, why, notice: true }); }
     s.stack = 0;
   }
   const eligible = s => s && s.stack > 0 && !s.sittingOut && !s.leaving;
@@ -323,7 +325,7 @@ function createPoker(opts) {
     T.street = T.street === 'showdown' ? 'showdown' : 'done';
     T.handResult = T.handId;
     // hand history per player (for their stats)
-    for (const s of T.seats) if (s && s.inHand) owe(s.pid, { id: `pk-hand-${BOOT}-${T.handId}`, game: 'pk', payout: 0, staked: s.total, net: s.won - s.total, hand: true });
+    for (const s of T.seats) if (s && s.inHand) { handDone(s.pid, s.total, s.won); owe(s.pid, { id: `pk-hand-${BOOT}-${T.handId}`, game: 'pk', payout: 0, staked: s.total, net: s.won - s.total, hand: true }); }
     changed();
     const hand = T.handId;
     setTimer(ms, () => { if (T.handId === hand) cleanup(); });
@@ -353,6 +355,7 @@ function createPoker(opts) {
       if (s) return err('You already have a seat.');
       if (T.seats[want]) return err('Someone just took that seat.');
       if (!(buy >= MIN_BUY && buy <= MAX_BUY)) return err(`Buy in for ${money(MIN_BUY)} to ${money(MAX_BUY)}.`, 400);
+      if (!take(pid, buy, 'Poker buy-in')) return err('Not enough in your bankroll.');
       T.seats[want] = { pid, name, stack: buy, inHand: false, folded: false, allIn: false, bet: 0, total: 0, hole: [], acted: false, canRaise: true, lastAction: '', sittingOut: false, leaving: false, timeouts: 0, lastSeen: now(), won: 0 };
       log(`${name} sits down with ${money(buy)}`);
       saveState();
@@ -375,6 +378,7 @@ function createPoker(opts) {
       }
       if (s.inHand) { s.leaving = true; return ok({ leaving: true }); }
       const refund = s.stack;
+      give(pid, refund, 'Poker cash-out');
       log(`${s.name} leaves with ${money(refund)}`);
       T.seats[i] = null; saveState();
       return ok({ refund });
@@ -383,6 +387,7 @@ function createPoker(opts) {
       if (s.inHand) return err('Wait for this hand to finish.');
       const amt = Math.round(Number(body.amount));
       if (!(amt >= 100) || s.stack + amt > MAX_BUY) return err(`Your stack can go up to ${money(MAX_BUY)}.`, 400);
+      if (!take(pid, amt, 'Poker chips added')) return err('Not enough in your bankroll.');
       s.stack += amt; s.sittingOut = false; s.timeouts = 0;
       log(`${s.name} adds ${money(amt)}`);
       saveState();

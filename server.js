@@ -1,10 +1,13 @@
-// Miguel's Casino server: hosts the casino pages and keeps the shared High Rollers leaderboard.
+// Miguel's Casino server: hosts the casino, keeps every player's bankroll, runs every game, and has a hidden admin room.
 // No packages needed. Start it with:  node server.js
 //
-// Where the leaderboard is saved:
+// Where things are saved:
 //   - If UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are set, in that Upstash Redis database
 //     (use this on Render's free plan, which wipes local files whenever the server sleeps).
-//   - Otherwise in data/players.json next to this file (fine on your own computer).
+//   - Otherwise in data/ next to this file (fine on your own computer).
+//
+// Admin room (optional): set ADMIN_USER, ADMIN_PASSWORD and ADMIN_PATH in the environment.
+// The room is then at https://your-casino/ADMIN_PATH and nowhere else.
 
 'use strict';
 const http = require('http');
@@ -13,8 +16,6 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
-// Find the casino pages: normally in public/, but also works when they were uploaded
-// next to server.js or inside an extra folder (GitHub's upload page sometimes does that).
 const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
@@ -34,33 +35,21 @@ function findPublicDir() {
   }
   return null;
 }
-function listFiles(dir, depth = 0, out = []) {
-  let entries = [];
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return out; }
-  for (const e of entries) {
-    if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
-    const full = path.join(dir, e.name), rel = path.relative(__dirname, full) || e.name;
-    if (e.isDirectory()) { out.push(rel + '/'); if (depth < 3) listFiles(full, depth + 1, out); }
-    else out.push(rel);
-    if (out.length > 60) break;
-  }
-  return out;
-}
 const PUBLIC_DIR = findPublicDir();
 const REDIS_URL = (process.env.UPSTASH_REDIS_REST_URL || '').replace(/\/+$/, '');
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || '';
 const USE_REDIS = Boolean(REDIS_URL && REDIS_TOKEN);
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
-const DATA_FILE = path.join(DATA_DIR, 'players.json');
-const REDIS_KEY = 'miguels-casino:players';
-const MAX_PLAYERS = 500;
-const FLUSH_MS = 10000;          // save changed players at most every 10 s (keeps Upstash usage low)
-const MIN_WRITE_GAP_MS = 1000;   // one update per player per second
-
-/** id -> { tokenHash, data } */
-const players = new Map();
-const dirty = new Set();
-const lastWrite = new Map();
+const KEYS = { players: 'miguels-casino:players', live: 'miguels-casino:live', meta: 'miguels-casino:meta' };
+const MAX_PLAYERS = 2000;
+const FLUSH_MS = 10000;
+const META_MS = 45000;           // the house books and logs change with every bet; save them less often
+const ADMIN = {
+  user: process.env.ADMIN_USER || '', pass: process.env.ADMIN_PASSWORD || '',
+  path: String(process.env.ADMIN_PATH || '').replace(/^\/+|\/+$/g, ''),
+};
+const ADMIN_ON = ADMIN.user.length >= 3 && ADMIN.pass.length >= 8 && /^[A-Za-z0-9_-]{6,64}$/.test(ADMIN.path);
+const STARTED = Date.now();
 
 /* ---------------- storage ---------------- */
 async function redis(command) {
@@ -68,114 +57,146 @@ async function redis(command) {
     method: 'POST',
     headers: { Authorization: `Bearer ${REDIS_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(command),
+    signal: AbortSignal.timeout(10000),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body.error) throw new Error(`Upstash error: ${body.error || res.status}`);
   return body.result;
 }
+const file = name => path.join(DATA_DIR, name + '.json');
+function writeFileAtomic(name, text) { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(file(name) + '.tmp', text); fs.renameSync(file(name) + '.tmp', file(name)); }
+const readFile = name => (fs.existsSync(file(name)) ? fs.readFileSync(file(name), 'utf8') : null);
+
+/* ---------------- accounts, security log, settings ---------------- */
+const A = require('./accounts')({ onChange: () => boardChanged(), canCreate });
+const META = { settings: { notice: null, locked: false, closed: false }, security: [], audit: [], house: A.house };
+let metaDirty = false;
+const saveMeta = () => { metaDirty = true; };
+function clientIp(req) { return (String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '').replace(/^::ffff:/, '').slice(0, 64); }
+function flag(id, kind, detail, ip) {
+  const rec = id ? A.get(id) : null;
+  META.security.push({ t: Date.now(), id: id || '', name: rec ? rec.name : '', ip: ip || (rec && rec.ip) || '', kind, detail: String(detail).slice(0, 200) });
+  if (META.security.length > 400) META.security.splice(0, META.security.length - 400);
+  if (rec) { rec.alerts = (rec.alerts || 0) + 1; A.touch(id); }
+  saveMeta();
+}
+function audit(action, detail, ip) {
+  META.audit.push({ t: Date.now(), action, detail: String(detail).slice(0, 200), ip });
+  if (META.audit.length > 300) META.audit.splice(0, META.audit.length - 300);
+  saveMeta();
+}
+// how fast new players can be made from one network (a whole school can share one address, so this is generous)
+const created = new Map();
+function canCreate(ip) {
+  if (META.settings.locked) return 'The casino is not taking new players right now.';
+  if (A.players.size >= MAX_PLAYERS) return 'The casino is full.';
+  const now = Date.now(), list = (created.get(ip) || []).filter(t => now - t < 3600000);
+  if (list.length >= 20) return 'Too many new players from this network. Try again later.';
+  list.push(now); created.set(ip, list);
+  return null;
+}
+// rate limits: a bucket of requests per key that refills over time
+const buckets = new Map();
+function allow(key, perSec, burst) {
+  const now = Date.now();
+  let b = buckets.get(key);
+  if (!b) { b = { tokens: burst, t: now }; buckets.set(key, b); }
+  b.tokens = Math.min(burst, b.tokens + (now - b.t) / 1000 * perSec); b.t = now;
+  if (b.tokens < 1) return false;
+  b.tokens -= 1; return true;
+}
+setInterval(() => { const now = Date.now(); for (const [k, b] of buckets) if (now - b.t > 600000) buckets.delete(k); }, 300000).unref();
+
+/* ---------------- loading & saving ---------------- */
+let ready = false, loadError = '';
+let liveState = null, liveDirty = false;
 async function load() {
   if (USE_REDIS) {
-    const flat = (await redis(['HGETALL', REDIS_KEY])) || [];
-    for (let i = 0; i + 1 < flat.length; i += 2) {
-      try { players.set(flat[i], JSON.parse(flat[i + 1])); } catch (e) { /* skip a damaged entry */ }
-    }
-  } else if (fs.existsSync(DATA_FILE)) {
-    const saved = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    for (const [id, entry] of Object.entries(saved)) players.set(id, entry);
+    const flat = (await redis(['HGETALL', KEYS.players])) || [];
+    const entries = [];
+    for (let i = 0; i + 1 < flat.length; i += 2) { try { entries.push([flat[i], JSON.parse(flat[i + 1])]); } catch (e) { /* skip */ } }
+    A.load(entries);
+    const meta = await redis(['GET', KEYS.meta]);
+    if (meta) mergeMeta(JSON.parse(meta));
+    const liveRaw = await redis(['GET', KEYS.live]);
+    return liveRaw ? JSON.parse(liveRaw) : null;
   }
+  const p = readFile('players');
+  if (p) A.load(Object.entries(JSON.parse(p)));
+  const m = readFile('meta');
+  if (m) mergeMeta(JSON.parse(m));
+  const l = readFile('live');
+  return l ? JSON.parse(l) : null;
 }
-let flushing = false;
-async function flush() {
-  if (flushing || !dirty.size) return;
+function mergeMeta(m) {
+  Object.assign(META.settings, m.settings || {});
+  META.security = Array.isArray(m.security) ? m.security : [];
+  META.audit = Array.isArray(m.audit) ? m.audit : [];
+  for (const [g, h] of Object.entries(m.house || {})) Object.assign(A.houseFor(g), h);
+}
+let flushing = false, lastMeta = 0;
+async function flush(force) {
+  if (flushing || !ready) return;
   flushing = true;
-  const ids = [...dirty];
-  dirty.clear();
+  const batch = A.takeDirty();
   try {
     if (USE_REDIS) {
-      const cmd = ['HSET', REDIS_KEY];
-      for (const id of ids) if (players.has(id)) cmd.push(id, JSON.stringify(players.get(id)));
-      if (cmd.length > 2) await redis(cmd);
+      for (let i = 0; i < batch.set.length; i += 25) await redis(['HSET', KEYS.players, ...batch.set.slice(i, i + 25).flat()]);
+      if (batch.del.length) await redis(['HDEL', KEYS.players, ...batch.del]);
+      if (metaDirty && (force || Date.now() - lastMeta > META_MS)) { metaDirty = false; lastMeta = Date.now(); await redis(['SET', KEYS.meta, JSON.stringify(META)]); }
+      if (liveDirty && liveState) { liveDirty = false; await redis(['SET', KEYS.live, JSON.stringify(liveState)]); }
     } else {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-      const tmp = DATA_FILE + '.tmp';
-      fs.writeFileSync(tmp, JSON.stringify(Object.fromEntries(players)));
-      fs.renameSync(tmp, DATA_FILE);
+      if (batch.set.length || batch.del.length) {
+        const all = {}; for (const [id, r] of A.players) all[id] = r;
+        writeFileAtomic('players', JSON.stringify(all));
+      }
+      if (metaDirty) { metaDirty = false; writeFileAtomic('meta', JSON.stringify(META)); }
+      if (liveDirty && liveState) { liveDirty = false; writeFileAtomic('live', JSON.stringify(liveState)); }
     }
   } catch (e) {
-    ids.forEach(id => dirty.add(id));   // try again next time
-    console.error('Could not save the leaderboard:', e.message);
-  } finally {
-    flushing = false;
-  }
+    A.putBack(batch); metaDirty = true; liveDirty = true;
+    console.error('Could not save:', e.message);
+  } finally { flushing = false; }
 }
 setInterval(flush, FLUSH_MS).unref();
 
-/* ---------------- players ---------------- */
-const num = (v, max = 1e15) => (Number.isFinite(+v) ? Math.max(0, Math.min(max, Math.round(+v))) : 0);
-function sanitize(b) {
-  const name = String(b.name || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18);
-  return {
-    name: name || 'Player',
-    cash: num(b.cash), peak: num(b.peak), resets: num(b.resets, 1e6),
-    hands: num(b.hands, 1e9), spins: num(b.spins, 1e9), rolls: num(b.rolls, 1e9),
-    bigWin: num(b.bigWin), blackjacks: num(b.blackjacks, 1e9), bestMult: num(b.bestMult, 1e4), pointsMade: num(b.pointsMade, 1e9),
-    joined: num(b.joined, 1e14),
-    updatedAt: Date.now(),
-  };
+/* ---------------- the games ---------------- */
+function authPlayer(id, token, ip, opts = {}) {
+  const r = A.auth(id, token, ip, opts);
+  if (r.error && r.reason === 'wrong-token') flag(id, 'wrong-key', 'Someone tried to use this seat with the wrong key', ip);
+  return r;
 }
-const publicList = () => [...players.entries()].map(([id, p]) => Object.assign({ id }, p.data)).sort((a, b) => b.cash - a.cash);
-const hash = t => crypto.createHash('sha256').update(String(t)).digest('hex');
+const games = require('./games')(A, { flag: (id, kind, detail) => flag(id, kind, detail), isClosed: () => META.settings.closed });
+const live = require('./live')({
+  A, cleanName: A.cleanName, flag,
+  saveState: s => { liveState = s; liveDirty = true; },
+  auth: (id, token, ip) => authPlayer(id, token, ip),
+  isClosed: () => META.settings.closed,
+});
 
-/* ---------------- live tables ---------------- */
-// the same browser seat (id + secret token) is used for the leaderboard and the live tables
-const liveAuth = new Map();
-function checkToken(id, token) {
-  if (!/^[A-Za-z0-9-]{8,64}$/.test(id) || token.length < 16 || token.length > 128) return false;
-  const known = players.has(id) ? players.get(id).tokenHash : liveAuth.get(id);
-  if (known) return known === hash(token);
-  liveAuth.set(id, hash(token));
-  return true;
-}
-const cleanName = n => String(n || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18) || 'Player';
-// live tables: money owed to players and poker stacks are saved (Upstash or data/live.json)
-const LIVE_FILE = path.join(DATA_DIR, 'live.json'), LIVE_KEY = 'miguels-casino:live';
-let liveState = null, liveDirty = false;
-const live = require('./live')({ checkToken, cleanName, saveState: s => { liveState = s; liveDirty = true; } });
-async function loadLive() {
-  if (USE_REDIS) { const raw = await redis(['GET', LIVE_KEY]); return raw ? JSON.parse(raw) : null; }
-  return fs.existsSync(LIVE_FILE) ? JSON.parse(fs.readFileSync(LIVE_FILE, 'utf8')) : null;
-}
-async function flushLive() {
-  if (!liveDirty || !liveState) return;
-  liveDirty = false;
-  const body = JSON.stringify(liveState);
-  try {
-    if (USE_REDIS) await redis(['SET', LIVE_KEY, body]);
-    else { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(LIVE_FILE + '.tmp', body); fs.renameSync(LIVE_FILE + '.tmp', LIVE_FILE); }
-  } catch (e) { liveDirty = true; console.error('Could not save the live tables:', e.message); }
-}
-setInterval(flushLive, 5000).unref();
-
-/* ---------------- live updates (server-sent events) ---------------- */
+/* ---------------- leaderboard stream ---------------- */
 const streams = new Set();
-let broadcastTimer = null;
-function broadcast() {
-  if (broadcastTimer) return;
-  broadcastTimer = setTimeout(() => {
-    broadcastTimer = null;
-    const msg = `event: players\ndata: ${JSON.stringify(publicList())}\n\n`;
+let boardTimer = null;
+function boardChanged() {
+  if (boardTimer || !ready) return;
+  boardTimer = setTimeout(() => {
+    boardTimer = null;
+    const msg = `event: players\ndata: ${JSON.stringify(A.publicList())}\n\n`;
     for (const res of streams) res.write(msg);
-  }, 400);
+  }, 1000);
 }
+function noticeNow() { const n = META.settings.notice; return n && n.text && (!n.until || n.until > Date.now()) ? n : null; }
+function sendNotice() { const msg = `event: notice\ndata: ${JSON.stringify(noticeNow())}\n\n`; for (const res of streams) res.write(msg); }
 setInterval(() => { for (const res of streams) res.write(': keep-alive\n\n'); }, 25000).unref();
 
-/* ---------------- http ---------------- */
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8' };
-function send(res, status, body, type = 'application/json') {
-  res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+/* ---------------- http helpers ---------------- */
+const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon' };
+const SECURITY_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'SAMEORIGIN', 'Referrer-Policy': 'same-origin' };
+function send(res, status, body, type = 'application/json', extra = {}) {
+  res.writeHead(status, Object.assign({ 'Content-Type': type, 'Cache-Control': 'no-store' }, SECURITY_HEADERS, extra));
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 }
-function readBody(req, limit = 8192) {
+function readBody(req, limit = 16384) {
   return new Promise((resolve, reject) => {
     let size = 0; const chunks = [];
     req.on('data', c => { size += c.length; if (size > limit) { reject(new Error('too large')); req.destroy(); } else chunks.push(c); });
@@ -183,78 +204,246 @@ function readBody(req, limit = 8192) {
     req.on('error', reject);
   });
 }
-async function handleUpdate(req, res) {
-  let body;
-  try { body = JSON.parse(await readBody(req)); } catch (e) { return send(res, 400, { error: 'Send the player as JSON.' }); }
-  const id = String(body.id || ''), token = String(body.token || '');
-  if (!/^[A-Za-z0-9-]{8,64}$/.test(id) || token.length < 16 || token.length > 128) return send(res, 400, { error: 'Missing player id or token.' });
-  const now = Date.now();
-  if (now - (lastWrite.get(id) || 0) < MIN_WRITE_GAP_MS) return send(res, 429, { error: 'Too many updates. Try again in a second.' });
-  const existing = players.get(id);
-  if (existing && existing.tokenHash !== hash(token)) return send(res, 403, { error: 'This seat belongs to another browser.' });
-  if (!existing && liveAuth.has(id) && liveAuth.get(id) !== hash(token)) return send(res, 403, { error: 'This seat belongs to another browser.' });
-  if (!existing && players.size >= MAX_PLAYERS) return send(res, 507, { error: 'The leaderboard is full.' });
-  lastWrite.set(id, now);
-  players.set(id, { tokenHash: hash(token), data: sanitize(body) });
-  dirty.add(id);
-  broadcast();
-  send(res, 200, { ok: true });
-}
-function missingPagesPage(res) {
-  const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
-  const files = listFiles(__dirname);
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Miguel's Casino setup</title>
-<style>body{margin:0;background:#16080E;color:#F5EBDD;font:16px/1.6 system-ui,sans-serif;padding:32px 20px}main{max-width:640px;margin:0 auto}h1{color:#F7DFA3;font-size:26px;margin:0 0 8px}
-code,li{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px}ul{background:#0B0407;border-radius:12px;padding:14px 14px 14px 34px}b{color:#F7DFA3}</style></head><body><main>
-<h1>The server is running, but the casino pages are missing</h1>
-<p>It looked for <b>index.html</b> (plus blackjack.html, roulette.html and craps.html) and couldn't find them. Upload those four files to your GitHub repository, either inside a folder named <b>public</b> or next to server.js. Render updates the site by itself a minute later.</p>
-<p>Files the server can see right now:</p><ul>${files.length ? files.map(f => `<li>${esc(f)}</li>`).join('') : '<li>(none)</li>'}</ul>
-</main></body></html>`;
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-  res.end(html);
-}
+async function jsonBody(req) { try { const b = JSON.parse(await readBody(req)); return b && typeof b === 'object' ? b : null; } catch (e) { return null; } }
 function serveFile(req, res, urlPath) {
-  if (!PUBLIC_DIR) return missingPagesPage(res);
-  let rel = decodeURIComponent(urlPath);
+  if (!PUBLIC_DIR) return send(res, 200, '<!doctype html><meta charset="utf-8"><title>Setup</title><p>The server is running, but the casino pages are missing. Upload index.html and the game pages next to server.js.', 'text/html; charset=utf-8');
+  let rel;
+  try { rel = decodeURIComponent(urlPath); } catch (e) { return send(res, 400, 'Bad address', 'text/plain; charset=utf-8'); }
   if (rel === '/' || rel === '') rel = '/index.html';
-  const file = path.normalize(path.join(PUBLIC_DIR, rel));
-  // only web pages and images, never the server's own files or the saved leaderboard
-  const allowed = /\.(html|css|svg|png|jpe?g|webp|ico)$/i.test(file);
-  const inData = file.startsWith(path.resolve(DATA_DIR) + path.sep);
-  if (!file.startsWith(PUBLIC_DIR + path.sep) || !allowed || inData) return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
-  fs.readFile(file, (err, buf) => {
+  const f = path.normalize(path.join(PUBLIC_DIR, rel));
+  const allowed = /\.(html|css|svg|png|jpe?g|webp|ico)$/i.test(f);
+  const inData = f.startsWith(path.resolve(DATA_DIR) + path.sep);
+  if (!f.startsWith(PUBLIC_DIR + path.sep) || !allowed || inData || /backroom/i.test(f)) return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
+  fs.readFile(f, (err, buf) => {
     if (err) return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
+    res.writeHead(200, Object.assign({ 'Content-Type': TYPES[path.extname(f).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache' }, SECURITY_HEADERS));
     res.end(req.method === 'HEAD' ? undefined : buf);
   });
 }
+
+/* ---------------- player API ---------------- */
+function meBody(id) {
+  return Object.assign(A.me(id), { notice: noticeNow(), closed: !!META.settings.closed, craps: (A.get(id).games.craps || null) });
+}
+async function playerApi(req, res, p, ip) {
+  if (!ready) return send(res, 503, { error: 'The casino is opening. Try again in a few seconds.' });
+  if (p === '/api/players' && req.method === 'GET') return send(res, 200, A.publicList());
+  if (req.method !== 'POST') return send(res, 405, { error: 'Use POST.' });
+  const b = await jsonBody(req);
+  if (!b) return send(res, 400, { error: 'Send JSON.' });
+  const id = String(b.id || '');
+  if (!allow('ip:' + ip, 40, 80)) return send(res, 429, { error: 'Slow down a little.' });
+  if (id && !allow('p:' + id, 14, 30)) { if (allow('flag429:' + id, 0.02, 1)) flag(id, 'rate-limit', 'Sent requests faster than any person can play', ip); return send(res, 429, { error: 'Slow down a little.' }); }
+
+  // the old leaderboard address: browsers used to report their own bankroll here. Nothing it says about money is used now.
+  if (p === '/api/players') {
+    const who = authPlayer(id, b.token, ip, { create: true, allowBanned: true });
+    if (who.error) return send(res, who.code, { error: who.error });
+    if (b.name) A.setName(id, b.name);
+    if (b.cash !== undefined) {
+      const claimed = Math.round(Number(b.cash) || 0), real = A.cash(id);
+      if (Math.abs(claimed - real) > 100) flag(id, claimed > real + 1000000 ? 'tamper' : 'legacy', `Reported a bankroll of ${A.usd(claimed)} (real: ${A.usd(real)}). Ignored.`, ip);
+    }
+    return send(res, 200, { ok: true, ignored: true, cents: who.rec.bal });
+  }
+  if (p === '/api/me') {
+    const who = authPlayer(id, b.token, ip, { create: true, allowBanned: true });
+    if (who.error) return send(res, who.code, { error: who.error });
+    if (b.name) A.setName(id, b.name);
+    return send(res, 200, meBody(id));
+  }
+  const who = authPlayer(id, b.token, ip);
+  if (who.error) return send(res, who.code, { error: who.error });
+  if (p === '/api/wallet/reset') {
+    const r = A.reset(id);
+    if (r.error) return send(res, r.code || 409, { error: r.error, cents: who.rec.bal });
+    return send(res, 200, meBody(id));
+  }
+  let m;
+  if ((m = p.match(/^\/api\/g\/(slots|roulette|blackjack|craps)$/))) {
+    const r = games.handle(m[1], id, b);
+    return send(res, r.code, r.body);
+  }
+  return send(res, 404, { error: 'Unknown address.' });
+}
+
+/* ---------------- admin room ---------------- */
+const sessions = new Map();          // token -> { exp, ip }
+const loginFails = new Map();        // ip -> [times]
+const sha = s => crypto.createHash('sha256').update(String(s)).digest();
+const same = (a, b) => crypto.timingSafeEqual(sha(a), sha(b));
+function cookies(req) { const o = {}; String(req.headers.cookie || '').split(';').forEach(c => { const i = c.indexOf('='); if (i > 0) o[c.slice(0, i).trim()] = c.slice(i + 1).trim(); }); return o; }
+function adminSession(req) {
+  const t = cookies(req).mc_bk;
+  if (!t) return null;
+  const s = sessions.get(t);
+  if (!s || s.exp < Date.now()) { sessions.delete(t); return null; }
+  return s;
+}
+const isHttps = req => String(req.headers['x-forwarded-proto'] || '').includes('https');
+async function adminApi(req, res, sub, ip) {
+  const notFound = () => send(res, 404, 'Not found', 'text/plain; charset=utf-8');
+  if (sub === '/api/login' && req.method === 'POST') {
+    const fails = (loginFails.get(ip) || []).filter(t => Date.now() - t < 15 * 60000);
+    if (fails.length >= 5) return send(res, 429, { error: 'Too many wrong tries. Wait 15 minutes.' });
+    const b = await jsonBody(req);
+    await new Promise(r => setTimeout(r, 400));
+    if (!b || !same(String(b.user || ''), ADMIN.user) || !same(String(b.pass || ''), ADMIN.pass)) {
+      fails.push(Date.now()); loginFails.set(ip, fails);
+      flag('', 'admin-login', `Wrong admin username or password (try ${fails.length} of 5)`, ip);
+      return send(res, 401, { error: 'Wrong username or password.' });
+    }
+    loginFails.delete(ip);
+    const token = crypto.randomBytes(32).toString('hex');
+    sessions.set(token, { exp: Date.now() + 12 * 3600000, ip });
+    audit('login', 'Signed in', ip);
+    return send(res, 200, { ok: true }, 'application/json', { 'Set-Cookie': `mc_bk=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200${isHttps(req) ? '; Secure' : ''}` });
+  }
+  const s = adminSession(req);
+  // every admin request must come from the admin page itself
+  if (!s || req.headers['x-backroom'] !== '1') return sub === '/api/session' ? send(res, 200, { ok: false }) : notFound();
+  if (!ready) return send(res, 503, { error: 'Still loading.' });
+  if (sub === '/api/session') return send(res, 200, { ok: true });
+  if (sub === '/api/logout' && req.method === 'POST') { sessions.delete(cookies(req).mc_bk); return send(res, 200, { ok: true }, 'application/json', { 'Set-Cookie': 'mc_bk=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' }); }
+  const onlineMap = live.onlineNow();
+  const recent = r => Date.now() - Math.max(r.lastPlay || 0, r.seen || 0) < 180000;
+  if (sub === '/api/overview') {
+    let money = 0, named = 0, banned = 0, online = 0;
+    for (const [id, r] of A.players) { money += A.cash(id); if (r.name) named++; if (r.banned) banned++; if (recent(r) || onlineMap.has(id)) online++; }
+    const bigWins = [];
+    for (const [id, r] of A.players) for (const e of r.log) if (e[2] >= 50000 && Date.now() - e[0] < 7 * 86400000 && !['reset', 'admin', 'import', 'table', 'join'].includes(e[1])) bigWins.push({ t: e[0], id, name: r.name, game: e[1], amount: e[2] });
+    bigWins.sort((a, b) => b.amount - a.amount);
+    return send(res, 200, {
+      players: A.players.size, named, banned, online, money, house: A.house, live: live.summary(), settings: META.settings,
+      security: META.security.slice(-80).reverse(), audit: META.audit.slice(-40).reverse(), bigWins: bigWins.slice(0, 12),
+      startedAt: STARTED, storage: USE_REDIS ? 'upstash' : 'file',
+    });
+  }
+  if (sub === '/api/players') {
+    const rows = [];
+    for (const [id, r] of A.players) rows.push({
+      id, name: r.name, bal: r.bal, cash: A.cash(id), peak: r.peak, resets: r.resets, rounds: r.st.rounds, wagered: r.st.wagered, paid: r.st.paid,
+      bigWin: r.st.bigWin, joined: r.joined, seen: Math.max(r.seen || 0, r.lastPlay || 0), lastGame: r.lastGame || '', ip: r.ip, banned: r.banned, hidden: !!r.hidden,
+      flagged: r.flagged || '', alerts: r.alerts || 0, imported: r.imported, online: recent(r) || onlineMap.has(id), where: live.where(id),
+    });
+    return send(res, 200, rows);
+  }
+  if (sub.startsWith('/api/player') && req.method === 'GET') {
+    const id = new URL(req.url, 'http://x').searchParams.get('id') || '';
+    const r = A.get(id);
+    if (!r) return send(res, 404, { error: 'No such player.' });
+    const o = Object.assign({}, r); delete o.tokenHash; delete o.games;
+    o.id = id; o.cash = A.cash(id); o.craps = r.games.craps || null; o.where = live.where(id);
+    o.security = META.security.filter(e => e.id === id).slice(-40).reverse();
+    o.sameIp = r.ip ? [...A.players].filter(([pid, x]) => pid !== id && x.ip === r.ip).map(([pid, x]) => ({ id: pid, name: x.name || '(no name)' })).slice(0, 20) : [];
+    return send(res, 200, o);
+  }
+  if (req.method !== 'POST') return notFound();
+  const b = await jsonBody(req);
+  if (!b) return send(res, 400, { error: 'Send JSON.' });
+  if (sub === '/api/player') {
+    const id = String(b.id || ''), r = A.get(id);
+    if (!r) return send(res, 404, { error: 'No such player.' });
+    const who = `${r.name || '(no name)'} (${id})`;
+    const cents = Math.round(Number(b.cents));
+    switch (b.op) {
+      case 'setBalance':
+        if (!(cents >= 0 && cents <= 1e11)) return send(res, 400, { error: 'Pick an amount from $0 to $1,000,000,000.' });
+        A.logTx(r, 'admin', cents - r.bal, 'Balance set by the casino'); r.bal = cents; r.peak = Math.max(r.peak, A.cash(id)); A.touch(id);
+        audit('balance', `${who}: set to ${A.usd(cents)}`, ip); break;
+      case 'adjust':
+        if (!Number.isFinite(cents) || !cents || Math.abs(cents) > 1e11) return send(res, 400, { error: 'Pick an amount.' });
+        if (r.bal + cents < 0) return send(res, 400, { error: `They only have ${A.usd(r.bal)}.` });
+        r.bal += cents; A.logTx(r, 'admin', cents, cents > 0 ? 'Gift from the casino' : 'Taken by the casino'); r.peak = Math.max(r.peak, A.cash(id)); A.touch(id);
+        audit('balance', `${who}: ${cents > 0 ? '+' : '−'}${A.usd(Math.abs(cents))}`, ip); break;
+      case 'rename': {
+        const n = A.cleanName(b.name);
+        if (n.length < 2) return send(res, 400, { error: 'Names need at least 2 characters.' });
+        audit('rename', `${who} → ${n}`, ip); r.name = n; r.nameLocked = true; A.touch(id); break;
+      }
+      case 'ban': r.banned = { t: Date.now(), reason: A.cleanName(b.reason || '').slice(0, 80) || 'Suspended' }; live.kick(id); A.touch(id); audit('ban', `${who}: ${r.banned.reason}`, ip); break;
+      case 'unban': r.banned = null; A.touch(id); audit('unban', who, ip); break;
+      case 'hide': r.hidden = !r.hidden; A.touch(id); audit('board', `${who}: ${r.hidden ? 'hidden from' : 'back on'} the leaderboard`, ip); break;
+      case 'kick': audit('kick', `${who}: removed from ${live.kick(id)} live table(s)`, ip); break;
+      case 'resetStats': r.st = Object.assign(r.st, { hands: 0, spins: 0, rolls: 0, bigWin: 0, blackjacks: 0, bestMult: 0, pointsMade: 0 }); r.resets = 0; r.peak = A.cash(id); A.touch(id); audit('stats', `${who}: stats cleared`, ip); break;
+      case 'clearFlag': r.flagged = ''; r.alerts = 0; A.touch(id); audit('flag', `${who}: alerts cleared`, ip); break;
+      case 'delete': live.kick(id); A.remove(id); audit('delete', `${who} deleted (had ${A.usd(r.bal)})`, ip); boardChanged(); return send(res, 200, { ok: true, deleted: true });
+      default: return send(res, 400, { error: 'Unknown action.' });
+    }
+    boardChanged();
+    return send(res, 200, { ok: true });
+  }
+  if (sub === '/api/settings') {
+    const st = META.settings;
+    if (b.notice !== undefined) {
+      const text = String(b.notice && b.notice.text || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200);
+      st.notice = text ? { text, kind: ['info', 'party', 'warn'].includes(b.notice.kind) ? b.notice.kind : 'info', until: Number(b.notice.hours) > 0 ? Date.now() + Math.min(720, Number(b.notice.hours)) * 3600000 : 0, t: Date.now() } : null;
+      audit('notice', text ? `Announcement: ${text}` : 'Announcement removed', ip); sendNotice();
+    }
+    if (b.locked !== undefined) { st.locked = !!b.locked; audit('signups', st.locked ? 'New players locked out' : 'New players welcome again', ip); }
+    if (b.closed !== undefined) { st.closed = !!b.closed; audit('closed', st.closed ? 'Casino closed' : 'Casino open', ip); }
+    saveMeta();
+    return send(res, 200, { ok: true, settings: st });
+  }
+  if (sub === '/api/gift') {
+    const cents = Math.round(Number(b.cents));
+    if (!(cents > 0 && cents <= 100000000)) return send(res, 400, { error: 'Gift $0.01 to $1,000,000.' });
+    let n = 0;
+    for (const [id, r] of A.players) {
+      if (r.banned || !r.name) continue;
+      if (b.to === 'online' && !(recent(r) || onlineMap.has(id))) continue;
+      r.bal += cents; A.logTx(r, 'admin', cents, String(b.note || 'Gift from the casino').slice(0, 60)); A.touch(id); n++;
+    }
+    audit('gift', `${A.usd(cents)} to ${n} player${n === 1 ? '' : 's'} (${b.to === 'online' ? 'online now' : 'everyone'})`, ip);
+    boardChanged();
+    return send(res, 200, { ok: true, count: n });
+  }
+  if (sub === '/api/clearlog') { META.security = []; saveMeta(); audit('log', 'Security log cleared', ip); return send(res, 200, { ok: true }); }
+  if (sub === '/api/export') {
+    const all = {}; for (const [id, r] of A.players) { const o = Object.assign({}, r); delete o.tokenHash; all[id] = o; }
+    audit('export', 'Downloaded a backup', ip);
+    return send(res, 200, { exportedAt: new Date().toISOString(), players: all, house: A.house, settings: META.settings });
+  }
+  return notFound();
+}
+function adminPage(res) {
+  let html = '';
+  try { html = fs.readFileSync(path.join(__dirname, 'backroom.tpl'), 'utf8'); } catch (e) { return send(res, 404, 'Not found', 'text/plain; charset=utf-8'); }
+  send(res, 200, html.replace(/__ADMIN_PATH__/g, ADMIN.path), 'text/html; charset=utf-8', { 'X-Robots-Tag': 'noindex, nofollow', 'X-Frame-Options': 'DENY' });
+}
+
+/* ---------------- server ---------------- */
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(String(req.url || '/').replace(/^\/+/, '/'), 'http://localhost');
-    const p = url.pathname;
+    const p = url.pathname, ip = clientIp(req);
+    if (ADMIN_ON && (p === '/' + ADMIN.path || p === '/' + ADMIN.path + '/')) return adminPage(res);
+    if (ADMIN_ON && p.startsWith('/' + ADMIN.path + '/api/')) return adminApi(req, res, p.slice(ADMIN.path.length + 1), ip);
     if (p === '/api/health') return send(res, 200, {
-      ok: true, storage: USE_REDIS ? 'upstash' : 'file', players: players.size,
+      ok: true, ready, storage: USE_REDIS ? 'upstash' : 'file', players: A.players.size, secure: 2, error: loadError || undefined,
       pagesFolder: PUBLIC_DIR ? (path.relative(__dirname, PUBLIC_DIR) || '(next to server.js)') : 'NOT FOUND',
       pages: PAGES.map(f => `${f}: ${PUBLIC_DIR && fs.existsSync(path.join(PUBLIC_DIR, f)) ? 'found' : 'missing'}`),
     });
-    if (p === '/api/players' && req.method === 'GET') return send(res, 200, publicList());
-    if (p === '/api/players' && req.method === 'POST') return handleUpdate(req, res);
     if (p === '/api/stream') {
-      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-      res.write(`retry: 3000\nevent: players\ndata: ${JSON.stringify(publicList())}\n\n`);
+      if (!ready) return send(res, 503, { error: 'Opening.' });
+      res.writeHead(200, Object.assign({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' }, SECURITY_HEADERS));
+      res.write(`retry: 3000\nevent: players\ndata: ${JSON.stringify(A.publicList())}\n\nevent: notice\ndata: ${JSON.stringify(noticeNow())}\n\n`);
       streams.add(res);
       req.on('close', () => streams.delete(res));
       return;
     }
-    if (p === '/api/live/stream') return live.stream(req, res, url);
+    if (p === '/api/live/stream') { if (!ready) return send(res, 503, { error: 'Opening.' }); return live.stream(req, res, url, ip); }
     if (p === '/api/live/summary') return send(res, 200, live.summary());
     if ((p === '/api/live/bj' || p === '/api/live/rl' || p === '/api/live/pk' || p === '/api/live/claim') && req.method === 'POST') {
-      let body;
-      try { body = JSON.parse(await readBody(req)); } catch (e) { return send(res, 400, { error: 'Send JSON.' }); }
-      const r = p === '/api/live/claim' ? live.claim(body) : live.action(p.endsWith('bj') ? 'bj' : p.endsWith('pk') ? 'pk' : 'rl', body);
+      if (!ready) return send(res, 503, { error: 'The casino is opening. Try again in a few seconds.' });
+      const b = await jsonBody(req);
+      if (!b) return send(res, 400, { error: 'Send JSON.' });
+      if (!allow('ip:' + ip, 40, 80) || !allow('p:' + String(b.id || ''), 14, 30)) return send(res, 429, { error: 'Slow down a little.' });
+      const r = p === '/api/live/claim' ? live.claim(b, ip) : live.action(p.endsWith('bj') ? 'bj' : p.endsWith('pk') ? 'pk' : 'rl', b, ip);
+      if (r.flag) flag(String(b.id || ''), 'invalid', r.flag, ip);
       return send(res, r.code, r.body);
     }
-    if (p.startsWith('/api/')) return send(res, 404, { error: 'Unknown address.' });
+    if (p.startsWith('/api/')) return playerApi(req, res, p, ip);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed', 'text/plain; charset=utf-8');
     return serveFile(req, res, p);
   } catch (e) {
@@ -264,18 +453,29 @@ const server = http.createServer(async (req, res) => {
 });
 
 async function shutdown() {
-  await flush();
-  await flushLive();
+  try { live.persist(); await flush(true); } catch (e) {}
   process.exit(0);
 }
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
-load()
-  .catch(e => console.error('Could not load the saved leaderboard:', e.message))
-  .then(() => loadLive().then(s => live.restore(s)).catch(e => console.error('Could not load the live tables:', e.message)))
-  .finally(() => server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Miguel's Casino is open on http://localhost:${PORT}`);
-    console.log(PUBLIC_DIR ? `Casino pages found in ${PUBLIC_DIR}` : 'WARNING: casino pages not found. Upload index.html, blackjack.html, roulette.html and craps.html.');
-    console.log(`Leaderboard saved in ${USE_REDIS ? 'Upstash Redis' : DATA_FILE} · ${players.size} player${players.size === 1 ? "" : "s"} loaded`);
-  }));
+// open the doors right away (Render waits for the port), then load the saved casino
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Miguel's Casino is open on http://localhost:${PORT}`);
+  console.log(PUBLIC_DIR ? `Casino pages found in ${PUBLIC_DIR}` : 'WARNING: casino pages not found.');
+  console.log(ADMIN_ON ? `Admin room is at /${ADMIN.path}` : 'Admin room is off (set ADMIN_USER, ADMIN_PASSWORD and ADMIN_PATH to turn it on).');
+});
+(async function start(attempt = 1) {
+  try {
+    const liveSaved = await load();
+    ready = true; loadError = '';
+    live.restore(liveSaved);
+    boardChanged();
+    console.log(`Saved in ${USE_REDIS ? 'Upstash Redis' : DATA_DIR} · ${A.players.size} player${A.players.size === 1 ? '' : 's'} loaded`);
+    flush();
+  } catch (e) {
+    loadError = e.message;
+    console.error(`Could not load the casino (try ${attempt}):`, e.message);
+    setTimeout(() => start(attempt + 1), Math.min(30000, 2000 * attempt));
+  }
+})();

@@ -373,66 +373,11 @@ kbd{font:600 10.5px var(--mono);padding:2px 5px;border-radius:5px;background:rgb
 </div>
 
 <script>
-/* Miguel's Casino: one shared bankroll (cents) for every table, plus leaderboard sync */
-window.CasinoWallet = (() => {
-  const KEY = 'miguels-casino-wallet', START = 100000;
-  const get = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
-  let memObj = null;
-  const readObj = () => { const w = get(KEY); return w && Number.isFinite(w.cents) ? w : memObj; };
-  function writeObj(o) { memObj = o; try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
-  function put(c) {
-    const o = Object.assign({ resets: 0, peak: 0 }, readObj() || {});
-    o.cents = Math.max(0, Math.round(c)); o.peak = Math.max(o.peak || 0, o.cents); o.t = Date.now();
-    writeObj(o);
-  }
-  function init() {
-    const w = get(KEY);
-    if (w && Number.isFinite(w.cents)) { memObj = w; return; }
-    // first visit: keep the net result from any table played before the bankroll was shared
-    let c = START;
-    const bj = get('brass-table-blackjack-v1'), rl = get('voltage-roulette-v1'), cr = get('bubble-dome-craps-v1');
-    if (bj && typeof bj.bankroll === 'number') c += Math.round(bj.bankroll * 100) - START;
-    if (rl && typeof rl.balance === 'number') c += Math.round(rl.balance * 100) - START;
-    if (cr && Number.isFinite(cr.bank)) c += cr.bank - START;
-    if (c < 500) c = START;
-    writeObj({ cents: c, peak: c, resets: 0, t: Date.now() });
-  }
-  init();
-  let last = 0, view = null, onExternal = null;
-  const cents = () => { const o = readObj(); return o ? o.cents : START; };
-  function bind(v, ext) { view = v; onExternal = ext; last = v(); }
-  // push this table's change (win, loss, bet placed or taken back) into the shared bankroll
-  function sync() {
-    if (!view) return;
-    const cur = view(), d = cur - last;
-    if (!d) return;
-    put(cents() + d); last = cur;
-    CasinoBoard.schedule();
-  }
-  // another tab changed the bankroll: move the same amount into this table's balance
-  function pull() {
-    if (!view) return;
-    const w = cents(), d = w - last;
-    if (!d) return;
-    last = w;
-    if (onExternal) onExternal(d);
-  }
-  function add(c) { put(cents() + c); CasinoBoard.schedule(); }
-  // a top-up or a reset of the bankroll, counted on the leaderboard
-  function noteReset() { const o = Object.assign({ resets: 0 }, readObj() || {}); o.resets = (o.resets || 0) + 1; writeObj(o); CasinoBoard.schedule(); }
-  const info = () => Object.assign({ cents: START, peak: START, resets: 0 }, readObj() || {});
-  addEventListener('storage', e => { if (e.key === KEY) pull(); });
-  addEventListener('focus', pull);
-  addEventListener('pageshow', pull);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
-  return { cents, bind, sync, pull, add, noteReset, info, START };
-})();
-
-window.CasinoBoard = (() => {
-  const NAME_KEY = 'miguels-casino-name', JOIN_KEY = 'miguels-casino-joined';
-  const get = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+/* Miguel's Casino (online): the casino's server keeps every bankroll and decides every game.
+   This page only shows a copy of your balance and sends your moves. */
+window.CASINO_ONLINE = true;
+window.CasinoNet = (() => {
   const SEAT_KEY = 'miguels-casino-seat';
-  let ready = null, db = null, uid = null, mode = null, token = null, timer = null, busy = false, again = false, lastKey = '', denied = false;
   function seat() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(SEAT_KEY)); } catch (e) {}
@@ -443,101 +388,155 @@ window.CasinoBoard = (() => {
     }
     return s;
   }
+  // POST to the casino with this browser's seat; returns { ok, status, body }
+  async function api(path, body = {}) {
+    const s = seat();
+    let r, j = {};
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id: s.id, token: s.token }, body)) });
+        j = await r.json().catch(() => ({}));
+        if (r.status === 429 && attempt < 2) { await new Promise(res => setTimeout(res, 700 * (attempt + 1))); continue; }
+        if (r.status === 503 && /opening/i.test(j.error || '') && attempt < 2) { await new Promise(res => setTimeout(res, 2500)); continue; }
+        break;
+      } catch (e) {
+        if (attempt === 2) return { ok: false, status: 0, body: { error: 'No connection to the casino. Check your internet and try again.' } };
+        await new Promise(res => setTimeout(res, 800));
+      }
+    }
+    if (typeof j.cents === 'number') CasinoWallet._server(j.cents);
+    if (r.status === 403 && /suspended/i.test(j.error || '')) CasinoUI.suspended();
+    return { ok: r.ok, status: r.status, body: j };
+  }
+  return { seat, api };
+})();
+
+window.CasinoWallet = (() => {
+  const START = 100000, CACHE = 'miguels-casino-cache';
+  let cache = null;
+  try { cache = JSON.parse(localStorage.getItem(CACHE)); } catch (e) {}
+  const mine = cache && cache.id === CasinoNet.seat().id;
+  let bal = mine && Number.isFinite(cache.cents) ? cache.cents : 0;
+  let info_ = { peak: mine ? cache.peak || 0 : 0, resets: mine ? cache.resets || 0 : 0 };
+  let view = null, onExternal = null, isBusy = () => false;
+  const listeners = [];
+  const cents = () => bal;
+  function bind(v, ext, busy) { view = v; onExternal = ext; if (busy) isBusy = busy; }
+  function remember() { try { localStorage.setItem(CACHE, JSON.stringify({ id: CasinoNet.seat().id, cents: bal, peak: info_.peak, resets: info_.resets })); } catch (e) {} }
+  // the server just told us the balance
+  function _server(c) { bal = c; remember(); listeners.forEach(f => { try { f(c); } catch (e) {} }); }
+  // move this page's own balance to match the server (only while nothing is in play)
+  function apply(c) {
+    if (view && onExternal) { const d = c - view(); if (d) onExternal(d); }
+    _server(c);
+  }
+  async function refresh() {
+    if (isBusy()) return null;
+    const r = await CasinoNet.api('api/me', { name: CasinoBoard.name() });
+    if (r.ok) { info_ = { peak: r.body.peak, resets: r.body.resets }; if (!isBusy()) apply(r.body.cents); CasinoUI.notice(r.body.notice); if (r.body.banned) CasinoUI.suspended(); }
+    return r.ok ? r.body : null;
+  }
+  // a fresh $1,000, only when you are out of chips everywhere
+  async function reset() {
+    const r = await CasinoNet.api('api/wallet/reset');
+    if (r.ok) { info_.resets = r.body.resets; apply(r.body.cents); }
+    return r;
+  }
+  const info = () => ({ cents: bal, peak: Math.max(info_.peak || 0, bal), resets: info_.resets || 0 });
+  const onChange = f => listeners.push(f);
+  let last = 0;
+  const maybeRefresh = () => { if (Date.now() - last > 4000) { last = Date.now(); refresh(); } };
+  addEventListener('focus', maybeRefresh);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeRefresh(); });
+  // money only moves on the server now, so these do nothing
+  const sync = () => {}, pull = () => {}, add = () => {}, noteReset = () => {};
+  return { cents, bind, sync, pull, add, noteReset, info, refresh, reset, apply, onChange, _server, START };
+})();
+
+window.CasinoBoard = (() => {
+  const NAME_KEY = 'miguels-casino-name';
+  let ready = null, mode = null, denied = false, meInfo = null, timer = null;
   function name() { try { return (localStorage.getItem(NAME_KEY) || '').trim(); } catch (e) { return ''; } }
-  function setName(n) { try { localStorage.setItem(NAME_KEY, n); } catch (e) {} lastKey = ''; push(); }
+  function setName(n) { try { localStorage.setItem(NAME_KEY, n); } catch (e) {} push(); }
   function connect() {
     if (ready) return ready;
     ready = (async () => {
-      // inside Claude: the artifact's shared database
-      if (window.claude && typeof claude.use === 'function') {
-        const [d, u] = await Promise.all([claude.use('db'), claude.use('user')]);
-        if (!d || !u) return false;
-        const id = await u.id();
-        if (!id) return false;
-        db = d; uid = id; mode = 'claude';
-        return true;
-      }
-      // on your own server: its /api
-      if (/^https?:$/.test(location.protocol)) {
-        const r = await fetch('api/health', { cache: 'no-store' });
-        if (!r.ok) return false;
-        const s = seat(); uid = s.id; token = s.token; mode = 'server';
-        return true;
-      }
-      return false;
-    })().catch(() => false);
+      if (!/^https?:$/.test(location.protocol)) return false;
+      const r = await CasinoNet.api('api/me', { name: name() });
+      if (!r.ok) { if (r.status === 403) { denied = true; mode = 'server'; return true; } ready = null; return false; }
+      meInfo = r.body; mode = 'server';
+      CasinoWallet.apply(r.body.cents);
+      CasinoUI.notice(r.body.notice);
+      if (r.body.banned) CasinoUI.suspended();
+      if (r.body.name && !name()) { try { localStorage.setItem(NAME_KEY, r.body.name); } catch (e) {} }
+      return true;
+    })().catch(() => { ready = null; return false; });
     return ready;
   }
-  // this player's line on the leaderboard, built from the bankroll and each table's own stats
-  function snapshot() {
-    const n = name();
-    if (!n) return null;
-    const w = CasinoWallet.info();
-    const bj = get('brass-table-blackjack-v1') || {}, rl = get('voltage-roulette-v1') || {}, cr = get('bubble-dome-craps-v1') || {};
-    const riding = cr.bets ? Object.values(cr.bets).reduce((a, b) => a + (+b || 0), 0) : 0;
-    const bst = bj.stats || {}, rst = rl.stats || {}, cst = cr.stats || {}, lv = get('miguels-live-stats') || {}, sl = (get('dynamite-diggers-v1') || {}).stats || {};
-    let joined = 0;
-    try { joined = +localStorage.getItem(JOIN_KEY) || 0; if (!joined) { joined = Date.now(); localStorage.setItem(JOIN_KEY, String(joined)); } } catch (e) { joined = Date.now(); }
-    const cash = w.cents + riding + Math.max(0, +get('miguels-live-poker-stack') || 0);
-    return {
-      name: n.slice(0, 18),
-      cash, peak: Math.max(w.peak || 0, cash), resets: w.resets || 0,
-      hands: (bst.hands || 0) + (lv.hands || 0), spins: (rst.spins || 0) + (lv.spins || 0) + (sl.spins || 0), rolls: cst.rolls || 0,
-      bigWin: Math.max(Math.round((bst.bestWin || 0) * 100), Math.round((rst.biggestWin || 0) * 100), cst.bigWin || 0, lv.bigWin || 0, sl.bigWin || 0),
-      blackjacks: bst.blackjacks || 0, bestMult: rst.bestMult || 0, pointsMade: cst.made || 0,
-      joined,
-    };
-  }
   async function push() {
-    if (denied) return false;
-    if (busy) { again = true; return false; }
     if (!(await connect())) return false;
-    const doc = snapshot();
-    if (!doc) return false;
-    const key = JSON.stringify(doc);
-    if (key === lastKey) return true;
-    busy = true;
-    try {
-      if (mode === 'claude') {
-        doc.updatedAt = Date.now();
-        await db.doc('players/' + uid).set(doc);
-        lastKey = key;
-      } else {
-        const r = await fetch('api/players', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id: uid, token }, doc)) });
-        if (r.ok) lastKey = key;
-        else if (r.status === 403) denied = true;
-        else if (r.status === 429) again = true;
-      }
-    } catch (e) {
-      if (e && e.code === 'invalid_argument') denied = true;
-    } finally {
-      busy = false;
-      if (again) { again = false; schedule(1500); }
-    }
-    return !denied;
+    const r = await CasinoNet.api('api/me', { name: name() });
+    if (r.ok) meInfo = r.body;
+    return r.ok;
   }
   function schedule(ms = 2500) { clearTimeout(timer); timer = setTimeout(push, ms); }
-  addEventListener('pagehide', () => { if (timer) { clearTimeout(timer); push(); } });
-  // live list of every player: onRows(rows) with rows = [{ id, name, cash, ... }]
   function subscribe(onRows, onError) {
-    if (mode === 'claude') {
-      return db.collection('players').orderBy('cash', 'desc').limit(200).onSnapshot(
-        snap => onRows(snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data() || {}))), onError);
-    }
-    if (mode === 'server') {
-      let poll = null, es = null;
-      const load = () => fetch('api/players', { cache: 'no-store' }).then(r => r.json()).then(onRows).catch(() => {});
-      if (window.EventSource) {
-        es = new EventSource('api/stream');
-        es.addEventListener('players', e => { try { onRows(JSON.parse(e.data)); } catch (x) {} });
-        es.onerror = () => { if (onError && es.readyState === 2) onError(); };
-      } else { load(); poll = setInterval(load, 8000); }
-      return () => { if (es) es.close(); if (poll) clearInterval(poll); };
-    }
-    return () => {};
+    let es = null, poll = null;
+    const load = () => fetch('api/players', { cache: 'no-store' }).then(r => r.json()).then(onRows).catch(() => {});
+    if (window.EventSource) {
+      es = new EventSource('api/stream');
+      es.addEventListener('players', e => { try { onRows(JSON.parse(e.data)); } catch (x) {} });
+      es.addEventListener('notice', e => { try { CasinoUI.notice(JSON.parse(e.data)); } catch (x) {} });
+      es.onerror = () => { if (onError && es.readyState === 2) onError(); };
+    } else { load(); poll = setInterval(load, 8000); }
+    return () => { if (es) es.close(); if (poll) clearInterval(poll); };
   }
-  const identity = () => seat();
-  return { name, setName, connect, push, schedule, snapshot, subscribe, identity, get db() { return db; }, get uid() { return uid; }, get mode() { return mode; }, get denied() { return denied; } };
+  const identity = () => CasinoNet.seat();
+  const snapshot = () => null;
+  return { name, setName, connect, push, schedule, snapshot, subscribe, identity, get uid() { return CasinoNet.seat().id; }, get mode() { return mode; }, get denied() { return denied; }, get me() { return meInfo; } };
+})();
+
+// announcements from the casino, and the notice for a suspended account
+window.CasinoUI = (() => {
+  let bar = null, shownKey = '';
+  const css = `.mc-notice{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:9999;max-width:min(680px,calc(100% - 24px));display:flex;gap:10px;align-items:center;padding:10px 12px 10px 16px;border-radius:14px;
+    font:600 14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1B1206;background:linear-gradient(180deg,#FFE9A8,#F2C65A);box-shadow:0 12px 30px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.2);animation:mcIn .35s ease}
+    .mc-notice.party{background:linear-gradient(90deg,#FF9AD5,#FFD36E,#8EF0B4);} .mc-notice.warn{background:linear-gradient(180deg,#FFB4A8,#F2786D);}
+    .mc-notice.ban{background:linear-gradient(180deg,#3A1414,#220A0A);color:#FFD9D2;box-shadow:0 12px 30px rgba(0,0,0,.5),0 0 0 1px #F2786D}
+    .mc-notice b{font-weight:800}
+    .mc-notice button{flex:none;border:0;background:rgba(0,0,0,.14);color:inherit;width:26px;height:26px;border-radius:50%;cursor:pointer;font:700 15px system-ui}
+    @keyframes mcIn{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}`;
+  function ensure() {
+    if (bar) return bar;
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    bar = document.createElement('div'); bar.className = 'mc-notice'; bar.hidden = true; bar.setAttribute('role', 'status');
+    document.body.appendChild(bar);
+    return bar;
+  }
+  function show(text, kind, closable) {
+    const b = ensure();
+    b.className = 'mc-notice ' + (kind || '');
+    b.textContent = '';
+    const s = document.createElement('span'); s.textContent = text; b.appendChild(s);
+    if (closable) { const x = document.createElement('button'); x.type = 'button'; x.setAttribute('aria-label', 'Close'); x.textContent = '×'; x.onclick = () => { b.hidden = true; try { sessionStorage.setItem('mc-notice-closed', shownKey); } catch (e) {} }; b.appendChild(x); }
+    b.hidden = false;
+  }
+  let banned = false;
+  function notice(n) {
+    if (banned) return;
+    if (!document.body) { addEventListener('DOMContentLoaded', () => notice(n)); return; }
+    if (!n || !n.text) { if (bar && !banned) bar.hidden = true; return; }
+    shownKey = String(n.t || n.text);
+    let closed = ''; try { closed = sessionStorage.getItem('mc-notice-closed') || ''; } catch (e) {}
+    if (closed === shownKey) return;
+    show('📣 ' + n.text, n.kind === 'party' ? 'party' : n.kind === 'warn' ? 'warn' : '', true);
+  }
+  function suspended() {
+    banned = true;
+    if (!document.body) { addEventListener('DOMContentLoaded', suspended); return; }
+    show('Your account has been suspended by the casino, so you can’t play right now. Ask Miguel if you think this is a mistake.', 'ban', false);
+  }
+  return { notice, suspended };
 })();
 </script>
 
@@ -598,7 +597,8 @@ function save() {
   save = function () { saveTable(); CasinoWallet.sync(); };
   CasinoWallet.bind(
     () => Math.round((S.bankroll + (S.phase === 'bet' ? S.bet + sideSum(S.side) : 0)) * 100),
-    d => { S.bankroll = Math.max(0, Math.round((S.bankroll + d / 100) * 100) / 100); render(); }
+    d => { S.bankroll = Math.max(0, Math.round((S.bankroll + d / 100) * 100) / 100); render(); },
+    () => S.busy || (S.phase !== 'bet' && !S.stale)
   );
 }
 /* ---------------- shoe ---------------- */
@@ -635,12 +635,48 @@ function countAdvice(tc) {
   if (tc <= -1) return 'The deck favours the dealer. Stay at the minimum.';
   return 'Neutral deck. Bet the minimum.';
 }
+/* online: the casino's server shuffles, deals and pays; this page plays the cards it is sent */
+const NET = { queue: [], last: null };
+async function server(action, extra) {
+  const r = await CasinoNet.api('api/g/blackjack', Object.assign({ action }, extra || {}));
+  if (!r.ok) { toast(r.status === 0 ? 'No connection' : 'The dealer said no', r.body.error || '', 'lose'); return null; }
+  const v = r.body;
+  NET.last = v;
+  NET.queue = (v.drawn || []).map(e => e.card);
+  if (typeof v.shoeLeft === 'number') { S.shoe = new Array(v.shoeLeft); S.shoeSize = v.shoeSize; S.shuffleDue = v.shuffleDue; }
+  return v;
+}
 function draw() {
-  if (!S.shoe.length) buildShoe();
-  const c = S.shoe.pop();
+  const c = NET.queue.length ? NET.queue.shift() : null;
   S.dealt++;
-  if (S.dealt >= S.cutAt) S.shuffleDue = true;
-  return { r: c.r, s: c.s, id: ++uid };
+  return c ? { r: c.r, s: c.s, id: ++uid } : { r: '?', s: '?', id: ++uid, hidden: true };
+}
+// the dealer's hole card arrives only when it is turned over
+function fillHole() {
+  const v = NET.last, h = S.dealer.cards[1];
+  if (!v || !h || !h.hidden || !v.dealer || !v.dealer[1]) return;
+  h.r = v.dealer[1].r; h.s = v.dealer[1].s; h.hidden = false;
+  const el = cardEls.get(h.id);
+  if (el) {
+    el.innerHTML = cardInner(h);
+    el.classList.toggle('red', h.s === '♥' || h.s === '♦');
+    el._label = `${h.r === 'A' ? 'Ace' : h.r === 'K' ? 'King' : h.r === 'Q' ? 'Queen' : h.r === 'J' ? 'Jack' : h.r} of ${({ '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 'clubs' })[h.s]}`;
+  }
+}
+// the round is over: the server's numbers are the real ones
+function trustServer() {
+  const v = NET.last;
+  if (!v || v.phase !== 'done') return;
+  const key = cs => cs.map(c => (c ? c.r + c.s : '?')).join(',');
+  const same = v.hands.length === S.hands.length && v.hands.every((h, i) => key(h.cards) === key(S.hands[i].cards)) && key(v.dealer) === key(S.dealer.cards);
+  if (!same) {
+    console.warn('This table got out of step with the casino; showing the casino’s cards.');
+    const CLS = { Win: 'win', Blackjack: 'bj', Push: 'push', Lose: 'lose', Bust: 'lose', 'Dealer blackjack': 'lose', Surrendered: 'push', 'Even money': 'win' };
+    S.hands = v.hands.map(h => Object.assign({}, h, { cards: h.cards.map(c => ({ r: c.r, s: c.s, id: ++uid })), bet: h.bet / 100, result: h.result ? { label: h.result.label, cls: CLS[h.result.label] || 'push', delta: h.result.delta / 100 } : null }));
+    S.dealer = { cards: v.dealer.map(c => ({ r: c.r, s: c.s, id: ++uid })), hole: false };
+    $('#dealerCards').innerHTML = ''; $('#hands').innerHTML = ''; cardEls.clear();
+  }
+  S.bankroll = v.cents / 100;
 }
 
 /* ---------------- rules helpers ---------------- */
@@ -1165,10 +1201,10 @@ function rebet(mult) {
   sfx('chip'); render(); save();
   return true;
 }
-function refill() {
-  CasinoWallet.noteReset();
-  S.bankroll += START; S.stats.peak = Math.max(S.stats.peak, S.bankroll);
-  toast('Fresh stack', `${fmt(START)} added to your bankroll`);
+async function refill() {
+  const r = await CasinoWallet.reset();
+  if (r.ok) toast('Fresh stack', `${fmt(START)} added to your bankroll`);
+  else toast('No top-up yet', r.body.error || '');
   render(); save();
 }
 
@@ -1179,11 +1215,13 @@ async function deal() {
   if (S.bet === 0 && sideSum(S.side) === 0 && S.lastBet >= MIN) { if (!rebet(1)) return; }
   if (S.bet < MIN) { toast(S.bet === 0 && sideSum(S.side) ? 'Place a main bet' : 'Minimum bet ' + fmt(MIN), sideSum(S.side) ? `Side bets need a main bet of at least ${fmt(MIN)}` : ''); return; }
   S.busy = true;
+  const inCents = x => Math.round(x * 100);
+  const v = await server('deal', { bet: inCents(S.bet), sides: { pp: inCents(S.side.pp), t21: inCents(S.side.t21), ll: inCents(S.side.ll) }, sidesOn: !!S.settings.sides, decks: S.settings.decks, h17: !!S.settings.h17, surrender: !!S.settings.surrender });
+  if (!v) { S.busy = false; render(); return; }
   clearTable();
-  if (S.shuffleDue || !S.shoe.length) {
-    const first = !S.shoe.length && S.dealt === 0 && S.discards === 0 && !S.shoeSize;
-    buildShoe();
-    if (!first) { toast('Shuffling', `Fresh ${S.settings.decks}-deck shoe`); sfx('shuffle'); render(); await sleep(RM ? 300 : 1100); }
+  if (v.shuffled) {
+    S.rc = 0; S.seen.clear(); S.discards = 0; S.dealt = 0;
+    toast('Shuffling', `Fresh ${S.settings.decks}-deck shoe`); sfx('shuffle'); render(); await sleep(RM ? 300 : 1100);
   }
   S.lastBet = S.bet;
   S.lastSides = Object.assign({}, S.side);
@@ -1213,16 +1251,17 @@ async function peek() {
 }
 async function revealHole() {
   if (!S.dealer.hole) return;
+  fillHole();
   S.dealer.hole = false; sfx('card'); render();
   await sleep(D.reveal);
 }
 
 async function afterDeal() {
-  const up = S.dealer.cards[0], h = S.hands[0];
-  if (up.r === 'A') { S.phase = 'insurance'; S.busy = false; render(); return; }
+  const up = S.dealer.cards[0], h = S.hands[0], v = NET.last;
+  if (v.phase === 'insurance') { S.phase = 'insurance'; S.busy = false; render(); return; }
   if (pts(up.r) === 10) {
     await peek();
-    if (dealerBJ()) { await revealHole(); return settle(); }
+    if (v.dealerBJ) { await revealHole(); return settle(); }
   }
   if (isBJ(h)) { await revealHole(); return settle(); }
   startPlay();
@@ -1231,12 +1270,14 @@ async function afterDeal() {
 async function resolveInsurance(take) {
   if (S.phase !== 'insurance' || S.busy) return;
   S.busy = true;
+  const v = await server('insurance', { take: !!take });
+  if (!v) { S.busy = false; render(); return; }
   const h = S.hands[0], pBJ = isBJ(h);
   if (take && pBJ) { h.evenMoney = true; S.phase = 'deal'; await revealHole(); return settle(); }
-  if (take) { const cost = h.bet / 2; if (S.bankroll >= cost) { S.bankroll -= cost; S.insurance = cost; } }
+  if (take && v.insurance) { const cost = v.insurance / 100; S.bankroll -= cost; S.insurance = cost; }
   S.phase = 'deal'; render();
   await peek();
-  if (dealerBJ()) { await revealHole(); return settle(); }
+  if (v.dealerBJ) { await revealHole(); return settle(); }
   if (S.insurance) toast('No blackjack', `Insurance lost · ${fmt(S.insurance)}`, 'lose');
   if (pBJ) { await revealHole(); return settle(); }
   startPlay();
@@ -1252,6 +1293,7 @@ function startPlay() {
 async function hit() {
   if (!canAct()) return;
   S.busy = true;
+  if (!(await server('hit'))) { S.busy = false; render(); return; }
   const h = cur();
   h.cards.push(draw()); sfx('card'); render();
   await sleep(D.deal);
@@ -1260,13 +1302,16 @@ async function hit() {
   if (t === 21) { h.done = true; return next(); }
   S.busy = false; render();
 }
-function stand() {
+async function stand() {
   if (!canAct()) return;
-  S.busy = true; cur().done = true; next();
+  S.busy = true;
+  if (!(await server('stand'))) { S.busy = false; render(); return; }
+  cur().done = true; next();
 }
 async function double() {
   if (!canDouble()) return;
   S.busy = true;
+  if (!(await server('double'))) { S.busy = false; render(); return; }
   const h = cur();
   S.bankroll -= h.bet; h.bet *= 2; h.doubled = true;
   sfx('chip'); render(); await sleep(D.short);
@@ -1280,6 +1325,7 @@ async function double() {
 async function split() {
   if (!canSplit()) return;
   S.busy = true;
+  if (!(await server('split'))) { S.busy = false; render(); return; }
   const h = cur();
   S.bankroll -= h.bet;
   const moved = h.cards.pop();
@@ -1294,9 +1340,10 @@ async function split() {
   if (h.splitAces || total(h.cards).total === 21) { h.done = true; return next(); }
   S.busy = false; render();
 }
-function surrender() {
+async function surrender() {
   if (!canSurrender()) return;
   S.busy = true;
+  if (!(await server('surrender'))) { S.busy = false; render(); return; }
   const h = cur(); h.surrendered = true; h.done = true;
   next();
 }
@@ -1377,6 +1424,8 @@ function settle() {
   st.bestWin = Math.max(st.bestWin, net + sideNet);
   st.peak = Math.max(st.peak, S.bankroll);
 
+  trustServer();
+  st.peak = Math.max(st.peak, S.bankroll);
   S.phase = 'bet'; S.busy = false; S.stale = true; S.active = 0;
   render();
 
@@ -1640,8 +1689,8 @@ function renderSheet() {
       ${sw('sound', 'Sound effects', 'Card, chip and payout sounds.', set.sound)}
       <h3>Bankroll</h3>
       ${confirmReset
-        ? `<div class="confirm"><span style="flex:1;min-width:180px">Reset your bankroll to ${fmt(START)} and clear all statistics?</span><button class="btn small danger" id="doReset">Reset</button><button class="btn small ghost" id="noReset">Cancel</button></div>`
-        : `<button class="btn small ghost" id="askReset" ${midRound ? 'disabled' : ''}>Reset bankroll &amp; stats</button>`}`;
+        ? `<div class="confirm"><span style="flex:1;min-width:180px">Clear all your statistics? Your bankroll stays as it is.</span><button class="btn small danger" id="doReset">Reset</button><button class="btn small ghost" id="noReset">Cancel</button></div>`
+        : `<button class="btn small ghost" id="askReset" ${midRound ? 'disabled' : ''}>Clear stats</button>`}`;
   }
 }
 document.addEventListener('click', e => {
@@ -1673,10 +1722,8 @@ document.addEventListener('click', e => {
   if (e.target.id === 'askReset') { confirmReset = true; renderSheet(); $('#doReset').focus(); return; }
   if (e.target.id === 'noReset') { confirmReset = false; renderSheet(); return; }
   if (e.target.id === 'doReset') {
-    CasinoWallet.noteReset();
-    S.bankroll = START; S.bet = 0; S.betChips = []; S.lastBet = 0; S.stats = defaultStats(); shownBank = START;
-    S.side = zeroSides(); S.sideChips = { pp: [], t21: [], ll: [] }; S.lastSides = zeroSides(); S.target = 'main';
-    clearTable(); confirmReset = false; save(); renderSheet(); render(); toast('Fresh start', fmt(START) + ' bankroll'); return;
+    S.stats = defaultStats(); S.stats.peak = S.bankroll;
+    confirmReset = false; save(); renderSheet(); render(); toast('Stats cleared', 'Your bankroll is kept safe by the casino'); return;
   }
 });
 document.addEventListener('change', e => {
@@ -1745,6 +1792,17 @@ document.addEventListener('keydown', e => {
 S.stats.peak = Math.max(S.stats.peak, S.bankroll);
 if (S.lastBet > MAX) S.lastBet = 0;
 render();
+// join the casino, and finish any hand left open when this page was last closed
+CasinoBoard.connect().then(async ok => {
+  if (!ok) { toast('Offline', 'This table needs the casino server to deal', 'lose'); return; }
+  const r = await CasinoNet.api('api/g/blackjack', { action: 'state' });
+  if (!r.ok) return;
+  const v = r.body;
+  S.shoe = new Array(v.shoeLeft); S.shoeSize = v.shoeSize; S.shuffleDue = v.shuffleDue;
+  CasinoWallet.apply(v.cents);
+  if (v.finished) toast('Your last hand was finished', `Played out while you were away · ${fmt(v.finished.net / 100, true)}`, v.finished.net >= 0 ? 'win' : 'lose');
+  render();
+});
 })();
 </script>
 </body>

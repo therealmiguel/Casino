@@ -63,6 +63,11 @@ button{font:inherit;color:inherit}
 .dealer .card{--cw:clamp(52px,6.6vw,84px)}
 .dealer .cards{min-height:calc(clamp(52px,6.6vw,84px) * 1.4)}
 .card.new{animation:deal .38s cubic-bezier(.2,.8,.2,1)}
+.card.peek{animation:peek .9s ease}
+@keyframes peek{35%{transform:translateY(-14px) rotateX(38deg)}70%{transform:translateY(-14px) rotateX(38deg)}}
+.ins{font:800 10.5px var(--body);letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:999px;background:rgba(111,177,214,.16);color:#9FD3F2}
+.ins.win{background:rgba(99,214,158,.16);color:var(--win)} .ins.lose{background:rgba(242,120,109,.14);color:var(--lose)}
+.btn.insure{background:linear-gradient(180deg,#9FD3F2,#5FA8D3);color:#0B1E22;border-color:transparent;min-width:150px}
 @keyframes deal{from{opacity:0;transform:translateY(-40px) rotate(-8deg) scale(.8)}to{opacity:1;transform:none}}
 .face{position:absolute;inset:0;border-radius:inherit;overflow:hidden;background:var(--ivory);color:var(--ink);box-shadow:inset 0 0 0 1px rgba(0,0,0,.06),0 6px 14px rgba(0,0,0,.34)}
 .card.red .face{color:var(--red)}
@@ -171,7 +176,7 @@ kbd{font:600 10.5px var(--mono);padding:2px 5px;border-radius:5px;background:rgb
     <svg class="arc" viewBox="0 0 800 120" aria-hidden="true">
       <path id="a1" d="M 90 14 Q 400 120 710 14" fill="none"/><path id="a2" d="M 160 44 Q 400 136 640 44" fill="none"/>
       <text class="big"><textPath href="#a1" startOffset="50%" text-anchor="middle">BLACKJACK PAYS 3 TO 2</textPath></text>
-      <text class="small"><textPath href="#a2" startOffset="50%" text-anchor="middle">LIVE TABLE · DEALER STANDS ON ALL 17s · $5 – $1,000</textPath></text>
+      <text class="small"><textPath href="#a2" startOffset="50%" text-anchor="middle">INSURANCE PAYS 2 TO 1 · $5 – $1,000</textPath></text>
     </svg>
     <div class="banner"><div class="t" id="bannerTxt">Connecting to the table…</div><div class="tbar" id="tbar" hidden><i id="tfill"></i></div></div>
     <div class="seats" id="seats"></div>
@@ -186,66 +191,11 @@ kbd{font:600 10.5px var(--mono);padding:2px 5px;border-radius:5px;background:rgb
 <div class="gate" id="gate" hidden><div class="gatecard" id="gateCard"></div></div>
 
 <script>
-/* Miguel's Casino: one shared bankroll (cents) for every table, plus leaderboard sync */
-window.CasinoWallet = (() => {
-  const KEY = 'miguels-casino-wallet', START = 100000;
-  const get = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
-  let memObj = null;
-  const readObj = () => { const w = get(KEY); return w && Number.isFinite(w.cents) ? w : memObj; };
-  function writeObj(o) { memObj = o; try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
-  function put(c) {
-    const o = Object.assign({ resets: 0, peak: 0 }, readObj() || {});
-    o.cents = Math.max(0, Math.round(c)); o.peak = Math.max(o.peak || 0, o.cents); o.t = Date.now();
-    writeObj(o);
-  }
-  function init() {
-    const w = get(KEY);
-    if (w && Number.isFinite(w.cents)) { memObj = w; return; }
-    // first visit: keep the net result from any table played before the bankroll was shared
-    let c = START;
-    const bj = get('brass-table-blackjack-v1'), rl = get('voltage-roulette-v1'), cr = get('bubble-dome-craps-v1');
-    if (bj && typeof bj.bankroll === 'number') c += Math.round(bj.bankroll * 100) - START;
-    if (rl && typeof rl.balance === 'number') c += Math.round(rl.balance * 100) - START;
-    if (cr && Number.isFinite(cr.bank)) c += cr.bank - START;
-    if (c < 500) c = START;
-    writeObj({ cents: c, peak: c, resets: 0, t: Date.now() });
-  }
-  init();
-  let last = 0, view = null, onExternal = null;
-  const cents = () => { const o = readObj(); return o ? o.cents : START; };
-  function bind(v, ext) { view = v; onExternal = ext; last = v(); }
-  // push this table's change (win, loss, bet placed or taken back) into the shared bankroll
-  function sync() {
-    if (!view) return;
-    const cur = view(), d = cur - last;
-    if (!d) return;
-    put(cents() + d); last = cur;
-    CasinoBoard.schedule();
-  }
-  // another tab changed the bankroll: move the same amount into this table's balance
-  function pull() {
-    if (!view) return;
-    const w = cents(), d = w - last;
-    if (!d) return;
-    last = w;
-    if (onExternal) onExternal(d);
-  }
-  function add(c) { put(cents() + c); CasinoBoard.schedule(); }
-  // a top-up or a reset of the bankroll, counted on the leaderboard
-  function noteReset() { const o = Object.assign({ resets: 0 }, readObj() || {}); o.resets = (o.resets || 0) + 1; writeObj(o); CasinoBoard.schedule(); }
-  const info = () => Object.assign({ cents: START, peak: START, resets: 0 }, readObj() || {});
-  addEventListener('storage', e => { if (e.key === KEY) pull(); });
-  addEventListener('focus', pull);
-  addEventListener('pageshow', pull);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
-  return { cents, bind, sync, pull, add, noteReset, info, START };
-})();
-
-window.CasinoBoard = (() => {
-  const NAME_KEY = 'miguels-casino-name', JOIN_KEY = 'miguels-casino-joined';
-  const get = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+/* Miguel's Casino (online): the casino's server keeps every bankroll and decides every game.
+   This page only shows a copy of your balance and sends your moves. */
+window.CASINO_ONLINE = true;
+window.CasinoNet = (() => {
   const SEAT_KEY = 'miguels-casino-seat';
-  let ready = null, db = null, uid = null, mode = null, token = null, timer = null, busy = false, again = false, lastKey = '', denied = false;
   function seat() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(SEAT_KEY)); } catch (e) {}
@@ -256,101 +206,155 @@ window.CasinoBoard = (() => {
     }
     return s;
   }
+  // POST to the casino with this browser's seat; returns { ok, status, body }
+  async function api(path, body = {}) {
+    const s = seat();
+    let r, j = {};
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id: s.id, token: s.token }, body)) });
+        j = await r.json().catch(() => ({}));
+        if (r.status === 429 && attempt < 2) { await new Promise(res => setTimeout(res, 700 * (attempt + 1))); continue; }
+        if (r.status === 503 && /opening/i.test(j.error || '') && attempt < 2) { await new Promise(res => setTimeout(res, 2500)); continue; }
+        break;
+      } catch (e) {
+        if (attempt === 2) return { ok: false, status: 0, body: { error: 'No connection to the casino. Check your internet and try again.' } };
+        await new Promise(res => setTimeout(res, 800));
+      }
+    }
+    if (typeof j.cents === 'number') CasinoWallet._server(j.cents);
+    if (r.status === 403 && /suspended/i.test(j.error || '')) CasinoUI.suspended();
+    return { ok: r.ok, status: r.status, body: j };
+  }
+  return { seat, api };
+})();
+
+window.CasinoWallet = (() => {
+  const START = 100000, CACHE = 'miguels-casino-cache';
+  let cache = null;
+  try { cache = JSON.parse(localStorage.getItem(CACHE)); } catch (e) {}
+  const mine = cache && cache.id === CasinoNet.seat().id;
+  let bal = mine && Number.isFinite(cache.cents) ? cache.cents : 0;
+  let info_ = { peak: mine ? cache.peak || 0 : 0, resets: mine ? cache.resets || 0 : 0 };
+  let view = null, onExternal = null, isBusy = () => false;
+  const listeners = [];
+  const cents = () => bal;
+  function bind(v, ext, busy) { view = v; onExternal = ext; if (busy) isBusy = busy; }
+  function remember() { try { localStorage.setItem(CACHE, JSON.stringify({ id: CasinoNet.seat().id, cents: bal, peak: info_.peak, resets: info_.resets })); } catch (e) {} }
+  // the server just told us the balance
+  function _server(c) { bal = c; remember(); listeners.forEach(f => { try { f(c); } catch (e) {} }); }
+  // move this page's own balance to match the server (only while nothing is in play)
+  function apply(c) {
+    if (view && onExternal) { const d = c - view(); if (d) onExternal(d); }
+    _server(c);
+  }
+  async function refresh() {
+    if (isBusy()) return null;
+    const r = await CasinoNet.api('api/me', { name: CasinoBoard.name() });
+    if (r.ok) { info_ = { peak: r.body.peak, resets: r.body.resets }; if (!isBusy()) apply(r.body.cents); CasinoUI.notice(r.body.notice); if (r.body.banned) CasinoUI.suspended(); }
+    return r.ok ? r.body : null;
+  }
+  // a fresh $1,000, only when you are out of chips everywhere
+  async function reset() {
+    const r = await CasinoNet.api('api/wallet/reset');
+    if (r.ok) { info_.resets = r.body.resets; apply(r.body.cents); }
+    return r;
+  }
+  const info = () => ({ cents: bal, peak: Math.max(info_.peak || 0, bal), resets: info_.resets || 0 });
+  const onChange = f => listeners.push(f);
+  let last = 0;
+  const maybeRefresh = () => { if (Date.now() - last > 4000) { last = Date.now(); refresh(); } };
+  addEventListener('focus', maybeRefresh);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeRefresh(); });
+  // money only moves on the server now, so these do nothing
+  const sync = () => {}, pull = () => {}, add = () => {}, noteReset = () => {};
+  return { cents, bind, sync, pull, add, noteReset, info, refresh, reset, apply, onChange, _server, START };
+})();
+
+window.CasinoBoard = (() => {
+  const NAME_KEY = 'miguels-casino-name';
+  let ready = null, mode = null, denied = false, meInfo = null, timer = null;
   function name() { try { return (localStorage.getItem(NAME_KEY) || '').trim(); } catch (e) { return ''; } }
-  function setName(n) { try { localStorage.setItem(NAME_KEY, n); } catch (e) {} lastKey = ''; push(); }
+  function setName(n) { try { localStorage.setItem(NAME_KEY, n); } catch (e) {} push(); }
   function connect() {
     if (ready) return ready;
     ready = (async () => {
-      // inside Claude: the artifact's shared database
-      if (window.claude && typeof claude.use === 'function') {
-        const [d, u] = await Promise.all([claude.use('db'), claude.use('user')]);
-        if (!d || !u) return false;
-        const id = await u.id();
-        if (!id) return false;
-        db = d; uid = id; mode = 'claude';
-        return true;
-      }
-      // on your own server: its /api
-      if (/^https?:$/.test(location.protocol)) {
-        const r = await fetch('api/health', { cache: 'no-store' });
-        if (!r.ok) return false;
-        const s = seat(); uid = s.id; token = s.token; mode = 'server';
-        return true;
-      }
-      return false;
-    })().catch(() => false);
+      if (!/^https?:$/.test(location.protocol)) return false;
+      const r = await CasinoNet.api('api/me', { name: name() });
+      if (!r.ok) { if (r.status === 403) { denied = true; mode = 'server'; return true; } ready = null; return false; }
+      meInfo = r.body; mode = 'server';
+      CasinoWallet.apply(r.body.cents);
+      CasinoUI.notice(r.body.notice);
+      if (r.body.banned) CasinoUI.suspended();
+      if (r.body.name && !name()) { try { localStorage.setItem(NAME_KEY, r.body.name); } catch (e) {} }
+      return true;
+    })().catch(() => { ready = null; return false; });
     return ready;
   }
-  // this player's line on the leaderboard, built from the bankroll and each table's own stats
-  function snapshot() {
-    const n = name();
-    if (!n) return null;
-    const w = CasinoWallet.info();
-    const bj = get('brass-table-blackjack-v1') || {}, rl = get('voltage-roulette-v1') || {}, cr = get('bubble-dome-craps-v1') || {};
-    const riding = cr.bets ? Object.values(cr.bets).reduce((a, b) => a + (+b || 0), 0) : 0;
-    const bst = bj.stats || {}, rst = rl.stats || {}, cst = cr.stats || {}, lv = get('miguels-live-stats') || {}, sl = (get('dynamite-diggers-v1') || {}).stats || {};
-    let joined = 0;
-    try { joined = +localStorage.getItem(JOIN_KEY) || 0; if (!joined) { joined = Date.now(); localStorage.setItem(JOIN_KEY, String(joined)); } } catch (e) { joined = Date.now(); }
-    const cash = w.cents + riding + Math.max(0, +get('miguels-live-poker-stack') || 0);
-    return {
-      name: n.slice(0, 18),
-      cash, peak: Math.max(w.peak || 0, cash), resets: w.resets || 0,
-      hands: (bst.hands || 0) + (lv.hands || 0), spins: (rst.spins || 0) + (lv.spins || 0) + (sl.spins || 0), rolls: cst.rolls || 0,
-      bigWin: Math.max(Math.round((bst.bestWin || 0) * 100), Math.round((rst.biggestWin || 0) * 100), cst.bigWin || 0, lv.bigWin || 0, sl.bigWin || 0),
-      blackjacks: bst.blackjacks || 0, bestMult: rst.bestMult || 0, pointsMade: cst.made || 0,
-      joined,
-    };
-  }
   async function push() {
-    if (denied) return false;
-    if (busy) { again = true; return false; }
     if (!(await connect())) return false;
-    const doc = snapshot();
-    if (!doc) return false;
-    const key = JSON.stringify(doc);
-    if (key === lastKey) return true;
-    busy = true;
-    try {
-      if (mode === 'claude') {
-        doc.updatedAt = Date.now();
-        await db.doc('players/' + uid).set(doc);
-        lastKey = key;
-      } else {
-        const r = await fetch('api/players', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id: uid, token }, doc)) });
-        if (r.ok) lastKey = key;
-        else if (r.status === 403) denied = true;
-        else if (r.status === 429) again = true;
-      }
-    } catch (e) {
-      if (e && e.code === 'invalid_argument') denied = true;
-    } finally {
-      busy = false;
-      if (again) { again = false; schedule(1500); }
-    }
-    return !denied;
+    const r = await CasinoNet.api('api/me', { name: name() });
+    if (r.ok) meInfo = r.body;
+    return r.ok;
   }
   function schedule(ms = 2500) { clearTimeout(timer); timer = setTimeout(push, ms); }
-  addEventListener('pagehide', () => { if (timer) { clearTimeout(timer); push(); } });
-  // live list of every player: onRows(rows) with rows = [{ id, name, cash, ... }]
   function subscribe(onRows, onError) {
-    if (mode === 'claude') {
-      return db.collection('players').orderBy('cash', 'desc').limit(200).onSnapshot(
-        snap => onRows(snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data() || {}))), onError);
-    }
-    if (mode === 'server') {
-      let poll = null, es = null;
-      const load = () => fetch('api/players', { cache: 'no-store' }).then(r => r.json()).then(onRows).catch(() => {});
-      if (window.EventSource) {
-        es = new EventSource('api/stream');
-        es.addEventListener('players', e => { try { onRows(JSON.parse(e.data)); } catch (x) {} });
-        es.onerror = () => { if (onError && es.readyState === 2) onError(); };
-      } else { load(); poll = setInterval(load, 8000); }
-      return () => { if (es) es.close(); if (poll) clearInterval(poll); };
-    }
-    return () => {};
+    let es = null, poll = null;
+    const load = () => fetch('api/players', { cache: 'no-store' }).then(r => r.json()).then(onRows).catch(() => {});
+    if (window.EventSource) {
+      es = new EventSource('api/stream');
+      es.addEventListener('players', e => { try { onRows(JSON.parse(e.data)); } catch (x) {} });
+      es.addEventListener('notice', e => { try { CasinoUI.notice(JSON.parse(e.data)); } catch (x) {} });
+      es.onerror = () => { if (onError && es.readyState === 2) onError(); };
+    } else { load(); poll = setInterval(load, 8000); }
+    return () => { if (es) es.close(); if (poll) clearInterval(poll); };
   }
-  const identity = () => seat();
-  return { name, setName, connect, push, schedule, snapshot, subscribe, identity, get db() { return db; }, get uid() { return uid; }, get mode() { return mode; }, get denied() { return denied; } };
+  const identity = () => CasinoNet.seat();
+  const snapshot = () => null;
+  return { name, setName, connect, push, schedule, snapshot, subscribe, identity, get uid() { return CasinoNet.seat().id; }, get mode() { return mode; }, get denied() { return denied; }, get me() { return meInfo; } };
+})();
+
+// announcements from the casino, and the notice for a suspended account
+window.CasinoUI = (() => {
+  let bar = null, shownKey = '';
+  const css = `.mc-notice{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:9999;max-width:min(680px,calc(100% - 24px));display:flex;gap:10px;align-items:center;padding:10px 12px 10px 16px;border-radius:14px;
+    font:600 14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1B1206;background:linear-gradient(180deg,#FFE9A8,#F2C65A);box-shadow:0 12px 30px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.2);animation:mcIn .35s ease}
+    .mc-notice.party{background:linear-gradient(90deg,#FF9AD5,#FFD36E,#8EF0B4);} .mc-notice.warn{background:linear-gradient(180deg,#FFB4A8,#F2786D);}
+    .mc-notice.ban{background:linear-gradient(180deg,#3A1414,#220A0A);color:#FFD9D2;box-shadow:0 12px 30px rgba(0,0,0,.5),0 0 0 1px #F2786D}
+    .mc-notice b{font-weight:800}
+    .mc-notice button{flex:none;border:0;background:rgba(0,0,0,.14);color:inherit;width:26px;height:26px;border-radius:50%;cursor:pointer;font:700 15px system-ui}
+    @keyframes mcIn{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}`;
+  function ensure() {
+    if (bar) return bar;
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    bar = document.createElement('div'); bar.className = 'mc-notice'; bar.hidden = true; bar.setAttribute('role', 'status');
+    document.body.appendChild(bar);
+    return bar;
+  }
+  function show(text, kind, closable) {
+    const b = ensure();
+    b.className = 'mc-notice ' + (kind || '');
+    b.textContent = '';
+    const s = document.createElement('span'); s.textContent = text; b.appendChild(s);
+    if (closable) { const x = document.createElement('button'); x.type = 'button'; x.setAttribute('aria-label', 'Close'); x.textContent = '×'; x.onclick = () => { b.hidden = true; try { sessionStorage.setItem('mc-notice-closed', shownKey); } catch (e) {} }; b.appendChild(x); }
+    b.hidden = false;
+  }
+  let banned = false;
+  function notice(n) {
+    if (banned) return;
+    if (!document.body) { addEventListener('DOMContentLoaded', () => notice(n)); return; }
+    if (!n || !n.text) { if (bar && !banned) bar.hidden = true; return; }
+    shownKey = String(n.t || n.text);
+    let closed = ''; try { closed = sessionStorage.getItem('mc-notice-closed') || ''; } catch (e) {}
+    if (closed === shownKey) return;
+    show('📣 ' + n.text, n.kind === 'party' ? 'party' : n.kind === 'warn' ? 'warn' : '', true);
+  }
+  function suspended() {
+    banned = true;
+    if (!document.body) { addEventListener('DOMContentLoaded', suspended); return; }
+    show('Your account has been suspended by the casino, so you can’t play right now. Ask Miguel if you think this is a mistake.', 'ban', false);
+  }
+  return { notice, suspended };
 })();
 </script>
 
@@ -365,18 +369,12 @@ const COLORS = ['#E8C170', '#E07A5F', '#81B29A', '#9C89B8', '#F2CC8F', '#6FB1D6'
 const tint = s => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
 const store = { get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
 
-/* ---------- money: the shared casino bankroll, in cents ---------- */
+/* ---------- money: the casino's server keeps your bankroll (cents); this page shows it ---------- */
 let bank = CasinoWallet.cents();
 CasinoWallet.bind(() => bank, d => { bank = Math.max(0, bank + d); renderHeader(); });
-const commit = () => { CasinoWallet.sync(); renderHeader(); };
+const setBank = c => { if (typeof c === 'number') { bank = c; CasinoWallet._server(c); renderHeader(); } };
 const applied = new Set(store.get('miguels-live-applied', []));
 const saveApplied = () => store.set('miguels-live-applied', [...applied].slice(-300));
-function addStats(e) {
-  const s = store.get('miguels-live-stats', { hands: 0, spins: 0, bigWin: 0 });
-  if (e.staked > 0) s.hands += e.hands || 1;
-  s.bigWin = Math.max(s.bigWin || 0, e.net || 0);
-  store.set('miguels-live-stats', s);
-}
 let sound = store.get('miguels-live-sound', true);
 
 /* ---------- audio ---------- */
@@ -405,17 +403,16 @@ function toast(title, sub = '', kind = '') {
 }
 
 /* ---------- connection ---------- */
-let me = null, name = '', st = null, offset = 0, busy = false, lastRound = 0, seenCards = new Set(), myTurnKey = '';
+let me = null, name = '', st = null, offset = 0, busy = false, lastRound = 0, seenCards = new Set(), myTurnKey = '', peekAnim = '', peekDone = '';
 async function act(action, extra = {}) {
   if (busy) return null;
   busy = true;
   try {
     const r = await fetch('api/live/bj', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id: me.id, token: me.token, name, action }, extra)) });
     const j = await r.json().catch(() => ({}));
+    setBank(j.cents);
     if (!r.ok) { toast(j.error || 'That did not go through', '', 'dim'); return null; }
-    if (j.charge) { bank -= j.charge; sfx('chip'); }
-    if (j.refund) { bank += j.refund; sfx('chip'); }
-    commit();
+    if (j.charge || j.refund) sfx('chip');
     return j;
   } catch (e) { toast('No connection to the table', 'Check your internet and try again', 'dim'); return null; }
   finally { busy = false; render(); }
@@ -428,15 +425,13 @@ async function processPayouts() {
   for (const e of list) {
     if (applied.has(e.id)) continue;
     applied.add(e.id);
-    bank += e.payout;
-    addStats(e);
     if (e.id === 'bj-' + st.roundId && st.phase === 'settle') {
       if (e.net > 0) { toast(`You win ${fmt(e.net)}`, `${fmt(e.payout)} back to your bankroll`, 'win'); sfx(st.seats[st.me.seat] && st.seats[st.me.seat].hands.some(h => h.result && h.result.label === 'Blackjack') ? 'bj' : 'win'); }
       else if (e.net < 0) { toast(`${fmtS(e.net)}`, 'Better luck next hand', 'lose'); sfx('lose'); }
       else toast('Push', 'Your bet is returned', 'dim');
     } else if (e.payout > 0) toast(`${fmt(e.payout)} returned`, e.staked ? 'From a hand that finished while you were away' : 'Your bet came back', 'dim');
   }
-  saveApplied(); commit();
+  saveApplied();
   claiming = true;
   try { await fetch('api/live/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: me.id, token: me.token, ids: list.map(e => e.id) }) }); } catch (e) {}
   claiming = false;
@@ -452,6 +447,9 @@ function connect() {
     const turnKey = st.phase === 'playing' && t && t.seat === mySeat ? `${st.roundId}-${t.hand}` : '';
     if (turnKey && turnKey !== myTurnKey) sfx('turn');
     myTurnKey = turnKey;
+    if (!busy) setBank(st.me.cents);
+    if (st.phase === 'insurance' && (!prev || prev.phase !== 'insurance')) sfx('turn');
+    if (st.peek && (!prev || prev.peek !== st.peek || prev.roundId !== st.roundId)) peekAnim = st.roundId + '-' + st.peek;
     processPayouts();
     render(prev);
   });
@@ -484,6 +482,10 @@ function bannerText() {
   const seats = st.seats, t = st.turn;
   if (st.phase === 'waiting') return seats.some(Boolean) ? 'Place your bets to start the round' : 'The table is open. Take a seat.';
   if (st.phase === 'betting') return `Bets close in <b>${secs}s</b>`;
+  if (st.phase === 'insurance') {
+    const waiting = seats.filter(s => s && s.inRound && s.ins === null).length;
+    return `Dealer shows an ace · insurance closes in <b>${secs}s</b>${waiting ? ` · ${waiting} still deciding` : ''}`;
+  }
   if (st.phase === 'playing' && t) {
     const s = seats[t.seat];
     const who = s && s.me ? 'Your turn' : `${escapeHTML(s ? s.name : 'Player')}'s turn`;
@@ -498,8 +500,8 @@ function bannerText() {
 const escapeHTML = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 function tick() {
   if (!st) return;
-  $('bannerTxt').innerHTML = (st.news ? `${escapeHTML(st.news)} · ` : '') + bannerText();
-  const total = st.phase === 'betting' ? 15000 : st.phase === 'playing' ? 20000 : st.phase === 'settle' ? 6000 : 0;
+  $('bannerTxt').innerHTML = (st.news && st.phase !== 'insurance' ? `${escapeHTML(st.news)} · ` : '') + bannerText();
+  const total = st.phase === 'betting' ? 15000 : st.phase === 'playing' ? 20000 : st.phase === 'settle' ? 6000 : st.phase === 'insurance' ? (st.insMs || 12000) : 0;
   const bar = $('tbar');
   bar.hidden = !total || !st.deadline;
   if (!bar.hidden) { const l = left(); $('tfill').style.width = Math.min(100, l / total * 100) + '%'; bar.classList.toggle('hot', l < 5000); }
@@ -511,6 +513,8 @@ function render() {
   // dealer
   const dc = $('dealerCards'); dc.innerHTML = '';
   st.dealer.forEach((c, i) => dc.appendChild(cardEl(c, c ? `d-${i}-${c.r}${c.s}` : `d-${i}-down`)));
+  // the dealer lifts the hole card to check for blackjack
+  if (peekAnim && peekAnim !== peekDone && dc.children[1]) { peekDone = peekAnim; const el = dc.children[1]; el.classList.add('peek'); setTimeout(() => el.classList.remove('peek'), 900); }
   const dt = $('dealerTotal');
   dt.hidden = !st.dealer.length;
   dt.className = 'pill' + (st.dealerTotal > 21 ? ' bust' : '');
@@ -538,9 +542,16 @@ function render() {
         meta.append(tp, stake);
         if (h.result) {
           const r = document.createElement('span');
-          const cls = { Win: 'win', Blackjack: 'blackjack', Push: 'push', Lose: 'lose', Bust: 'bust', 'Dealer blackjack': 'dealer' }[h.result.label] || 'push';
+          const cls = { Win: 'win', Blackjack: 'blackjack', Push: 'push', Lose: 'lose', Bust: 'bust', 'Dealer blackjack': 'dealer', 'Even money': 'win', Surrendered: 'push' }[h.result.label] || 'push';
           r.className = 'res ' + cls; r.textContent = h.result.net > 0 ? `${h.result.label} ${fmtS(h.result.net)}` : h.result.label;
           meta.appendChild(r);
+        }
+        if (hi === 0 && s.ins !== null && s.ins !== undefined && s.ins !== 0 && s.inRound) {
+          const ins = document.createElement('span');
+          const res = s.insResult;
+          ins.className = 'ins' + (res > 0 ? ' win' : res < 0 ? ' lose' : '');
+          ins.textContent = s.ins === 'even' ? 'Even money' : res > 0 ? `Insurance ${fmtS(res)}` : res < 0 ? `Insurance ${fmtS(res)}` : `Insured ${fmt(s.ins)}`;
+          meta.appendChild(ins);
         }
         hd.append(cs, meta); hands.appendChild(hd);
       });
@@ -554,6 +565,7 @@ function render() {
       const stt = document.createElement('div'); stt.className = 'st';
       if (s.leaving) stt.textContent = 'Leaving after this hand';
       else if (!s.online) stt.textContent = 'Away';
+      else if (st.phase === 'insurance') stt.textContent = !s.inRound ? 'Sitting out' : s.ins === null ? 'Deciding on insurance…' : s.ins === 'even' ? 'Took even money' : s.ins > 0 ? 'Insured' : 'No insurance';
       else if (st.phase === 'playing' || st.phase === 'dealer' || st.phase === 'settle') stt.textContent = s.inRound ? (isTurn ? 'Playing' : 'In the hand') : 'Sitting out';
       else if (s.ready) { stt.textContent = 'Ready'; stt.classList.add('ok'); }
       else stt.textContent = s.bet ? 'Betting' : 'No bet yet';
@@ -606,6 +618,23 @@ function renderControls() {
     row.appendChild(btn('Leave seat', '', () => act('leave'), { cls: 'ghost' }));
     return;
   }
+  if (st.phase === 'insurance') {
+    if (!s.inRound) { status.textContent = "Dealer shows an ace. You're sitting out this round."; row.appendChild(btn('Leave seat', '', () => act('leave'), { cls: 'ghost' })); return; }
+    const h = s.hands[0], nat = h.cards.length === 2 && h.total === 21;
+    if (s.ins === null) {
+      if (nat) {
+        status.innerHTML = `You have <b>blackjack</b> and the dealer shows an ace. Take <b>even money</b> (${fmt(h.bet)} now, guaranteed) or play on for 3 to 2?`;
+        row.appendChild(btn(`Even money ${fmtS(h.bet)}`, 'Y', () => act('insurance', { take: true }), { cls: 'insure' }));
+        row.appendChild(btn('Play for 3:2', 'N', () => act('insurance', { take: false })));
+      } else {
+        const cost = h.bet / 2;
+        status.innerHTML = `The dealer shows an ace. Insurance costs <b>${fmt(cost)}</b> and pays <b>2 to 1</b> if the dealer has blackjack.`;
+        row.appendChild(btn(`Insure ${fmt(cost)}`, 'Y', () => act('insurance', { take: true }), { cls: 'insure', disabled: cost > bank }));
+        row.appendChild(btn('No insurance', 'N', () => act('insurance', { take: false })));
+      }
+    } else status.innerHTML = s.ins === 'even' ? 'Even money taken. Waiting for the other players…' : s.ins > 0 ? `Insured for <b>${fmt(s.ins)}</b>. Waiting for the other players…` : 'No insurance. Waiting for the other players…';
+    return;
+  }
   const t = st.turn, mine = st.phase === 'playing' && t && t.seat === i;
   if (mine) {
     const h = s.hands[t.hand];
@@ -617,6 +646,7 @@ function renderControls() {
     row.appendChild(btn('Stand', 'S', () => act('stand')));
     row.appendChild(btn('Double', 'D', () => act('double'), { disabled: !two || h.bet > bank }));
     row.appendChild(btn('Split', 'P', () => act('split'), { disabled: !canSplit }));
+    row.appendChild(btn('Surrender', 'R', () => act('surrender'), { cls: 'ghost', disabled: !(two && s.hands.length === 1 && !h.fromSplit) }));
     return;
   }
   if (st.phase === 'playing' && t) status.innerHTML = s.inRound ? `Waiting for <b>${escapeHTML(st.seats[t.seat] ? st.seats[t.seat].name : 'a player')}</b>…` : "You're sitting out this round. Bet on the next one.";
@@ -638,7 +668,9 @@ document.addEventListener('keydown', e => {
   if (i < 0) return;
   const mine = st.phase === 'playing' && st.turn && st.turn.seat === i;
   if (mine) {
-    if (k === 'h') act('hit'); else if (k === 's') act('stand'); else if (k === 'd') act('double'); else if (k === 'p') act('split');
+    if (k === 'h') act('hit'); else if (k === 's') act('stand'); else if (k === 'd') act('double'); else if (k === 'p') act('split'); else if (k === 'r') act('surrender');
+  } else if (st.phase === 'insurance') {
+    if (k === 'y') act('insurance', { take: true }); else if (k === 'n') act('insurance', { take: false });
   } else if (st.phase === 'waiting' || st.phase === 'betting') {
     if (k === ' ' && e.target.tagName !== 'BUTTON') { e.preventDefault(); act('ready'); }
     else if (k === 'c') act('clear');
