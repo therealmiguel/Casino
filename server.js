@@ -258,5 +258,5 @@ load()
   .finally(() => server.listen(PORT, '0.0.0.0', () => {
     console.log(`Miguel's Casino is open on http://localhost:${PORT}`);
     console.log(PUBLIC_DIR ? `Casino pages found in ${PUBLIC_DIR}` : 'WARNING: casino pages not found. Upload index.html, blackjack.html, roulette.html and craps.html.');
-    console.log(`Leaderboard saved in ${USE_REDIS ? 'Upstash Redis' : DATA_FILE} · ${players.size} player${players.size === 1 ? "" : "s"} loaded`);
+    console.log(`Leaderboard saved in ${USE_REDIS ? 'Upstash Redis' : DATA_FILE} Â· ${players.size} player${players.size === 1 ? "" : "s"} loaded`);
   }));
