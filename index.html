@@ -3,339 +3,316 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Miguel's Casino</title>
+<title>Bubble Dome Craps</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Limelight&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=DM+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Share+Tech+Mono&display=swap">
 <style>
 :root{
   color-scheme: dark;
-  --velvet:#16080E; --velvet-2:#240C16; --velvet-3:#34111F;
-  --gold:#E8C170; --gold-2:#F7DFA3; --gold-dim:rgba(232,193,112,.35);
-  --ivory:#F5EBDD; --muted:#B69C9F; --red:#C0283E;
-  --display:"Limelight","Didot","Bodoni 72","Georgia",serif;
-  --body:"DM Sans","Segoe UI",system-ui,sans-serif;
-  --mono:"DM Mono",ui-monospace,Menlo,Consolas,monospace;
+  --room:#06080B; --panel:#0D1015; --panel-2:#141920; --panel-3:#1B222B; --edge:rgba(255,255,255,.09); --edge-2:rgba(255,255,255,.16);
+  --felt:#0E5B37; --felt-2:#0A4529; --fl:rgba(246,242,226,.82); --ft:#F6F2E2; --gold:#F2C14E; --fred:#E5483A;
+  --led:#FFB547; --led-dim:rgba(255,181,71,.18);
+  --text:#EDEFF3; --muted:#8A93A3; --win:#58E08F; --lose:#FF6E62; --roll:#E23B2E;
+  --display:"Oswald","Arial Narrow","Segoe UI",system-ui,sans-serif;
+  --fancy:"Abril Fatface","Georgia","Times New Roman",serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --lcd:"Share Tech Mono",ui-monospace,Menlo,Consolas,monospace;
 }
+html,body{height:100%}
+body{margin:0;background:var(--room);color:var(--text);font-family:var(--body);overflow:hidden;-webkit-tap-highlight-color:transparent}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-html{background:var(--velvet)}
-body{margin:0;min-height:100%;color:var(--ivory);font-family:var(--body);
-  background:radial-gradient(90% 60% at 50% 0%,var(--velvet-3) 0%,var(--velvet-2) 40%,var(--velvet) 100%) fixed;}
-body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.08;mix-blend-mode:overlay;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-a{color:inherit}
-:focus-visible{outline:2px solid var(--gold-2);outline-offset:3px}
-.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:36px 40px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr)}
 
-/* marquee sign */
-.sign{position:relative;margin:0 auto;max-width:760px;padding:34px 30px 30px;border-radius:26px;text-align:center;
-  background:linear-gradient(180deg,#2A0D18,#1B0810);box-shadow:0 0 0 2px #5a3a1c,0 0 0 8px #1c0a10,0 0 0 10px #6b4a22,0 30px 70px rgba(0,0,0,.55),0 0 90px rgba(232,193,112,.12)}
-.bulbs{position:absolute;inset:10px;pointer-events:none}
-.bulb{position:absolute;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:#FFE7A8;box-shadow:0 0 6px 2px rgba(255,210,120,.75),0 0 16px rgba(255,190,90,.45);animation:chase 1.6s linear infinite}
-@keyframes chase{0%,100%{opacity:1}50%{opacity:.25;box-shadow:none}}
-.eyebrow{font:500 12px var(--body);letter-spacing:.34em;text-transform:uppercase;color:var(--gold)}
-h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spacing:.02em;color:var(--gold-2);
-  text-shadow:0 0 18px rgba(247,223,163,.45),0 0 44px rgba(232,193,112,.25),0 3px 0 #6b4a22;text-wrap:balance}
-.lede{margin:0 auto;max-width:44ch;color:var(--ivory);opacity:.85;font-size:16px;line-height:1.55}
-.bank{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin:22px auto 0}
-.meter{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 26px 9px;border-radius:14px;background:#0B0407;box-shadow:inset 0 2px 10px rgba(0,0,0,.8),0 0 0 1px rgba(232,193,112,.3)}
-.meter span{font:500 10.5px var(--body);letter-spacing:.26em;text-transform:uppercase;color:var(--muted)}
-.meter b{font:500 clamp(26px,5vw,36px) var(--mono);color:var(--gold-2);text-shadow:0 0 14px rgba(247,223,163,.45);font-variant-numeric:tabular-nums;line-height:1.1}
-.topup{font:700 13px var(--body);letter-spacing:.06em;text-transform:uppercase;color:#1A0B0F;background:linear-gradient(180deg,var(--gold-2),var(--gold));border:0;border-radius:999px;padding:11px 18px;cursor:pointer}
-.riding{font-size:13px;color:var(--gold)}
+/* header / machine top */
+.bar{display:flex;align-items:center;gap:16px;padding:9px 18px;background:linear-gradient(180deg,#151A21,#0D1015);border-bottom:1px solid var(--edge)}
+.brand{display:flex;flex-direction:column;line-height:1;white-space:nowrap}
+.brand b{font:700 19px var(--display);letter-spacing:.06em;text-transform:uppercase}
+.brand b i{font-style:normal;color:var(--gold)}
+.brand small{font:500 10px var(--body);letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.meters{margin-left:auto;display:flex;gap:10px}
+.meter{background:#050607;border:1px solid #222831;border-radius:8px;padding:5px 11px 4px;min-width:112px;box-shadow:inset 0 2px 8px rgba(0,0,0,.8)}
+.meter .l{font:600 9.5px var(--body);letter-spacing:.16em;text-transform:uppercase;color:#6E7684;display:block}
+.meter .v{font:22px var(--lcd);color:var(--led);text-shadow:0 0 10px rgba(255,181,71,.45);display:block;text-align:right;font-variant-numeric:tabular-nums;line-height:1.1}
+.meter .v.win{color:var(--win);text-shadow:0 0 10px rgba(88,224,143,.45)}
+.pointbox{display:flex;align-items:center;gap:8px;padding:0 4px}
+.puckmini{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font:700 11px var(--display);letter-spacing:.06em;
+  background:radial-gradient(circle at 35% 30%,#3a3f47,#0b0c0f);color:#d8dbe0;box-shadow:0 0 0 2px #5b616b,0 3px 8px rgba(0,0,0,.6)}
+.puckmini.on{background:radial-gradient(circle at 35% 30%,#fff,#d6d9de);color:#111;box-shadow:0 0 0 2px #fff,0 0 14px rgba(255,255,255,.35)}
+.pointbox .pl{display:flex;flex-direction:column;line-height:1.05}
+.pointbox .pl span{font:600 9.5px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.pointbox .pl b{font:700 17px var(--display);letter-spacing:.03em}
+.icons{display:flex;gap:6px}
+.ibtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--edge);background:var(--panel-2);display:grid;place-items:center;cursor:pointer;color:var(--text)}
+.ibtn:hover{background:var(--panel-3)}
+.ibtn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ibtn.off{color:var(--muted)}
 
-/* tables */
-.tables{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin-top:44px}
-.table{display:flex;flex-direction:column;text-decoration:none;border-radius:20px;overflow:hidden;background:#1D0A12;
-  box-shadow:0 0 0 1px rgba(232,193,112,.2),0 18px 40px rgba(0,0,0,.45);transition:transform .25s ease,box-shadow .25s ease}
-.table:hover{transform:translateY(-5px);box-shadow:0 0 0 1px var(--gold-dim),0 26px 50px rgba(0,0,0,.55),0 0 40px rgba(232,193,112,.14)}
-.art{position:relative;aspect-ratio:16/10;display:grid;place-items:center;overflow:hidden}
-.art svg{width:100%;height:100%;display:block}
-.info{display:flex;flex-direction:column;gap:8px;padding:18px 20px 20px;flex:1}
-.kind{font:500 11px var(--body);letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
-.info h2{margin:0;font:400 28px/1.1 var(--display);letter-spacing:.01em;color:var(--ivory)}
-.info p{margin:0;font-size:14.5px;line-height:1.5;color:var(--muted)}
-.foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding-top:14px;border-top:1px solid rgba(232,193,112,.14)}
-.chips{display:flex;flex-direction:column;line-height:1.2}
-.chips span{font:500 10.5px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
-.chips b{font:500 15px var(--mono);color:var(--ivory);font-variant-numeric:tabular-nums}
-.chips em{font-style:normal}
-.play{display:inline-flex;align-items:center;gap:8px;font:700 14px var(--body);letter-spacing:.06em;text-transform:uppercase;color:#1A0B0F;
-  background:linear-gradient(180deg,var(--gold-2),var(--gold));padding:11px 18px;border-radius:999px;box-shadow:0 4px 14px rgba(232,193,112,.25)}
-.play svg{width:14px;height:14px}
+/* main */
+.main{overflow-y:auto;overflow-x:hidden;background:radial-gradient(120% 90% at 30% 20%,#141A22 0%,#0A0D11 55%,var(--room) 100%)}
+.stage{display:grid;grid-template-columns:minmax(300px,430px) minmax(0,1fr);gap:22px;align-items:center;padding:16px 20px;min-height:100%;max-width:1560px;margin-inline:auto}
+.domecol{display:flex;flex-direction:column;gap:12px;min-width:0}
+.domebox{position:relative;width:100%;aspect-ratio:1/1;border-radius:18px;overflow:hidden;background:#07090C;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06),0 20px 50px rgba(0,0,0,.5)}
+.domebox canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.callout{position:absolute;left:0;right:0;top:12px;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;text-align:center;padding:0 12px}
+.callout .tot{display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(-6px);transition:opacity .25s,transform .25s}
+.callout .tot b{font:700 34px var(--display);color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+.callout .say{font:600 15px var(--body);color:var(--gold);text-shadow:0 2px 10px rgba(0,0,0,.9);opacity:0;transition:opacity .25s;text-wrap:balance}
+.callout.show .tot,.callout.show .say{opacity:1;transform:none}
+.callout .say.bad{color:var(--lose)} .callout .say.good{color:var(--win)}
+.mdie{display:inline-block;vertical-align:middle}
+.fallback{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:14px;padding:20px}
+.histwrap{display:flex;align-items:center;gap:10px;min-height:34px}
+.histwrap .lbl{font:600 10px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.hist{display:flex;gap:6px;overflow:hidden;flex:1;-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}
+.hr{flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 5px;border-radius:7px;background:var(--panel-2);border:1px solid var(--edge)}
+.hr span{font:600 12px var(--lcd);line-height:1}
+.hr.seven span{color:var(--lose)}
+.hr.ptk{border-color:rgba(242,193,78,.5)}
+.hr .dd{display:flex;gap:2px}
+.hist .empty{font-size:13px;color:var(--muted)}
 
-.note{margin:40px auto 0;max-width:62ch;text-align:center;font-size:13.5px;line-height:1.6;color:var(--muted)}
-.note b{color:var(--ivory);font-weight:500}
+/* craps layout */
+.layoutcol{min-width:0;display:flex;flex-direction:column;align-items:center;gap:10px}
+.feltscroll{width:100%;overflow-x:auto;overflow-y:hidden;display:flex;justify-content:center}
+.feltsize{position:relative;flex:none}
+.felt{position:absolute;left:0;top:0;width:760px;height:390px;transform-origin:0 0;border-radius:14px;user-select:none;-webkit-user-select:none;touch-action:manipulation;
+  background:radial-gradient(120% 120% at 40% 30%,#137047 0%,var(--felt) 45%,var(--felt-2) 100%);
+  box-shadow:0 0 0 3px #3a2616,0 0 0 9px #22160c,0 18px 40px rgba(0,0,0,.55)}
+.felt::before{content:"";position:absolute;inset:0;border-radius:14px;pointer-events:none;opacity:.22;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.ar{position:absolute;border:0;padding:0;background:transparent;color:var(--ft);box-shadow:inset 0 0 0 1.5px var(--fl);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font:600 14px var(--display);letter-spacing:.08em;text-transform:uppercase;transition:background .15s}
+.ar:hover{background:rgba(255,255,255,.07)}
+.ar.off{cursor:not-allowed}
+.ar.off:hover{background:transparent}
+.ar.dim{opacity:.55}
+.felt.locked .ar{cursor:default}
+.felt.locked .ar:hover{background:transparent}
+.ar.hl{background:rgba(242,193,78,.14)}
+.ar .num{font:44px var(--fancy);letter-spacing:.01em;text-transform:none;line-height:1;margin-top:6px}
+.ar .num.w{font-size:33px;letter-spacing:.04em}
+.ar.strip{font-size:11px;letter-spacing:.3em;color:rgba(246,242,226,.75)}
+.dcbar{flex-direction:column;gap:6px}
+.vt{writing-mode:vertical-rl;transform:rotate(180deg);font-size:12px;letter-spacing:.14em}
+.come{font:700 58px var(--display);letter-spacing:.14em;color:var(--fred);text-shadow:0 2px 0 rgba(0,0,0,.25)}
+.fieldin{display:flex;flex-direction:column;align-items:center;gap:2px}
+.fnums{display:flex;align-items:center;gap:14px;font:600 26px var(--display);color:var(--gold);letter-spacing:.02em}
+.fnums .ring{position:relative;display:grid;place-items:center;width:46px;height:46px;border-radius:50%;box-shadow:0 0 0 2px var(--gold)}
+.fnums .ring small{position:absolute;bottom:-15px;font:600 8px var(--body);letter-spacing:.1em;color:var(--ft);white-space:nowrap}
+.fnums i{font-style:normal;color:var(--ft);font-size:18px}
+.fieldlbl{font:700 18px var(--display);letter-spacing:.45em;margin-top:14px;color:var(--ft)}
+.dp{gap:12px;font-size:16px;letter-spacing:.2em}
+.pass{font:700 34px var(--display);letter-spacing:.32em}
+.big{font:700 13px var(--display)}
+.big span{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:.9}
+.big span b{font:44px var(--fancy);color:var(--fred)}
+.big6 span{left:8px;top:18px} .big8 span{right:8px;bottom:22px}
+.bigline{position:absolute;left:0;top:140px;width:70px;height:190px;pointer-events:none}
+.pr{flex-direction:column;gap:3px;font-size:10.5px;letter-spacing:.06em;background:rgba(0,0,0,.12)}
+.pr .dd{display:flex;gap:3px}
+.pr small{font:600 10px var(--display);letter-spacing:.08em;color:var(--gold)}
+.pr.red{font-size:17px;color:var(--fred);letter-spacing:.12em;flex-direction:row;gap:10px}
+.pr.red small{font-size:11px}
+.pr.wide{flex-direction:row;gap:8px;font-size:14px;white-space:nowrap}
+.pr.wide small{font-size:8.5px}
+.pr.tall{flex-direction:column;gap:2px}
+.chips-l{position:absolute;inset:0;pointer-events:none}
+.lchip{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;display:grid;place-items:center;font:700 9.5px var(--display);letter-spacing:0;color:#111;
+  background:radial-gradient(circle,var(--c) 0 54%,transparent 55%),repeating-conic-gradient(var(--e) 0 15deg,var(--c) 15deg 45deg);
+  box-shadow:0 1px 0 rgba(0,0,0,.6),0 2px 0 rgba(0,0,0,.45),0 4px 8px rgba(0,0,0,.4);transition:left .45s ease,top .45s ease,opacity .35s,transform .35s;animation:drop .2s ease}
+.lchip.odds{width:22px;height:22px;margin:-11px 0 0 -11px;font-size:8.5px}
+.lchip.click{pointer-events:auto;cursor:pointer}
+.lchip.gone{opacity:0;transform:scale(.4)}
+.lchip.off::after{content:"OFF";position:absolute;top:-9px;left:50%;transform:translateX(-50%);font:700 7px var(--body);letter-spacing:.06em;background:#111;color:#fff;padding:1px 3px;border-radius:3px}
 
+.puck{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;display:grid;place-items:center;font:700 9px var(--display);letter-spacing:.06em;pointer-events:none;
+  transition:left .5s cubic-bezier(.3,.7,.2,1),top .5s cubic-bezier(.3,.7,.2,1),background .3s;z-index:3;
+  background:radial-gradient(circle at 35% 30%,#3a3f47,#0b0c0f);color:#e5e7ea;box-shadow:0 0 0 2px #71777f,0 4px 8px rgba(0,0,0,.55)}
+.puck.on{background:radial-gradient(circle at 35% 30%,#fff,#d7dade);color:#111;box-shadow:0 0 0 2px #fff,0 4px 10px rgba(0,0,0,.5)}
+.fly{position:absolute;transform:translate(-50%,-50%);font:700 13px var(--display);letter-spacing:.02em;padding:2px 7px;border-radius:6px;pointer-events:none;white-space:nowrap;z-index:5;animation:fly 1.9s ease forwards}
+.fly.w{background:rgba(10,40,24,.92);color:var(--win);box-shadow:0 0 0 1px rgba(88,224,143,.5)}
+.fly.l{background:rgba(40,10,10,.9);color:var(--lose);box-shadow:0 0 0 1px rgba(255,110,98,.4)}
+.fly.b{background:rgba(20,20,20,.9);color:#ddd}
 
-/* ---------- live tables ---------- */
-.live-sec{margin-top:40px}
-.live-sec .head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px}
-.live-sec h2{margin:6px 0 0;font:400 clamp(30px,5vw,44px)/1 var(--display);color:var(--gold-2)}
-.live-sec p{margin:6px 0 0;color:var(--muted);font-size:14.5px}
-.lives{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-.lt{display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:18px;text-decoration:none;color:inherit;background:linear-gradient(135deg,#27101A,#1A0910);
-  box-shadow:0 0 0 1px rgba(232,193,112,.25),0 14px 30px rgba(0,0,0,.4);transition:transform .2s,box-shadow .2s}
-.lt:hover{transform:translateY(-3px);box-shadow:0 0 0 1px var(--gold-dim),0 20px 40px rgba(0,0,0,.5),0 0 30px rgba(232,193,112,.12)}
-.lt .ic{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;flex:none;font-size:28px}
-.lt .ic.bj{background:radial-gradient(circle at 40% 30%,#1B4D57,#0A2227);color:#F0CD85}
-.lt .ic.rl{background:radial-gradient(circle at 40% 30%,#1D2230,#08090E);color:#FFD447}
-.lt .tx{flex:1;min-width:0}
-.lt h3{margin:0;font:400 22px/1.15 var(--display);color:var(--ivory)}
-.lt .now{margin-top:4px;font-size:13.5px;color:var(--muted)}
-.lt .now b{color:#8EF0B4;font-weight:600}
-.seatdots{display:flex;gap:5px;margin-top:8px}
-.seatdots i{width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
-.seatdots i.on{background:#E8C170;box-shadow:0 0 8px rgba(232,193,112,.6)}
-@media (max-width:760px){ .lives{grid-template-columns:minmax(0,1fr)} }
-/* ---------- leaderboard ---------- */
-.board{margin-top:56px;padding:28px 26px 26px;border-radius:26px;position:relative;overflow:hidden;
-  background:radial-gradient(120% 90% at 50% 0%,#2E0F1B 0%,#1C0910 60%,#150710 100%);box-shadow:0 0 0 1px rgba(232,193,112,.22),0 24px 60px rgba(0,0,0,.5)}
-.board::before{content:"";position:absolute;left:50%;top:-140px;width:620px;height:320px;transform:translateX(-50%);pointer-events:none;
-  background:radial-gradient(closest-side,rgba(247,223,163,.16),transparent)}
-.board-head{position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.board-head h2{margin:6px 0 0;font:400 clamp(34px,6vw,54px)/1 var(--display);color:var(--gold-2);text-shadow:0 0 22px rgba(247,223,163,.35);text-wrap:balance}
-.board-head p{margin:8px 0 0;color:var(--muted);font-size:14.5px;max-width:52ch;line-height:1.5}
-.live{display:inline-flex;align-items:center;gap:8px;font:700 11px var(--body);letter-spacing:.2em;text-transform:uppercase;color:#8EF0B4;
-  padding:7px 12px;border-radius:999px;background:rgba(40,120,80,.18);box-shadow:0 0 0 1px rgba(142,240,180,.3)}
-.live i{width:8px;height:8px;border-radius:50%;background:#58E08F;box-shadow:0 0 10px #58E08F;animation:pulse 1.6s ease-in-out infinite}
-.live.off{color:var(--muted);background:rgba(255,255,255,.04);box-shadow:0 0 0 1px rgba(255,255,255,.1)}
-.live.off i{background:var(--muted);box-shadow:none;animation:none}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.7)}}
-.you{position:relative;margin-top:22px;display:flex;align-items:center;gap:14px 18px;flex-wrap:wrap;padding:14px 18px;border-radius:16px;
-  background:linear-gradient(90deg,rgba(232,193,112,.16),rgba(232,193,112,.04));box-shadow:0 0 0 1px rgba(232,193,112,.35)}
-.you .rk{font:400 34px/1 var(--display);color:var(--gold-2);min-width:58px;text-align:center}
-.you .txt{flex:1;min-width:200px;font-size:15px;line-height:1.45}
-.you .txt b{color:var(--gold-2);font-weight:700}
-.you .txt small{display:block;color:var(--muted);font-size:13px}
-.ghost{font:600 13px var(--body);color:var(--ivory);background:transparent;border:1px solid rgba(232,193,112,.4);border-radius:999px;padding:9px 14px;cursor:pointer}
-.ghost:hover{background:rgba(232,193,112,.12)}
-.podium{position:relative;display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:16px;align-items:end;margin-top:30px}
-.pod{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0}
-.pod .who{display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 6px 14px;min-width:0;max-width:100%}
-.av{position:relative;width:74px;height:74px;border-radius:50%;display:grid;place-items:center;font:700 26px var(--body);color:#1A0B0F;flex:none;
-  box-shadow:0 0 0 3px var(--ring,#C0C6CF),0 0 0 7px rgba(0,0,0,.35),0 10px 24px rgba(0,0,0,.45);overflow:hidden;background:var(--avbg,#8a6f5a)}
-.av img{width:100%;height:100%;object-fit:cover;display:block}
-.p1 .av{width:96px;height:96px;font-size:34px}
-.crown{width:46px;height:30px;margin-bottom:-6px;filter:drop-shadow(0 0 10px rgba(247,223,163,.7))}
-.pod .nm{font:700 17px var(--body);color:var(--ivory);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pod .cash{font:500 clamp(20px,2.6vw,28px) var(--mono);color:var(--gold-2);font-variant-numeric:tabular-nums;text-shadow:0 0 16px rgba(247,223,163,.35)}
-.p1 .cash{font-size:clamp(24px,3.2vw,34px)}
-.pod .mini{font-size:12.5px;color:var(--muted);line-height:1.5}
-.step{width:100%;border-radius:14px 14px 6px 6px;display:grid;place-items:center;font:400 44px var(--display);color:rgba(26,11,15,.85);
-  background:linear-gradient(180deg,var(--s1),var(--s2));box-shadow:inset 0 2px 0 rgba(255,255,255,.4),0 12px 26px rgba(0,0,0,.4)}
-.p1{--ring:#F7DFA3;--s1:#F7DFA3;--s2:#C9973F} .p1 .step{height:120px;font-size:58px}
-.p2{--ring:#D9DEE6;--s1:#E4E8EE;--s2:#9AA3AF} .p2 .step{height:86px}
-.p3{--ring:#E0A26E;--s1:#E8AF7C;--s2:#A5643A} .p3 .step{height:64px}
-.pod.empty .step{background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);color:rgba(255,255,255,.18)}
-.pod.empty .who{opacity:.5}
-.pod.me .nm::after{content:" (you)";color:var(--gold);font-weight:500}
-.chip-r{display:inline-flex;align-items:center;gap:5px;font:600 11.5px var(--body);padding:3px 9px;border-radius:999px;white-space:nowrap}
-.chip-r.clean{color:#8EF0B4;background:rgba(40,120,80,.2);box-shadow:0 0 0 1px rgba(142,240,180,.3)}
-.chip-r.reset{color:#FFB3A8;background:rgba(192,40,62,.18);box-shadow:0 0 0 1px rgba(255,140,120,.3)}
-.awards{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:26px}
-.award{padding:14px 14px 13px;border-radius:14px;background:rgba(0,0,0,.22);box-shadow:0 0 0 1px rgba(232,193,112,.16);min-width:0}
-.award .t{display:flex;align-items:center;gap:7px;font:600 10.5px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
-.award .t svg{width:15px;height:15px;flex:none}
-.award .v{margin-top:8px;font:500 20px var(--mono);color:var(--ivory);font-variant-numeric:tabular-nums}
-.award .n{margin-top:2px;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ranks{position:relative;margin-top:24px;display:flex;flex-direction:column;gap:8px}
-.rhead,.row{display:grid;grid-template-columns:44px minmax(0,1.6fr) 1fr 1fr 1fr 1.3fr 0.9fr;gap:12px;align-items:center;padding:0 16px}
-.rhead{font:600 10.5px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding-bottom:2px}
-.rhead span:nth-child(n+3),.row > :nth-child(n+3){text-align:right}
-.row{padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.035);box-shadow:0 0 0 1px rgba(255,255,255,.05)}
-.row.me{background:rgba(232,193,112,.1);box-shadow:0 0 0 1px rgba(232,193,112,.4)}
-.row .rn{font:400 22px var(--display);color:var(--gold)}
-.row .pl{display:flex;align-items:center;gap:10px;min-width:0}
-.row .av{width:36px;height:36px;font-size:14px;box-shadow:0 0 0 2px rgba(232,193,112,.35)}
-.row .pn{min-width:0}
-.row .pn b{display:block;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row .pn small{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
-.dot{width:7px;height:7px;border-radius:50%;background:#58E08F;box-shadow:0 0 8px #58E08F;display:inline-block}
-.row .c{font:500 17px var(--mono);color:var(--gold-2);font-variant-numeric:tabular-nums}
-.row .m{font:500 14px var(--mono);color:var(--ivory);font-variant-numeric:tabular-nums}
-.row .g{font-size:12.5px;color:var(--muted);line-height:1.35}
-.flash{animation:flash 1.4s ease}
-@keyframes flash{0%{background:rgba(88,224,143,.28)}100%{}}
-.board-msg{position:relative;margin:22px 0 0;padding:16px 18px;border-radius:14px;background:rgba(0,0,0,.25);color:var(--ivory);font-size:14.5px;line-height:1.55;text-align:center}
-.lbl-sm{display:none}
-/* name prompt */
-.modal{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(10,3,6,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-.namecard{width:min(460px,100%);text-align:center;padding:30px 26px 26px;border-radius:24px;background:linear-gradient(180deg,#2A0D18,#1B0810);
-  box-shadow:0 0 0 2px #5a3a1c,0 0 0 7px #1c0a10,0 0 0 9px #6b4a22,0 30px 80px rgba(0,0,0,.6);animation:rise .35s ease}
-@keyframes rise{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
-.namecard h2{margin:8px 0 8px;font:400 38px/1.05 var(--display);color:var(--gold-2);text-wrap:balance}
-.namecard p{margin:0 auto 18px;color:var(--muted);font-size:14.5px;line-height:1.55;max-width:36ch}
-.namecard input{width:100%;font:600 20px var(--body);text-align:center;color:var(--ivory);background:#0B0407;border:0;border-radius:14px;padding:14px 16px;
-  box-shadow:inset 0 2px 8px rgba(0,0,0,.8),0 0 0 1px rgba(232,193,112,.35)}
-.namecard input:focus{outline:none;box-shadow:inset 0 2px 8px rgba(0,0,0,.8),0 0 0 2px var(--gold)}
-.namecard .err{min-height:20px;margin:8px 0 6px;color:#FF9C8F;font-size:13px}
-.namecard button{border:0;cursor:pointer;width:100%;justify-content:center;padding:14px 18px;font-size:15px}
-@media (max-width:900px){
-  .awards{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .rhead{display:none}
-  .row{grid-template-columns:34px minmax(0,1fr) auto;row-gap:6px}
-  .row > :nth-child(n+4){grid-column:2 / -1;text-align:left!important}
-  .row .m,.row .g,.row .rs{font-size:12.5px}
-  .row .m::before,.row .g::before{content:attr(data-l) " ";color:var(--muted);font-family:var(--body)}
+/* dock */
+.dock{background:linear-gradient(180deg,#10141A,#0B0E12);border-top:1px solid var(--edge);padding:9px 18px 12px;display:flex;flex-direction:column;gap:8px}
+.status{text-align:center;font-size:13.5px;color:var(--muted);min-height:19px}
+.status b{color:var(--text);font-weight:600}
+.status .g{color:var(--gold);font-weight:600}
+.dock-row{display:flex;align-items:center;justify-content:center;gap:12px 24px;flex-wrap:wrap}
+.chips{display:flex;gap:10px;padding-top:5px}
+.chip{width:50px;height:50px;border-radius:50%;border:0;padding:0;cursor:pointer;display:grid;place-items:center;font:700 13px var(--display);position:relative;color:#111;
+  background:radial-gradient(circle,var(--c) 0 55%,transparent 56%),repeating-conic-gradient(var(--e) 0 14deg,var(--c) 14deg 45deg);
+  box-shadow:inset 0 0 0 2px rgba(0,0,0,.22),0 3px 0 rgba(0,0,0,.5),0 7px 14px rgba(0,0,0,.4);transition:transform .15s,box-shadow .2s}
+.chip::after{content:"";position:absolute;inset:9px;border-radius:50%;border:1.5px dashed rgba(255,255,255,.5)}
+.chip[data-c="1"]::after{border-color:rgba(0,0,0,.22)}
+.chip:hover{transform:translateY(-3px)}
+.chip.sel{transform:translateY(-7px);box-shadow:inset 0 0 0 2px rgba(0,0,0,.22),0 0 0 3px var(--gold),0 0 20px rgba(242,193,78,.45),0 10px 16px rgba(0,0,0,.4)}
+.acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}
+.act{font:600 13.5px var(--body);padding:10px 13px;border-radius:11px;border:1px solid var(--edge-2);background:var(--panel-2);cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+.act:hover:not(:disabled){background:var(--panel-3)}
+.act:disabled{opacity:.33;cursor:not-allowed}
+.act[aria-pressed="true"]{border-color:var(--lose);color:var(--lose);background:rgba(255,110,98,.08)}
+kbd{font:500 10px var(--lcd);padding:2px 5px;border-radius:5px;background:rgba(255,255,255,.08);color:var(--muted)}
+.rollbtn{width:84px;height:84px;border-radius:50%;border:0;cursor:pointer;flex:none;margin-left:4px;
+  background:radial-gradient(circle at 38% 30%,#FF8A73 0%,#E23B2E 45%,#8E1810 100%);color:#fff;font:700 20px var(--display);letter-spacing:.12em;
+  box-shadow:0 0 0 4px #2a0c09,0 0 0 6px #6b1a12,0 0 26px rgba(226,59,46,.55),inset 0 -6px 12px rgba(0,0,0,.35);text-shadow:0 2px 3px rgba(0,0,0,.4);transition:transform .12s,filter .2s,box-shadow .2s}
+.rollbtn:hover:not(:disabled){transform:scale(1.04);box-shadow:0 0 0 4px #2a0c09,0 0 0 6px #8a2217,0 0 36px rgba(226,59,46,.8),inset 0 -6px 12px rgba(0,0,0,.35)}
+.rollbtn:active:not(:disabled){transform:scale(.97)}
+.rollbtn:disabled{filter:grayscale(.9) brightness(.5);cursor:not-allowed;box-shadow:0 0 0 4px #111,0 0 0 6px #333}
+.rollbtn.go{animation:glow 1.6s ease-in-out infinite}
+
+/* toast & sheets */
+.toast{position:fixed;left:50%;top:11%;transform:translate(-50%,-50%);z-index:40;text-align:center;pointer-events:none;opacity:0;width:max-content;max-width:92%}
+.toast.show{animation:toast 2.3s ease forwards}
+.toast .t{font:700 clamp(22px,4vw,36px) var(--display);letter-spacing:.03em;color:var(--text);text-shadow:0 4px 24px rgba(0,0,0,.85),0 2px 0 rgba(0,0,0,.5);text-wrap:balance}
+.toast.win .t{color:var(--win)} .toast.gold .t{color:var(--gold)} .toast.bad .t{color:var(--lose)}
+.toast .s{margin-top:6px;font:500 14px var(--body);color:var(--text);text-shadow:0 2px 10px rgba(0,0,0,.85)}
+.backdrop{position:fixed;inset:0;z-index:50;background:rgba(3,5,8,.72);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);display:grid;place-items:center;padding:16px}
+.sheet{width:min(600px,100%);max-height:86vh;overflow:auto;background:#0E1117;border:1px solid var(--edge-2);border-radius:18px;padding:22px;box-shadow:0 30px 80px rgba(0,0,0,.6);animation:pop .22s ease}
+.sheet h2{margin:0 0 4px;font:700 24px var(--display);letter-spacing:.03em;text-wrap:balance}
+.sheet .sub{margin:0 0 14px;color:var(--muted);font-size:13.5px;line-height:1.5}
+.sheet h3{margin:20px 0 8px;font:600 11px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.sheet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.sheet p{font-size:14px;line-height:1.6;margin:6px 0}
+.help{margin:0;padding-left:18px;font-size:14px;line-height:1.6}
+.help li{margin:3px 0}
+.pt{width:100%;border-collapse:collapse;font-size:13.5px}
+.pt th{text-align:left;font:600 10.5px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:0 0 6px}
+.pt th:last-child,.pt td:last-child{text-align:right}
+.pt td{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}
+.pt td:last-child{font:600 13px var(--lcd);color:var(--gold);white-space:nowrap;padding-left:10px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:11px 12px;min-width:0}
+.stat .l{font:600 10px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font:600 19px var(--lcd);margin-top:4px;font-variant-numeric:tabular-nums}
+.stat .v.pos{color:var(--win)} .stat .v.neg{color:var(--lose)}
+.freq{width:100%;border-collapse:collapse;font:500 13px var(--lcd);text-align:center}
+.freq th{font:600 11px var(--body);color:var(--muted);padding:4px 0}
+.freq td{padding:5px 0;border-top:1px solid rgba(255,255,255,.06)}
+.freqwrap{overflow-x:auto}
+.setting{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.setting:last-child{border-bottom:0}
+.setting .n{font-weight:600;font-size:14.5px}
+.setting .d{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45}
+.seg{display:flex;background:rgba(0,0,0,.35);border:1px solid var(--edge-2);border-radius:10px;padding:3px;gap:2px;flex:none}
+.seg button{border:0;background:transparent;padding:6px 10px;border-radius:7px;font:600 12.5px var(--body);cursor:pointer;color:var(--muted);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--gold);color:#16130a}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+.switch{appearance:none;-webkit-appearance:none;width:44px;height:26px;border-radius:99px;background:rgba(255,255,255,.14);position:relative;cursor:pointer;flex:none;margin:0;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s}
+.switch:checked{background:var(--gold)}
+.switch:checked::after{transform:translateX(18px)}
+.switch:disabled{opacity:.4;cursor:not-allowed}
+.btn{font:600 14px var(--body);padding:10px 14px;border-radius:11px;border:1px solid var(--edge-2);background:var(--panel-2);cursor:pointer}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.danger{background:#6B2229;border-color:rgba(255,110,98,.4)}
+.confirm{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;padding:12px;border-radius:12px;background:rgba(255,110,98,.08);border:1px solid rgba(255,110,98,.3);font-size:13.5px}
+
+.chip[data-c="1"],.lchip[data-c="1"]{--c:#EFEDE6;--e:#6E7482;color:#15171B}
+.chip[data-c="5"],.lchip[data-c="5"]{--c:#C9262F;--e:#F2EFE6;color:#fff}
+.chip[data-c="25"],.lchip[data-c="25"]{--c:#1F8A55;--e:#F2EFE6;color:#fff}
+.chip[data-c="100"],.lchip[data-c="100"]{--c:#16171B;--e:#E8D6A0;color:#E8D6A0}
+.chip[data-c="500"],.lchip[data-c="500"]{--c:#6E3AB2;--e:#F2C14E;color:#fff}
+@keyframes drop{from{opacity:0;transform:translateY(-10px) scale(1.2)}to{opacity:1;transform:none}}
+@keyframes fly{0%{opacity:0;transform:translate(-50%,-30%)}12%{opacity:1;transform:translate(-50%,-60%)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-150%)}}
+@keyframes toast{0%{opacity:0;transform:translate(-50%,-30%) scale(.94)}12%{opacity:1;transform:translate(-50%,-50%) scale(1)}80%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(-50%,-70%)}}
+@keyframes pop{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 4px #2a0c09,0 0 0 6px #6b1a12,0 0 20px rgba(226,59,46,.45),inset 0 -6px 12px rgba(0,0,0,.35)}50%{box-shadow:0 0 0 4px #2a0c09,0 0 0 6px #b42a1c,0 0 40px rgba(255,90,60,.85),inset 0 -6px 12px rgba(0,0,0,.35)}}
+
+@media (max-width:1060px){
+  .stage{grid-template-columns:minmax(0,1fr);gap:14px;align-items:start;padding:12px 16px 16px}
+  .domecol{max-width:560px;width:100%;margin-inline:auto}
+  .domebox{aspect-ratio:4/3}
 }
-@media (max-width:560px){
-  .board{padding:22px 14px 18px}
-  .podium{gap:8px}
-  .av{width:54px;height:54px;font-size:20px} .p1 .av{width:68px;height:68px;font-size:24px}
-  .pod .nm{font-size:14px} .pod .mini{display:none}
-  .step{font-size:32px} .p1 .step{height:92px;font-size:42px} .p2 .step{height:66px} .p3 .step{height:50px}
+@media (max-width:700px){
+  .bar{gap:8px;padding:7px 10px}
+  .brand small{display:none}
+  .brand b{font-size:15px}
+  .meter{min-width:0;padding:4px 7px 3px}
+  .meter .v{font-size:15px}
+  .meter.hide-sm,.pointbox .pl{display:none}
+  .puckmini{width:32px;height:32px;font-size:10px}
+  .ibtn{width:32px;height:32px}
+  .icons{gap:3px}
+  .dock{padding:7px 10px 9px;gap:6px}
+  .dock-row{gap:8px}
+  .acts{display:contents}
+  .chips{order:1;gap:6px}
+  .rollbtn{order:2;width:64px;height:64px;font-size:15px;margin-left:0}
+  .act{order:3;padding:7px 8px;font-size:12px}
+  .act kbd{display:none}
+  .chip{width:42px;height:42px;font-size:11.5px}
+  .chip::after{inset:7px}
+  .stats{grid-template-columns:repeat(2,1fr)}
 }
-@media (prefers-reduced-motion:reduce){ .live i{animation:none} .flash{animation:none} .namecard{animation:none} }
-
-@media (max-width:900px){ .tables{grid-template-columns:minmax(0,1fr);max-width:520px;margin-inline:auto} }
-@media (max-width:520px){ .wrap{padding-block:22px 30px} .sign{padding:28px 18px 24px} .lede{font-size:15px} }
-@media (prefers-reduced-motion:reduce){ .bulb{animation:none} .table{transition:none} }
+@media (max-width:440px){ .brand{display:none} }
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+  .toast.show{animation:none;opacity:1}
+}
+.lobbylink{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:999px;border:1px solid rgba(232,193,112,.45);color:#F7DFA3;text-decoration:none;font:600 13px system-ui,-apple-system,"Segoe UI",sans-serif;white-space:nowrap;flex:none;background:rgba(0,0,0,.2)}
+.lobbylink:hover{background:rgba(232,193,112,.14)}
+.lobbylink svg{width:15px;height:15px}
+@media (max-width:640px){.lobbylink span{display:none}.lobbylink{padding:0 9px}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="sign">
-    <div class="bulbs" id="bulbs" aria-hidden="true"></div>
-    <div class="eyebrow">Open all night · Tables live</div>
-    <h1>Miguel's Casino</h1>
-    <p class="lede">Pick a table. Blackjack, lightning roulette and bubble craps, all under one roof.</p>
-    <div class="bank">
-      <div class="meter"><span>Your bankroll</span><b id="bankroll">$1,000.00</b></div>
-      <button class="topup" id="topup" hidden>Get $1,000 in chips</button>
+<div class="app">
+  <header class="bar">
+    <a href="index.html" class="lobbylink" title="Back to Miguel's Casino" aria-label="Back to Miguel's Casino lobby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Lobby</span></a>
+    <div class="brand"><b>Bubble <i>Dome</i> Craps</b><small>Electronic air dice</small></div>
+    <div class="meters">
+      <div class="meter"><span class="l">Credits</span><span class="v" id="mCred">$1,000.00</span></div>
+      <div class="meter"><span class="l">Total bet</span><span class="v" id="mBet">$0.00</span></div>
+      <div class="meter hide-sm"><span class="l">Win</span><span class="v" id="mWin">$0.00</span></div>
+    </div>
+    <div class="pointbox"><div class="puckmini" id="puckMini">OFF</div><div class="pl"><span>Point</span><b id="pointTxt">Come-out</b></div></div>
+    <div class="icons">
+      <button class="ibtn" id="soundBtn" title="Sound (M)" aria-label="Toggle sound"></button>
+      <button class="ibtn" data-open="stats" title="Statistics" aria-label="Statistics"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></button>
+      <button class="ibtn" data-open="help" title="Rules and payouts" aria-label="Rules and payouts"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.2-2.5 3.9M12 17.3v.2"/></svg></button>
+      <button class="ibtn" data-open="settings" title="Table settings" aria-label="Table settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
     </div>
   </header>
 
-  <main class="tables">
-    <a class="table" href="blackjack.html">
-      <div class="art" style="background:radial-gradient(120% 100% at 50% 0%,#1B4D57,#0F3037 55%,#061518)">
-        <svg viewBox="0 0 320 200" aria-hidden="true">
-          <path d="M20 200 Q160 110 300 200" fill="none" stroke="rgba(216,170,82,.45)" stroke-width="2"/>
-          <text x="160" y="186" text-anchor="middle" font-family="Georgia,serif" font-size="11" letter-spacing="3" fill="rgba(216,170,82,.7)">BLACKJACK PAYS 3 TO 2</text>
-          <g transform="translate(118 36) rotate(-10)">
-            <rect width="74" height="104" rx="8" fill="#F7F2E7" stroke="rgba(0,0,0,.15)"/>
-            <text x="10" y="24" font-family="Georgia,serif" font-weight="700" font-size="20" fill="#15171C">A</text>
-            <text x="10" y="42" font-size="16" fill="#15171C">♠︎</text>
-            <text x="37" y="68" text-anchor="middle" font-size="40" fill="#15171C">♠︎</text>
-          </g>
-          <g transform="translate(156 38) rotate(9)">
-            <rect width="74" height="104" rx="8" fill="#F7F2E7" stroke="rgba(0,0,0,.15)"/>
-            <text x="10" y="24" font-family="Georgia,serif" font-weight="700" font-size="20" fill="#C22F3B">K</text>
-            <text x="10" y="42" font-size="16" fill="#C22F3B">♥︎</text>
-            <rect x="21" y="34" width="32" height="40" rx="4" fill="none" stroke="#C22F3B" stroke-width="1.5"/>
-            <text x="37" y="62" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="22" fill="#C22F3B">K</text>
-          </g>
-          <g transform="translate(70 118)"><circle r="17" fill="#C22F3B"/><circle r="11" fill="none" stroke="#F4F1EA" stroke-width="2" stroke-dasharray="4 3"/></g>
-          <g transform="translate(252 126)"><circle r="17" fill="#1E8C57"/><circle r="11" fill="none" stroke="#F4F1EA" stroke-width="2" stroke-dasharray="4 3"/></g>
-        </svg>
-      </div>
-      <div class="info">
-        <span class="kind">Card table</span>
-        <h2>Brass Table Blackjack</h2>
-        <p>Splits, doubles, insurance and three side bets, with a strategy coach and a card-counting trainer.</p>
-        <div class="foot">
-          <div class="chips"><span>Table limits</span><b>$5 – $1,000</b></div>
-          <span class="play">Play <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  <main class="main">
+    <div class="stage">
+      <section class="domecol">
+        <div class="domebox" id="domebox">
+          <canvas id="dome" role="img" aria-label="Dice dome"></canvas>
+          <div class="callout" id="callout"><div class="tot" id="calloutTot"></div><div class="say" id="calloutSay"></div></div>
         </div>
-      </div>
-    </a>
-
-    <a class="table" href="roulette.html">
-      <div class="art" style="background:radial-gradient(100% 90% at 50% 50%,#10261E,#0B1814 55%,#08090E)">
-        <svg viewBox="0 0 320 200" aria-hidden="true" id="wheelArt"></svg>
-      </div>
-      <div class="info">
-        <span class="kind">Wheel</span>
-        <h2>Voltage Roulette</h2>
-        <p>European roulette where lightning strikes up to five numbers every spin for 50× to 500× multipliers.</p>
-        <div class="foot">
-          <div class="chips"><span>Chips</span><b>$1 – $1,000</b></div>
-          <span class="play">Play <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-        </div>
-      </div>
-    </a>
-
-    <a class="table" href="craps.html">
-      <div class="art" style="background:radial-gradient(120% 100% at 50% 0%,#141A22,#0A0D11 60%,#06080B)">
-        <svg viewBox="0 0 320 200" aria-hidden="true">
-          <defs>
-            <radialGradient id="felt" cx="45%" cy="40%" r="70%"><stop offset="0" stop-color="#18804F"/><stop offset="1" stop-color="#0A472B"/></radialGradient>
-            <linearGradient id="chrome" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#E6E9EE"/><stop offset=".5" stop-color="#8C929C"/><stop offset="1" stop-color="#D5D9DF"/></linearGradient>
-            <radialGradient id="glass" cx="50%" cy="80%" r="75%"><stop offset="0" stop-color="rgba(200,225,255,.02)"/><stop offset=".8" stop-color="rgba(200,225,255,.08)"/><stop offset="1" stop-color="rgba(220,235,255,.3)"/></radialGradient>
-          </defs>
-          <ellipse cx="160" cy="150" rx="128" ry="40" fill="none" stroke="#4696FF" stroke-width="3" opacity=".7"/>
-          <ellipse cx="160" cy="146" rx="108" ry="34" fill="url(#chrome)"/>
-          <ellipse cx="160" cy="142" rx="96" ry="29" fill="url(#felt)"/>
-          <ellipse cx="160" cy="142" rx="86" ry="25" fill="none" stroke="rgba(242,193,78,.6)" stroke-width="1"/>
-          <g transform="translate(128 124) rotate(-12)"><rect width="26" height="26" rx="4" fill="#C41E2F"/><circle cx="7" cy="7" r="2.6" fill="#F4F1E6"/><circle cx="13" cy="13" r="2.6" fill="#F4F1E6"/><circle cx="19" cy="19" r="2.6" fill="#F4F1E6"/></g>
-          <g transform="translate(172 112) rotate(14)"><rect width="26" height="26" rx="4" fill="#A9182A"/><circle cx="7" cy="7" r="2.6" fill="#F4F1E6"/><circle cx="19" cy="7" r="2.6" fill="#F4F1E6"/><circle cx="7" cy="19" r="2.6" fill="#F4F1E6"/><circle cx="19" cy="19" r="2.6" fill="#F4F1E6"/></g>
-          <path d="M64 142 A96 108 0 0 1 256 142" fill="url(#glass)" stroke="rgba(235,245,255,.55)" stroke-width="1.5"/>
-          <path d="M104 92 Q116 62 146 50" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="5" stroke-linecap="round"/>
-          <circle cx="198" cy="58" r="7" fill="rgba(255,255,255,.55)"/>
-        </svg>
-      </div>
-      <div class="info">
-        <span class="kind">Dice</span>
-        <h2>Bubble Dome Craps</h2>
-        <p>Air-blown dice bounce in a glass dome, with the full casino craps layout, odds and every center bet.</p>
-        <div class="foot">
-          <div class="chips"><span>Bets</span><b>$1 – $500</b><em class="riding" id="riding" hidden></em></div>
-          <span class="play">Play <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-        </div>
-      </div>
-    </a>
+        <div class="histwrap"><span class="lbl">Rolls</span><div class="hist" id="hist"></div></div>
+      </section>
+      <section class="layoutcol">
+        <div class="feltscroll" id="feltscroll"><div class="feltsize" id="feltsize"><div class="felt" id="felt"></div></div></div>
+      </section>
+    </div>
   </main>
 
-
-  <section class="live-sec" id="liveSec" hidden aria-labelledby="liveTitle">
-    <div class="head">
-      <div><div class="eyebrow">Play together</div><h2 id="liveTitle">Live tables</h2><p>Sit down with everyone online right now. One dealer, one wheel, same cards for all.</p></div>
-      <div class="live" id="liveNow"><i></i><span>Open</span></div>
-    </div>
-    <div class="lives">
-      <a class="lt" href="blackjack-live.html">
-        <div class="ic bj">&#9824;&#xFE0E;</div>
-        <div class="tx"><h3>Brass Table Live</h3><div class="now" id="ltBj">5 seats · open</div><div class="seatdots" id="ltBjDots"><i></i><i></i><i></i><i></i><i></i></div></div>
-        <span class="play">Join</span>
-      </a>
-      <a class="lt" href="roulette-live.html">
-        <div class="ic rl"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" fill="currentColor"/></svg></div>
-        <div class="tx"><h3>Voltage Roulette Live</h3><div class="now" id="ltRl">Shared wheel · open</div></div>
-        <span class="play">Join</span>
-      </a>
-    </div>
-  </section>
-
-  <section class="board" aria-labelledby="boardTitle">
-    <div class="board-head">
-      <div>
-        <div class="eyebrow">Live standings</div>
-        <h2 id="boardTitle">High Rollers</h2>
-        <p>Everyone at Miguel's Casino, ranked by cash. Resets are on the record, so a clean bankroll is worth bragging about.</p>
+  <footer class="dock">
+    <div class="status" id="status"></div>
+    <div class="dock-row">
+      <div class="chips" id="chips"></div>
+      <div class="acts">
+        <button class="act" id="bUndo">Undo <kbd>Z</kbd></button>
+        <button class="act" id="bTake" aria-pressed="false" title="Tap bets to take them down">Take down <kbd>X</kbd></button>
+        <button class="act" id="bClear" title="Take down every bet that can be removed">Clear <kbd>C</kbd></button>
+        <button class="act" id="bOdds" title="Back every line and come bet with maximum odds">Max odds <kbd>O</kbd></button>
+        <button class="rollbtn" id="bRoll">ROLL</button>
       </div>
-      <div class="live off" id="live"><i></i><span id="liveTxt">Connecting</span></div>
     </div>
-    <div class="you" id="you" hidden></div>
-    <div class="podium" id="podium"></div>
-    <div class="awards" id="awards"></div>
-    <div class="ranks" id="ranks"></div>
-    <p class="board-msg" id="boardMsg" hidden></p>
-  </section>
-
-  <p class="note">Your bankroll goes with you to every table: win at blackjack and the same money is waiting at roulette and craps. It is saved in this browser. <b>Play money only</b>: no real money is used or paid out. Each game has a Lobby button at the top left to bring you back here.</p>
+  </footer>
 </div>
 
-<div class="modal" id="nameModal" hidden>
-  <form class="namecard" id="nameForm" novalidate>
-    <div class="eyebrow">Welcome in</div>
-    <h2>What's your name?</h2>
-    <p>It goes on the High Rollers board, so everyone at Miguel's Casino can see your bankroll and stats.</p>
-    <input id="nameInput" maxlength="18" autocomplete="nickname" placeholder="Your name" aria-label="Your name">
-    <div class="err" id="nameErr" role="alert"></div>
-    <button type="submit" class="play">Take a seat</button>
-  </form>
-</div>
+<div class="toast" id="toast" role="status" aria-live="polite"><div class="t"></div><div class="s"></div></div>
+<div class="backdrop" id="sheet" hidden><div class="sheet" id="sheetBody" role="dialog" aria-modal="true"></div></div>
 
 <script>
 /* Miguel's Casino: one shared bankroll (cents) for every table, plus leaderboard sync */
@@ -505,240 +482,1436 @@ window.CasinoBoard = (() => {
   return { name, setName, connect, push, schedule, snapshot, subscribe, identity, get db() { return db; }, get uid() { return uid; }, get mode() { return mode; }, get denied() { return denied; } };
 })();
 </script>
+
 <script>
-(() => {
-  // marquee bulbs around the sign
-  const box = document.getElementById('bulbs');
-  function bulbs() {
-    const w = box.clientWidth, h = box.clientHeight;
-    if (!w) return;
-    box.innerHTML = '';
-    const gap = 22, per = Math.round((w + h) * 2 / gap);
-    const pts = [];
-    for (let i = 0; i < per; i++) {
-      let d = i / per * (w + h) * 2, x, y;
-      if (d < w) { x = d; y = 0; } else if ((d -= w) < h) { x = w; y = d; } else if ((d -= h) < w) { x = w - d; y = h; } else { d -= w; x = 0; y = h - d; }
-      pts.push([x, y]);
+/*PHYS-START*/
+const PHYS = (() => {
+  const H = 0.5;             // half die size (die = 1 unit)
+  const DOME = 6;            // inner dome radius
+  const G = 150;             // gravity (units/s²)
+  const II = 6;              // inverse inertia of a unit cube with mass 1 (I = 1/6)
+  const STEP = 1 / 240;
+  const SLOP = 0.012;          // contact margin
+  const CORN = [];
+  for (const x of [-H, H]) for (const y of [-H, H]) for (const z of [-H, H]) CORN.push([x, y, z]);
+
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const len = a => Math.sqrt(dot(a, a));
+  function qmat(q) {
+    const [w, x, y, z] = q;
+    return [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w),
+            2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w),
+            2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)];
+  }
+  const mulv = (R, v) => [R[0] * v[0] + R[1] * v[1] + R[2] * v[2], R[3] * v[0] + R[4] * v[1] + R[5] * v[2], R[6] * v[0] + R[7] * v[1] + R[8] * v[2]];
+  const mulTv = (R, v) => [R[0] * v[0] + R[3] * v[1] + R[6] * v[2], R[1] * v[0] + R[4] * v[1] + R[7] * v[2], R[2] * v[0] + R[5] * v[1] + R[8] * v[2]];
+  function qnorm(q) { const l = Math.hypot(q[0], q[1], q[2], q[3]) || 1; q[0] /= l; q[1] /= l; q[2] /= l; q[3] /= l; }
+  function qFromAxisAngle(ax, a) { const s = Math.sin(a / 2), l = len(ax) || 1; return [Math.cos(a / 2), ax[0] / l * s, ax[1] / l * s, ax[2] / l * s]; }
+  function qmul(a, b) {
+    return [a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
+            a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
+            a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
+            a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]];
+  }
+
+  function makeDie(x, z) { return { p: [x, H, z], v: [0, 0, 0], q: [1, 0, 0, 0], w: [0, 0, 0], R: null, still: 0 }; }
+  function corners(d) { d.R = qmat(d.q); return CORN.map(c => { const r = mulv(d.R, c); return [d.p[0] + r[0], d.p[1] + r[1], d.p[2] + r[2]]; }); }
+
+  function impulse(d, r, n, j) {
+    d.v[0] += n[0] * j; d.v[1] += n[1] * j; d.v[2] += n[2] * j;
+    const rn = cross(r, n);
+    d.w[0] += rn[0] * j * II; d.w[1] += rn[1] * j * II; d.w[2] += rn[2] * j * II;
+  }
+  function velAt(d, r) { const wr = cross(d.w, r); return [d.v[0] + wr[0], d.v[1] + wr[1], d.v[2] + wr[2]]; }
+
+  // contact against static geometry (floor or dome), returns impact speed
+  function hitStatic(d, c, n, e, mu) {
+    const r = [c[0] - d.p[0], c[1] - d.p[1], c[2] - d.p[2]];
+    const vc = velAt(d, r), vn = dot(vc, n);
+    if (vn >= 0) return 0;
+    const rn = cross(r, n), k = 1 + dot(rn, rn) * II;
+    const ee = -vn < 1.5 ? 0 : e;
+    const j = -(1 + ee) * vn / k;
+    impulse(d, r, n, j);
+    const vc2 = velAt(d, r), vn2 = dot(vc2, n);
+    const vt = [vc2[0] - vn2 * n[0], vc2[1] - vn2 * n[1], vc2[2] - vn2 * n[2]], lt = len(vt);
+    if (lt > 1e-6) {
+      const t = [vt[0] / lt, vt[1] / lt, vt[2] / lt], rt = cross(r, t);
+      const jt = Math.max(-lt / (1 + dot(rt, rt) * II), -mu * j);
+      impulse(d, r, t, jt);
     }
-    pts.forEach(([x, y], i) => {
-      const b = document.createElement('span');
-      b.className = 'bulb'; b.style.left = x + 'px'; b.style.top = y + 'px';
-      b.style.animationDelay = -(i % 3) * 0.53 + 's';
-      box.appendChild(b);
-    });
+    return -vn;
   }
-  bulbs();
-  addEventListener('resize', bulbs);
 
-  // roulette wheel art
-  const order = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
-  const reds = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
-  const cx = 160, cy = 100, R1 = 78, R2 = 54, seg = Math.PI * 2 / 37;
-  let s = `<circle cx="${cx}" cy="${cy}" r="88" fill="#3B2416"/><circle cx="${cx}" cy="${cy}" r="82" fill="#20242E"/>`;
-  order.forEach((n, i) => {
-    const a0 = i * seg - Math.PI / 2 - seg / 2, a1 = a0 + seg;
-    const p = (r, a) => `${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`;
-    const fill = n === 0 ? '#14935C' : reds.has(n) ? '#C3263C' : '#1E2027';
-    const hit = n === 17 || n === 32;
-    s += `<path d="M${p(R1, a0)} A${R1} ${R1} 0 0 1 ${p(R1, a1)} L${p(R2, a1)} A${R2} ${R2} 0 0 0 ${p(R2, a0)}Z" fill="${hit ? '#FFD447' : fill}" stroke="#C9A45C" stroke-width=".6"/>`;
-  });
-  s += `<circle cx="${cx}" cy="${cy}" r="${R2}" fill="#4E2E19"/><circle cx="${cx}" cy="${cy}" r="46" fill="#B8924E"/><circle cx="${cx}" cy="${cy}" r="10" fill="#F6E6B8"/>`;
-  s += `<circle cx="${cx + 66}" cy="${cy - 12}" r="4.5" fill="#fff"/>`;
-  s += `<path d="M252 18 L232 64 H248 L236 104 L272 50 H254 L268 18Z" fill="#FFD447" stroke="#14161C" stroke-width="1.5" stroke-linejoin="round"/>`;
-  s += `<g font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="15"><rect x="24" y="28" width="52" height="24" rx="6" fill="#FFD447"/><text x="50" y="45" text-anchor="middle" fill="#14161C">500×</text></g>`;
-  document.getElementById('wheelArt').innerHTML = s;
+  function hitPair(a, b, c, n, e, mu) {
+    // n points from b to a
+    const ra = [c[0] - a.p[0], c[1] - a.p[1], c[2] - a.p[2]], rb = [c[0] - b.p[0], c[1] - b.p[1], c[2] - b.p[2]];
+    const va = velAt(a, ra), vb = velAt(b, rb);
+    const vr = [va[0] - vb[0], va[1] - vb[1], va[2] - vb[2]], vn = dot(vr, n);
+    if (vn >= 0) return 0;
+    const ran = cross(ra, n), rbn = cross(rb, n);
+    const k = 2 + (dot(ran, ran) + dot(rbn, rbn)) * II;
+    const ee = -vn < 1.5 ? 0 : e;
+    const j = -(1 + ee) * vn / k;
+    impulse(a, ra, n, j); impulse(b, rb, n, -j);
+    const va2 = velAt(a, ra), vb2 = velAt(b, rb);
+    const vr2 = [va2[0] - vb2[0], va2[1] - vb2[1], va2[2] - vb2[2]], vn2 = dot(vr2, n);
+    const vt = [vr2[0] - vn2 * n[0], vr2[1] - vn2 * n[1], vr2[2] - vn2 * n[2]], lt = len(vt);
+    if (lt > 1e-6) {
+      const t = [vt[0] / lt, vt[1] / lt, vt[2] / lt], rat = cross(ra, t), rbt = cross(rb, t);
+      const jt = Math.max(-lt / (2 + (dot(rat, rat) + dot(rbt, rbt)) * II), -mu * j);
+      impulse(a, ra, t, jt); impulse(b, rb, t, -jt);
+    }
+    return -vn;
+  }
 
-  // shared bankroll
-  const usd = c => '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  function show() {
-    const c = CasinoWallet.cents();
-    document.getElementById('bankroll').textContent = usd(c);
-    let riding = 0;
-    try { const cr = JSON.parse(localStorage.getItem('bubble-dome-craps-v1')); if (cr && cr.bets) riding = Object.values(cr.bets).reduce((a, b) => a + (+b || 0), 0); } catch (e) {}
-    const r = document.getElementById('riding');
-    r.hidden = !riding; r.textContent = riding ? `${usd(riding)} still riding on this table` : '';
-    document.getElementById('topup').hidden = c >= 500;
+  // corners of a that are inside b
+  function pairContacts(a, b, ca) {
+    const out = [];
+    for (const c of ca) {
+      const l = mulTv(b.R, [c[0] - b.p[0], c[1] - b.p[1], c[2] - b.p[2]]);
+      const px = H - Math.abs(l[0]), py = H - Math.abs(l[1]), pz = H - Math.abs(l[2]);
+      if (px <= -SLOP || py <= -SLOP || pz <= -SLOP) continue;
+      let ax = 0, pen = px;
+      if (py < pen) { ax = 1; pen = py; }
+      if (pz < pen) { ax = 2; pen = pz; }
+      const ln = [0, 0, 0]; ln[ax] = Math.sign(l[ax]) || 1;
+      out.push({ c, n: mulv(b.R, ln), pen });
+    }
+    return out;
   }
-  document.getElementById('topup').addEventListener('click', () => { CasinoWallet.noteReset(); CasinoWallet.add(CasinoWallet.START); show(); });
-  addEventListener('storage', show); addEventListener('focus', show); addEventListener('pageshow', show);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) show(); });
-  show();
 
-  // ---------- name ----------
-  const modal = document.getElementById('nameModal'), form = document.getElementById('nameForm'), input = document.getElementById('nameInput'), err = document.getElementById('nameErr');
-  function askName() { input.value = CasinoBoard.name(); err.textContent = ''; modal.hidden = false; setTimeout(() => input.focus(), 50); }
-  form.addEventListener('submit', e => {
-    e.preventDefault();
-    const n = input.value.replace(/\s+/g, ' ').trim();
-    if (n.length < 2) { err.textContent = 'Use at least 2 characters.'; input.focus(); return; }
-    if (n.length > 18) { err.textContent = 'Keep it to 18 characters or fewer.'; input.focus(); return; }
-    CasinoBoard.setName(n);
-    modal.hidden = true;
-    renderBoard();
-  });
-  if (!CasinoBoard.name()) askName();
-
-  // ---------- leaderboard ----------
-  const $ = id => document.getElementById(id);
-  const money = c => '$' + Math.round(c / 100).toLocaleString('en-US');
-  const num = v => (Number.isFinite(+v) ? +v : 0);
-  const COLORS = ['#E8C170', '#E07A5F', '#81B29A', '#9C89B8', '#F2CC8F', '#6FB1D6', '#E5989B', '#B5E48C'];
-  const tint = s => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
-  const ago = t => { const s = (Date.now() - t) / 1000; if (s < 180) return 'now'; if (s < 3600) return Math.round(s / 60) + 'm ago'; if (s < 86400) return Math.round(s / 3600) + 'h ago'; return Math.round(s / 86400) + 'd ago'; };
-  let players = [], prevCash = new Map(), profiles = {}, userNs = null, connected = false;
-  function clean(id, d) {
-    return {
-      id, name: String(d.name || 'Player').replace(/\s+/g, ' ').trim().slice(0, 18) || 'Player',
-      cash: Math.max(0, num(d.cash)), peak: Math.max(0, num(d.peak)), resets: Math.max(0, Math.floor(num(d.resets))),
-      hands: num(d.hands), spins: num(d.spins), rolls: num(d.rolls), bigWin: Math.max(0, num(d.bigWin)),
-      blackjacks: num(d.blackjacks), bestMult: num(d.bestMult), pointsMade: num(d.pointsMade), updatedAt: num(d.updatedAt),
-    };
-  }
-  function avatar(p, cls) {
-    const el = document.createElement('div');
-    el.className = 'av' + (cls ? ' ' + cls : '');
-    const prof = profiles[p.id];
-    if (prof && prof.avatarUrl && prof.name) { const img = document.createElement('img'); img.alt = ''; img.src = prof.avatarUrl; el.appendChild(img); }
-    else { el.style.setProperty('--avbg', tint(p.name)); el.textContent = p.name.slice(0, 1).toUpperCase(); }
-    return el;
-  }
-  function resetChip(p) {
-    const s = document.createElement('span');
-    s.className = 'chip-r ' + (p.resets ? 'reset' : 'clean');
-    s.textContent = p.resets ? `Reset ${p.resets}×` : 'Never reset';
-    return s;
-  }
-  const played = p => {
-    const parts = [];
-    const n = (v, w) => `${v.toLocaleString('en-US')} ${w}${v === 1 ? '' : 's'}`;
-    if (p.hands) parts.push(n(p.hands, 'hand'));
-    if (p.spins) parts.push(n(p.spins, 'spin'));
-    if (p.rolls) parts.push(n(p.rolls, 'roll'));
-    return parts.join(' · ') || 'Just sat down';
-  };
-  const ICON = {
-    win: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3a3 3 0 0 1-3 4M7 5H4a3 3 0 0 0 3 4"/></svg>',
-    peak: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l6-9 4 5 3-4 5 8z"/></svg>',
-    play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/></svg>',
-    reset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg>',
-  };
-  function renderBoard() {
-    const me = CasinoBoard.uid;
-    const list = players.slice().sort((a, b) => b.cash - a.cash || a.resets - b.resets || a.updatedAt - b.updatedAt);
-    // podium
-    const pod = $('podium'); pod.innerHTML = '';
-    [1, 0, 2].forEach(i => {
-      const p = list[i], box = document.createElement('div');
-      box.className = `pod p${i + 1}` + (p ? '' : ' empty') + (p && p.id === me ? ' me' : '');
-      const who = document.createElement('div'); who.className = 'who';
-      if (i === 0) who.insertAdjacentHTML('beforeend', '<svg class="crown" viewBox="0 0 46 30" aria-hidden="true"><path d="M3 26 L7 6 L16 16 L23 2 L30 16 L39 6 L43 26 Z" fill="#F7DFA3" stroke="#8A6116" stroke-width="1.5" stroke-linejoin="round"/><circle cx="23" cy="2.5" r="2.5" fill="#FFF1C9"/><circle cx="7" cy="6" r="2.2" fill="#FFF1C9"/><circle cx="39" cy="6" r="2.2" fill="#FFF1C9"/></svg>');
-      if (p) {
-        who.appendChild(avatar(p));
-        const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = p.name; who.appendChild(nm);
-        const c = document.createElement('div'); c.className = 'cash'; c.textContent = money(p.cash); who.appendChild(c);
-        who.appendChild(resetChip(p));
-        const mini = document.createElement('div'); mini.className = 'mini'; mini.textContent = `Peak ${money(p.peak)} · ${played(p)}`; who.appendChild(mini);
-      } else {
-        const a = document.createElement('div'); a.className = 'av'; a.textContent = '?'; who.appendChild(a);
-        const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = 'Open seat'; who.appendChild(nm);
+  function step(dice, onHit) {
+    const dt = STEP;
+    for (const d of dice) {
+      if (d.frozen) continue;
+      d.v[1] -= G * dt;
+    }
+    for (let i = 0; i < dice.length; i++) for (let k = i + 1; k < dice.length; k++) {
+      const a = dice[i], b = dice[k];
+      if (a.frozen === b.frozen) continue;
+      const dist = Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1], a.p[2] - b.p[2]);
+      const mv = a.frozen ? b : a;
+      if (dist < 1.8 && Math.hypot(...mv.v) + Math.hypot(...mv.w) * 0.5 > 0.6) { a.frozen = b.frozen = false; a.still = b.still = 0; }
+    }
+    for (let it = 0; it < 4; it++) {
+      const cs = dice.map(corners);
+      for (let i = 0; i < dice.length; i++) {
+        const d = dice[i];
+        if (d.frozen) continue;
+        for (const c of cs[i]) {
+          if (c[1] < SLOP) { const s = hitStatic(d, c, [0, 1, 0], 0.38, 0.36); if (it === 0 && s > 2 && onHit) onHit(s, 'floor'); }
+          const rl = len(c);
+          if (rl > DOME - SLOP && c[1] > -0.01) { const s = hitStatic(d, c, [-c[0] / rl, -c[1] / rl, -c[2] / rl], 0.55, 0.12); if (it === 0 && s > 2 && onHit) onHit(s, 'dome'); }
+        }
       }
-      const step = document.createElement('div'); step.className = 'step'; step.textContent = i + 1;
-      box.append(who, step); pod.appendChild(box);
-    });
-    // awards
-    const aw = $('awards'); aw.innerHTML = '';
-    const best = (f, min = 1) => list.reduce((m, p) => (f(p) >= min && (!m || f(p) > f(m)) ? p : m), null);
-    [['win', 'Biggest win', best(p => p.bigWin), p => money(p.bigWin)],
-     ['peak', 'Highest peak', best(p => p.peak), p => money(p.peak)],
-     ['play', 'Most played', best(p => p.hands + p.spins + p.rolls), p => `${(p.hands + p.spins + p.rolls).toLocaleString('en-US')} rounds`],
-     ['reset', 'Most resets', best(p => p.resets), p => `${p.resets}×`]].forEach(([ic, t, p, v]) => {
-      const d = document.createElement('div'); d.className = 'award';
-      d.innerHTML = `<div class="t">${ICON[ic]}<span></span></div><div class="v"></div><div class="n"></div>`;
-      d.querySelector('.t span').textContent = t;
-      d.querySelector('.v').textContent = p ? v(p) : '—';
-      d.querySelector('.n').textContent = p ? p.name : 'Up for grabs';
-      aw.appendChild(d);
-    });
-    // everyone else
-    const rk = $('ranks'); rk.innerHTML = '';
-    if (list.length > 3) {
-      rk.insertAdjacentHTML('beforeend', '<div class="rhead"><span>#</span><span>Player</span><span>Cash</span><span>Peak</span><span>Biggest win</span><span>Played</span><span>Resets</span></div>');
-      list.slice(3).forEach((p, i) => {
-        const r = document.createElement('div'); r.className = 'row' + (p.id === me ? ' me' : '');
-        if (prevCash.has(p.id) && prevCash.get(p.id) !== p.cash) r.classList.add('flash');
-        const rn = document.createElement('div'); rn.className = 'rn'; rn.textContent = i + 4;
-        const pl = document.createElement('div'); pl.className = 'pl'; pl.appendChild(avatar(p));
-        const pn = document.createElement('div'); pn.className = 'pn';
-        const b = document.createElement('b'); b.textContent = p.name + (p.id === me ? ' (you)' : '');
-        const sm = document.createElement('small');
-        if (Date.now() - p.updatedAt < 180000) { const dt = document.createElement('i'); dt.className = 'dot'; sm.appendChild(dt); sm.append('Playing now'); } else sm.textContent = 'Last seen ' + ago(p.updatedAt);
-        pn.append(b, sm); pl.appendChild(pn);
-        const c = document.createElement('div'); c.className = 'c'; c.textContent = money(p.cash);
-        const pk = document.createElement('div'); pk.className = 'm'; pk.dataset.l = 'Peak'; pk.textContent = money(p.peak);
-        const bw = document.createElement('div'); bw.className = 'm'; bw.dataset.l = 'Biggest win'; bw.textContent = money(p.bigWin);
-        const pd = document.createElement('div'); pd.className = 'g'; pd.dataset.l = ''; pd.textContent = played(p);
-        const rs = document.createElement('div'); rs.className = 'rs'; rs.appendChild(resetChip(p));
-        r.append(rn, pl, c, pk, bw, pd, rs); rk.appendChild(r);
-      });
+      for (let i = 0; i < dice.length; i++) for (let k = i + 1; k < dice.length; k++) {
+        const a = dice[i], b = dice[k];
+        if (a.frozen && b.frozen) continue;
+        const dx = a.p[0] - b.p[0], dy = a.p[1] - b.p[1], dz = a.p[2] - b.p[2], dist = Math.hypot(dx, dy, dz);
+        if (dist > 1.75) continue;
+        const list = pairContacts(a, b, cs[i]).map(o => ({ ...o, sgn: 1 }))
+          .concat(pairContacts(b, a, cs[k]).map(o => ({ ...o, sgn: -1 })));
+        for (const o of list) {
+          const n = o.sgn > 0 ? o.n : [-o.n[0], -o.n[1], -o.n[2]];   // from b to a
+          const s = hitPair(a, b, o.c, n, 0.5, 0.2);
+          if (it === 0 && s > 2 && onHit) onHit(s, 'dice');
+        }
+        if (dist < 1.0) { // edge-edge fallback: keep centres apart
+          const n = dist > 1e-6 ? [dx / dist, dy / dist, dz / dist] : [1, 0, 0];
+          const vr = dot([a.v[0] - b.v[0], a.v[1] - b.v[1], a.v[2] - b.v[2]], n);
+          if (vr < 0) { const j = -vr * 0.75; for (let m = 0; m < 3; m++) { a.v[m] += n[m] * j; b.v[m] -= n[m] * j; } }
+        }
+      }
     }
-    prevCash = new Map(list.map(p => [p.id, p.cash]));
-    // you
-    const you = $('you'), idx = list.findIndex(p => p.id === me);
-    if (connected && idx >= 0) {
-      const p = list[idx];
-      let line;
-      if (list.length === 1) line = `You're the first High Roller. <small>Anyone who joins the casino shows up here live.</small>`;
-      else if (idx === 0) line = `You're on top with <b>${money(p.cash)}</b>. <small>${money(p.cash - list[1].cash)} ahead of ${escapeHTML(list[1].name)}. Keep it that way.</small>`;
-      else line = `You're <b>#${idx + 1}</b> of ${list.length} with <b>${money(p.cash)}</b>. <small>${money(list[idx - 1].cash - p.cash)} behind ${escapeHTML(list[idx - 1].name)} for #${idx}. One good hand could do it.</small>`;
-      you.innerHTML = `<div class="rk">#${idx + 1}</div><div class="txt">${line}</div><button class="ghost" id="rename" type="button">Change name</button>`;
-      you.hidden = false;
-      $('rename').onclick = askName;
-    } else you.hidden = true;
-    // messages
-    const msg = $('boardMsg');
-    if (!connected) { msg.hidden = false; msg.textContent = CONNECT_MSG; }
-    else if (CasinoBoard.denied) { msg.hidden = false; msg.textContent = CasinoBoard.mode === 'claude' ? 'You can watch the board, but joining it needs Contributor access to this casino. Ask Miguel to share it with you as a Contributor.' : 'The board could not save your seat from this browser. Reload the page to try again.'; }
-    else if (!list.length) { msg.hidden = false; msg.textContent = 'No one on the board yet. Take a seat at any table and you will be first.'; }
-    else msg.hidden = true;
+    // integrate
+    for (const d of dice) {
+      if (d.frozen) continue;
+      d.p[0] += d.v[0] * dt; d.p[1] += d.v[1] * dt; d.p[2] += d.v[2] * dt;
+      const wl = len(d.w);
+      if (wl > 1e-9) { const dq = qFromAxisAngle(d.w, wl * dt); d.q = qmul(dq, d.q); qnorm(d.q); }
+    }
+    // position correction
+    for (const d of dice) {
+      if (d.frozen) continue;
+      const cs = corners(d);
+      let low = Infinity, maxOut = 0, outDir = null;
+      for (const c of cs) {
+        if (c[1] < low) low = c[1];
+        const rl = len(c); if (rl - DOME > maxOut) { maxOut = rl - DOME; outDir = [c[0] / rl, c[1] / rl, c[2] / rl]; }
+      }
+      if (low < 0) d.p[1] -= low * 0.9;
+      if (outDir) { d.p[0] -= outDir[0] * maxOut * 0.9; d.p[1] -= outDir[1] * maxOut * 0.9; d.p[2] -= outDir[2] * maxOut * 0.9; }
+      d.touch = low < 0.03;
+    }
+    for (let i = 0; i < dice.length; i++) for (let k = i + 1; k < dice.length; k++) {
+      const a = dice[i], b = dice[k];
+      const cs = [corners(a), corners(b)];
+      let best = null;
+      for (const o of pairContacts(a, b, cs[0])) if (!best || o.pen > best.pen) best = { ...o, sgn: 1 };
+      for (const o of pairContacts(b, a, cs[1])) if (!best || o.pen > best.pen) best = { ...o, sgn: -1 };
+      if (best) {
+        const n = best.sgn > 0 ? best.n : [-best.n[0], -best.n[1], -best.n[2]];
+        const fa = a.frozen ? 0 : b.frozen ? 0.9 : 0.45, fb = b.frozen ? 0 : a.frozen ? 0.9 : 0.45;
+        for (let q = 0; q < 3; q++) { a.p[q] += n[q] * best.pen * fa; b.p[q] -= n[q] * best.pen * fb; }
+      }
+    }
+    // damping and rest
+    for (const d of dice) {
+      if (d.frozen) continue;
+      const air = Math.exp(-0.05 * dt);
+      d.v[0] *= air; d.v[1] *= air; d.v[2] *= air;
+      const wd = Math.exp(-(d.touch ? 2.2 : 0.1) * dt);
+      d.w[0] *= wd; d.w[1] *= wd; d.w[2] *= wd;
+      if (d.touch) { const hd = Math.exp(-1.2 * dt); d.v[0] *= hd; d.v[2] *= hd; }
+      const sp = len(d.v), ws = len(d.w);
+      d.avg = (d.avg || 0) * 0.92 + (sp + ws * 0.5) * 0.08;
+      if (d.touch && d.avg < 0.45) { d.still += dt; if (d.still > 0.22) { d.v = [0, 0, 0]; d.w = [0, 0, 0]; d.frozen = true; } }
+      else d.still = 0;
+    }
   }
-  const escapeHTML = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  let CONNECT_MSG = 'Connecting to the live leaderboard…';
-  renderBoard();
-  (async () => {
-    const ok = await CasinoBoard.connect();
-    if (!ok) {
-      CONNECT_MSG = 'The live leaderboard needs the casino to run online, on Claude or on your own server. Your bankroll still carries across every table here.';
-      $('liveTxt').textContent = 'Offline'; renderBoard(); return;
+
+  // which face is up; returns { value, tilt } where tilt=1 means perfectly flat
+  const FACES = [[0, 1, 1], [0, -1, 6], [1, 1, 2], [1, -1, 5], [2, 1, 3], [2, -1, 4]];
+  function topFace(d) {
+    const R = qmat(d.q), up = mulTv(R, [0, 1, 0]);
+    let best = null;
+    for (const [ax, s, val] of FACES) { const dd = up[ax] * s; if (!best || dd > best.dd) best = { dd, val }; }
+    return { value: best.val, tilt: best.dd };
+  }
+  const settled = dice => dice.every(d => d.frozen);
+
+  function pop(dice, strength, rnd) {
+    for (const d of dice) {
+      const cs = corners(d);
+      const low = Math.min(...cs.map(c => c[1]));
+      if (low > 1.2) continue;
+      d.frozen = false; d.avg = 5;
+      const s = strength * (0.85 + 0.3 * rnd());
+      d.v[1] = Math.max(d.v[1], 0) + 36 * s;
+      d.v[0] += (rnd() * 2 - 1) * 9 * s; d.v[2] += (rnd() * 2 - 1) * 9 * s;
+      d.w = [(rnd() * 2 - 1) * 28 * s, (rnd() * 2 - 1) * 28 * s, (rnd() * 2 - 1) * 28 * s];
+      d.still = 0;
     }
-    connected = true;
-    if (CasinoBoard.mode === 'server') {
-      $('liveSec').hidden = false;
-      const PH = { waiting: 'waiting for bets', betting: 'taking bets', playing: 'hand in progress', dealer: 'dealer playing', settle: 'paying out', idle: 'waiting for players', spinning: 'wheel spinning', result: 'paying out' };
-      const poll = async () => {
-        if (document.hidden) return;
-        try {
-          const s = await (await fetch('api/live/summary', { cache: 'no-store' })).json();
-          $('ltBj').innerHTML = s.bj.seated ? `<b>${s.bj.seated} of 5 seats taken</b> · ${PH[s.bj.phase] || ''}` : '5 seats · all open';
-          [...$('ltBjDots').children].forEach((d, i) => d.classList.toggle('on', i < s.bj.seated));
-          $('ltRl').innerHTML = s.rl.players ? `<b>${s.rl.players} at the wheel</b> · ${PH[s.rl.phase] || ''}` : 'Shared wheel · nobody yet';
-        } catch (e) {}
-      };
-      poll(); setInterval(poll, 5000);
-    }
-    if (CasinoBoard.mode === 'claude') { try { userNs = await claude.use('user'); } catch (e) { userNs = null; } }
-    $('live').classList.remove('off'); $('liveTxt').textContent = 'Live';
-    await CasinoBoard.push();
-    CasinoBoard.subscribe(async rows => {
-      players = rows.filter(r => r && r.id).map(r => clean(String(r.id), r));
-      if (userNs) { try { profiles = await userNs.profiles(players.map(p => p.id)); } catch (e) { profiles = {}; } }
-      $('live').classList.remove('off'); $('liveTxt').textContent = 'Live';
-      renderBoard();
-    }, () => { $('live').classList.add('off'); $('liveTxt').textContent = 'Paused'; });
-    renderBoard();
-  })();
-  addEventListener('focus', () => CasinoBoard.push());
-  setInterval(renderBoard, 60000);
+  }
+  const POPS = [[0, 1], [0.13, 0.9], [0.28, 0.8], [0.45, 0.68], [0.64, 0.52]];
+  return { H, DOME, STEP, makeDie, step, topFace, settled, pop, POPS, corners, qmat, mulv, mulTv, qFromAxisAngle, qmul, qnorm };
 })();
+/*PHYS-END*/
+/*RULES-START*/
+const RULES = (() => {
+  const PT = [4, 5, 6, 8, 9, 10];
+  const TRUE_ODDS = { 4: [2, 1], 10: [2, 1], 5: [3, 2], 9: [3, 2], 6: [6, 5], 8: [6, 5] };
+  const PLACE_PAY = { 4: [9, 5], 10: [9, 5], 5: [7, 5], 9: [7, 5], 6: [7, 6], 8: [7, 6] };
+  const LAY_PAY = { 4: [1, 2], 10: [1, 2], 5: [2, 3], 9: [2, 3], 6: [5, 6], 8: [5, 6] };
+  const HARD_PAY = { 4: 7, 10: 7, 6: 9, 8: 9 };
+  const pay = (amt, r) => Math.floor(amt * r[0] / r[1]);          // amounts are in cents; fractions of a cent are dropped
+  const vig = w => Math.floor(w * 5 / 100);                        // 5% commission on the win
+
+  function oddsMax(flat, n, mode) {
+    if (mode === '345') return flat * { 4: 3, 10: 3, 5: 4, 9: 4, 6: 5, 8: 5 }[n];
+    return flat * mode;
+  }
+  function layMax(flat, n, mode) {
+    if (mode === '345') return flat * 6;
+    return Math.floor(flat * mode * { 4: 2, 10: 2, 5: 1.5, 9: 1.5, 6: 1.2, 8: 1.2 }[n]);
+  }
+
+  function resolve(bets, point, d1, d2, rules) {
+    const t = d1 + d2, hard = d1 === d2, comeOut = point === null;
+    const B = Object.assign({}, bets);
+    const ev = [];
+    let bank = 0;
+    const has = k => (B[k] || 0) > 0;
+    const win = (k, profit) => { bank += profit; ev.push({ k, type: 'win', amt: profit }); };                       // bet stays up
+    const collect = (k, profit) => { bank += B[k] + profit; ev.push({ k, type: 'win', amt: profit, off: true }); delete B[k]; };
+    const lose = k => { ev.push({ k, type: 'lose', amt: B[k] }); delete B[k]; };
+    const giveBack = k => { bank += B[k]; ev.push({ k, type: 'back', amt: B[k] }); delete B[k]; };
+    const push = k => ev.push({ k, type: 'push', amt: B[k] });
+    const working = !comeOut || rules.working;          // place, buy and hardways
+    const comeOddsOn = !comeOut || rules.comeOddsOn;
+
+    // one-roll bets
+    if (has('field')) {
+      const a = B.field;
+      if (t === 2) win('field', a * 2);
+      else if (t === 12) win('field', a * rules.field12);
+      else if ([3, 4, 9, 10, 11].includes(t)) win('field', a);
+      else lose('field');
+    }
+    if (has('any7')) t === 7 ? win('any7', B.any7 * 4) : lose('any7');
+    if (has('anyCraps')) [2, 3, 12].includes(t) ? win('anyCraps', B.anyCraps * 7) : lose('anyCraps');
+    if (has('p2')) t === 2 ? win('p2', B.p2 * 30) : lose('p2');
+    if (has('p3')) t === 3 ? win('p3', B.p3 * 15) : lose('p3');
+    if (has('p11')) t === 11 ? win('p11', B.p11 * 15) : lose('p11');
+    if (has('p12')) t === 12 ? win('p12', B.p12 * 30) : lose('p12');
+    if (has('horn')) {            // one quarter each on 2, 3, 11, 12
+      const a = B.horn;
+      if (t === 2 || t === 12) win('horn', Math.floor(a * 27 / 4));
+      else if (t === 3 || t === 11) win('horn', a * 3);
+      else lose('horn');
+    }
+    if (has('ce')) {              // half on any craps, half on 11
+      const a = B.ce;
+      if ([2, 3, 12].includes(t)) win('ce', a * 3);
+      else if (t === 11) win('ce', a * 7);
+      else lose('ce');
+    }
+    // hardways
+    for (const n of [4, 6, 8, 10]) {
+      const k = 'hard' + n;
+      if (!has(k) || !working) continue;
+      if (t === 7) lose(k);
+      else if (t === n) hard ? win(k, B[k] * HARD_PAY[n]) : lose(k);
+    }
+    // big 6 / big 8 (always working)
+    for (const n of [6, 8]) {
+      const k = 'big' + n;
+      if (!has(k)) continue;
+      if (t === 7) lose(k); else if (t === n) win(k, B[k]);
+    }
+    // place, buy, lay
+    for (const n of PT) {
+      let k = 'place' + n;
+      if (has(k) && working) { if (t === 7) lose(k); else if (t === n) win(k, pay(B[k], PLACE_PAY[n])); }
+      k = 'buy' + n;
+      if (has(k) && working) { if (t === 7) lose(k); else if (t === n) { const w = pay(B[k], TRUE_ODDS[n]); win(k, w - vig(w)); } }
+      k = 'lay' + n;
+      if (has(k)) { if (t === 7) { const w = pay(B[k], LAY_PAY[n]); win(k, w - vig(w)); } else if (t === n) lose(k); }
+    }
+    // come and don't come bets already on numbers
+    for (const n of PT) {
+      const cf = 'come' + n, co = 'come' + n + 'o', df = 'dc' + n, dO = 'dc' + n + 'o';
+      if (has(cf)) {
+        if (t === n) { if (has(co)) { comeOddsOn ? collect(co, pay(B[co], TRUE_ODDS[n])) : giveBack(co); } collect(cf, B[cf]); }
+        else if (t === 7) { if (has(co)) { comeOddsOn ? lose(co) : giveBack(co); } lose(cf); }
+      } else if (has(co)) giveBack(co);
+      if (has(df)) {
+        if (t === 7) { if (has(dO)) collect(dO, pay(B[dO], LAY_PAY[n])); collect(df, B[df]); }
+        else if (t === n) { if (has(dO)) lose(dO); lose(df); }
+      } else if (has(dO)) giveBack(dO);
+    }
+    // new come / don't come bets
+    if (has('come')) {
+      const a = B.come;
+      if (t === 7 || t === 11) win('come', a);
+      else if ([2, 3, 12].includes(t)) lose('come');
+      else { delete B.come; B['come' + t] = a; ev.push({ k: 'come', type: 'move', to: 'come' + t, amt: a }); }
+    }
+    if (has('dc')) {
+      const a = B.dc;
+      if (t === 2 || t === 3) win('dc', a);
+      else if (t === 12) push('dc');
+      else if (t === 7 || t === 11) lose('dc');
+      else { delete B.dc; B['dc' + t] = a; ev.push({ k: 'dc', type: 'move', to: 'dc' + t, amt: a }); }
+    }
+    // line bets and the point
+    let newPoint = point, outcome;
+    if (comeOut) {
+      if (has('pass')) { if (t === 7 || t === 11) win('pass', B.pass); else if ([2, 3, 12].includes(t)) lose('pass'); }
+      if (has('dp')) { if (t === 2 || t === 3) win('dp', B.dp); else if (t === 12) push('dp'); else if (t === 7 || t === 11) lose('dp'); }
+      if (has('passOdds')) giveBack('passOdds');
+      if (has('dpOdds')) giveBack('dpOdds');
+      if (PT.includes(t)) { newPoint = t; outcome = 'point'; }
+      else outcome = t === 7 || t === 11 ? 'natural' : 'craps';
+    } else if (t === point) {
+      if (has('pass')) win('pass', B.pass);
+      if (has('passOdds')) collect('passOdds', pay(B.passOdds, TRUE_ODDS[point]));
+      if (has('dp')) lose('dp');
+      if (has('dpOdds')) lose('dpOdds');
+      newPoint = null; outcome = 'made';
+    } else if (t === 7) {
+      if (has('pass')) lose('pass');
+      if (has('passOdds')) lose('passOdds');
+      if (has('dp')) win('dp', B.dp);
+      if (has('dpOdds')) collect('dpOdds', pay(B.dpOdds, LAY_PAY[point]));
+      newPoint = null; outcome = 'sevenout';
+    } else outcome = 'roll';
+    return { bets: B, bank, ev, point: newPoint, total: t, hard, outcome };
+  }
+  return { PT, TRUE_ODDS, PLACE_PAY, LAY_PAY, HARD_PAY, resolve, oddsMax, layMax };
+})();
+/*RULES-END*/
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const TAU = Math.PI * 2;
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function rnd() { try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; } catch (e) { return Math.random(); } }
+const PT = RULES.PT;
+const START = 100000, MAXBET = 50000;            // cents
+const CHIPS = [100, 500, 2500, 10000, 50000];
+const fmt = c => (c < 0 ? '−' : '') + '$' + (Math.abs(c) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtS = c => (c > 0 ? '+' : c < 0 ? '−' : '') + fmt(Math.abs(c));
+const chipLabel = c => { const d = c / 100; if (d >= 1000) return (d / 1000).toFixed(d % 1000 ? 1 : 0).replace(/\.0$/, '') + 'K'; return String(Math.round(d * 100) / 100); };
+const chipColor = c => { const d = c / 100; return d >= 500 ? 500 : d >= 100 ? 100 : d >= 25 ? 25 : d >= 5 ? 5 : 1; };
+
+/* ================= state ================= */
+const KEY = 'bubble-dome-craps-v1';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { saved = {}; }
+const defStats = () => ({ rolls: 0, sevens: 0, made: 0, sevenOuts: 0, longest: 0, hand: 0, counts: Array(13).fill(0), bigWin: 0, refills: 0 });
+const defSet = () => ({ odds: '345', working: false, comeOddsOn: false, field12: 3, sound: true });
+const S = {
+  bank: Number.isFinite(saved.bank) && saved.bank >= 0 ? saved.bank : START,
+  bets: saved.bets && typeof saved.bets === 'object' ? saved.bets : {},
+  point: PT.includes(saved.point) ? saved.point : null,
+  chip: CHIPS.includes(saved.chip) ? saved.chip : 500,
+  phase: 'bet', undo: [], take: false, lastWin: 0, hover: null,
+  hist: Array.isArray(saved.hist) ? saved.hist.slice(-40) : [],
+  stats: Object.assign(defStats(), saved.stats || {}),
+  settings: Object.assign(defSet(), saved.settings || {}),
+};
+for (const k of Object.keys(S.bets)) if (!(S.bets[k] > 0)) delete S.bets[k];
+if (!Array.isArray(S.stats.counts) || S.stats.counts.length !== 13) S.stats.counts = Array(13).fill(0);
+const onTable = () => Object.values(S.bets).reduce((a, b) => a + b, 0);
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify({ bank: S.bank, bets: S.bets, point: S.point, chip: S.chip, hist: S.hist.slice(-40), stats: S.stats, settings: S.settings })); } catch (e) {}
+}
+S.bank = CasinoWallet.cents();
+{
+  const saveTable = save;
+  save = function () { saveTable(); CasinoWallet.sync(); };
+  CasinoWallet.bind(() => S.bank, d => { S.bank = Math.max(0, S.bank + d); render(); });
+}
+const rulesCfg = () => ({ working: S.settings.working, comeOddsOn: S.settings.comeOddsOn, field12: S.settings.field12 });
+
+/* ================= bet names & payouts ================= */
+const NAMES = { pass: 'Pass line', passOdds: 'Pass line odds', dp: "Don't pass", dpOdds: "Don't pass lay odds", come: 'Come', dc: "Don't come", field: 'Field', big6: 'Big 6', big8: 'Big 8', any7: 'Any seven', anyCraps: 'Any craps', p2: 'Aces (2)', p3: 'Ace-deuce (3)', p11: 'Yo-leven (11)', p12: 'Midnight (12)', horn: 'Horn', ce: 'C & E' };
+const ratio = r => `${r[0]}:${r[1]}`;
+function nameOf(k) {
+  if (NAMES[k]) return NAMES[k];
+  let m;
+  if ((m = k.match(/^place(\d+)$/))) return 'Place ' + m[1];
+  if ((m = k.match(/^buy(\d+)$/))) return 'Buy ' + m[1];
+  if ((m = k.match(/^lay(\d+)$/))) return 'Lay ' + m[1];
+  if ((m = k.match(/^hard(\d+)$/))) return 'Hard ' + m[1];
+  if ((m = k.match(/^come(\d+)o$/))) return `Come ${m[1]} odds`;
+  if ((m = k.match(/^come(\d+)$/))) return `Come bet on ${m[1]}`;
+  if ((m = k.match(/^dc(\d+)o$/))) return `Don't come ${m[1]} lay odds`;
+  if ((m = k.match(/^dc(\d+)$/))) return `Don't come bet on ${m[1]}`;
+  return k;
+}
+function payText(k) {
+  const p = S.point; let m;
+  if (k === 'pass') return p === null ? 'wins on 7 or 11, loses on 2, 3, 12, pays 1:1' : `point is ${p}: tap to add odds, paid ${ratio(RULES.TRUE_ODDS[p])}`;
+  if (k === 'dp') return p === null ? "wins on 2 or 3, 12 is a push, loses on 7 or 11, pays 1:1" : `point is ${p}: tap to lay odds, paid ${ratio(RULES.LAY_PAY[p])}`;
+  if (k === 'come') return 'like the pass line, on the next roll; pays 1:1';
+  if (k === 'dc') return "like don't pass, on the next roll; 12 is a push; pays 1:1";
+  if (k === 'field') return `one roll · 3, 4, 9, 10, 11 pay 1:1 · 2 pays 2:1 · 12 pays ${S.settings.field12}:1`;
+  if (k === 'big6' || k === 'big8') return 'pays 1:1, loses on 7, always working';
+  if (k === 'any7') return 'one roll · pays 4:1';
+  if (k === 'anyCraps') return 'one roll · 2, 3 or 12 pays 7:1';
+  if (k === 'p2' || k === 'p12') return 'one roll · pays 30:1';
+  if (k === 'p3' || k === 'p11') return 'one roll · pays 15:1';
+  if (k === 'horn') return 'one roll · a quarter each on 2, 3, 11, 12 · 2 or 12 nets 27:4, 3 or 11 nets 3:1';
+  if (k === 'ce') return 'one roll · half on any craps, half on 11 · craps nets 3:1, 11 nets 7:1';
+  if ((m = k.match(/^place(\d+)$/))) return `pays ${ratio(RULES.PLACE_PAY[m[1]])} · loses on 7${S.settings.working ? '' : ' · off on the come-out'}`;
+  if ((m = k.match(/^buy(\d+)$/))) return `pays ${ratio(RULES.TRUE_ODDS[m[1]])} minus 5% commission on the win${S.settings.working ? '' : ' · off on the come-out'}`;
+  if ((m = k.match(/^lay(\d+)$/))) return `wins on 7 before ${m[1]} · pays ${ratio(RULES.LAY_PAY[m[1]])} minus 5% commission · always working`;
+  if ((m = k.match(/^hard(\d+)$/))) return `pays ${RULES.HARD_PAY[m[1]]}:1 · loses on 7 or an easy ${m[1]}${S.settings.working ? '' : ' · off on the come-out'}`;
+  return '';
+}
+
+/* ================= layout (felt) ================= */
+const felt = $('#felt');
+const NX = n => 70 + PT.indexOf(n) * 90;
+const NUMLABEL = { 4: '4', 5: '5', 6: 'SIX', 8: '8', 9: 'NINE', 10: '10' };
+function dieSVG(n, s = 16, fill = '#F7F4EA', pip = '#15171B') {
+  const P = { 1: [[.5, .5]], 2: [[.27, .27], [.73, .73]], 3: [[.27, .27], [.5, .5], [.73, .73]], 4: [[.27, .27], [.73, .27], [.27, .73], [.73, .73]], 5: [[.27, .27], [.73, .27], [.5, .5], [.27, .73], [.73, .73]], 6: [[.27, .25], [.73, .25], [.27, .5], [.73, .5], [.27, .75], [.73, .75]] }[n];
+  return `<svg class="mdie" width="${s}" height="${s}" viewBox="0 0 1 1" aria-hidden="true"><rect x=".03" y=".03" width=".94" height=".94" rx=".18" fill="${fill}"/>${P.map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".095" fill="${pip}"/>`).join('')}</svg>`;
+}
+const dd = (a, b, s) => `<span class="dd">${dieSVG(a, s)}${dieSVG(b, s)}</span>`;
+function fieldHTML() {
+  return `<div class="fieldin"><div class="fnums"><span class="ring">2<small>PAYS DOUBLE</small></span><i>·</i>3<i>·</i>4<i>·</i>9<i>·</i>10<i>·</i>11<i>·</i><span class="ring">12<small>PAYS ${S.settings.field12 === 3 ? 'TRIPLE' : 'DOUBLE'}</small></span></div><div class="fieldlbl">FIELD</div></div>`;
+}
+const AREAS = [];
+AREAS.push({ id: 'dc', x: 0, y: 0, w: 70, h: 140, cls: 'dcbar', html: `<span class="vt">DON'T COME BAR</span>${dd(6, 6, 15)}` });
+for (const n of PT) {
+  AREAS.push({ id: 'lay' + n, x: NX(n), y: 0, w: 90, h: 22, cls: 'strip', html: 'LAY' });
+  AREAS.push({ id: 'place' + n, x: NX(n), y: 22, w: 90, h: 96, html: `<span class="num${n === 6 || n === 9 ? ' w' : ''}">${NUMLABEL[n]}</span>` });
+  AREAS.push({ id: 'buy' + n, x: NX(n), y: 118, w: 90, h: 22, cls: 'strip', html: 'BUY' });
+}
+AREAS.push({ id: 'come', x: 70, y: 140, w: 540, h: 70, html: '<span class="come">COME</span>' });
+AREAS.push({ id: 'field', x: 70, y: 210, w: 540, h: 80, html: '' });
+AREAS.push({ id: 'dp', x: 70, y: 290, w: 540, h: 40, cls: 'dp', html: `DON'T PASS BAR ${dd(6, 6, 16)}` });
+AREAS.push({ id: 'pass', x: 0, y: 330, w: 610, h: 60, cls: 'pass', html: 'PASS LINE' });
+AREAS.push({ id: 'big6', x: 0, y: 140, w: 70, h: 190, cls: 'big big6', clip: 'polygon(0 0,100% 0,0 100%)', html: '<span>BIG<b>6</b></span>' });
+AREAS.push({ id: 'big8', x: 0, y: 140, w: 70, h: 190, cls: 'big big8', clip: 'polygon(100% 0,100% 100%,0 100%)', html: '<span><b>8</b>BIG</span>' });
+AREAS.push({ id: 'any7', x: 620, y: 0, w: 140, h: 36, n: [0, 454, 152, 40], prop: true, cls: 'pr red', html: 'SEVEN <small>4 TO 1</small>' });
+[['hard6', 620, 36, 3, 3, 9], ['hard10', 690, 36, 5, 5, 7], ['hard8', 620, 91, 4, 4, 9], ['hard4', 690, 91, 2, 2, 7], ['p2', 620, 146, 1, 1, 30], ['p3', 690, 146, 1, 2, 15], ['p12', 620, 201, 6, 6, 30], ['p11', 690, 201, 5, 6, 15]]
+  .forEach(([id, x, y, a, b, p], i) => AREAS.push({ id, x, y, w: 70, h: 55, n: [i * 76, 398, 76, 56], prop: true, cls: 'pr', html: `${dd(a, b, 17)}<small>${p} TO 1</small>` }));
+AREAS.push({ id: 'horn', x: 620, y: 256, w: 140, h: 40, n: [152, 454, 152, 40], prop: true, cls: 'pr wide', html: `HORN <small>2·3·11·12</small>` });
+AREAS.push({ id: 'ce', x: 620, y: 296, w: 140, h: 40, n: [304, 454, 152, 40], prop: true, cls: 'pr wide', html: 'C &amp; E <small>CRAPS · 11</small>' });
+AREAS.push({ id: 'anyCraps', x: 620, y: 336, w: 140, h: 54, n: [456, 454, 154, 40], prop: true, cls: 'pr red tall', html: 'ANY CRAPS <small>7 TO 1</small>' });
+let narrow = false;
+const FW = () => narrow ? 610 : 760, FH = () => narrow ? 494 : 390;
+const propRect = a => narrow && a.n ? { x: a.n[0], y: a.n[1], w: a.n[2], h: a.n[3] } : { x: a.x, y: a.y, w: a.w, h: a.h };
+
+function anchor(k) {
+  const A = { pass: [92, 358], passOdds: [124, 365], dp: [150, 310], dpOdds: [182, 315], come: [140, 176], dc: [35, 100], field: [452, 270], big6: [16, 240], big8: [54, 232] };
+  if (A[k]) return A[k];
+  const pa = AREAS.find(x => x.id === k && x.prop);
+  if (pa) { const r = propRect(pa); return r.w > 100 ? [r.x + r.w - 16, r.y + r.h / 2] : [r.x + r.w - 14, r.y + 14]; }
+  let m;
+  if ((m = k.match(/^place(\d+)$/))) return [NX(+m[1]) + 45, 102];
+  if ((m = k.match(/^buy(\d+)$/))) return [NX(+m[1]) + 45, 129];
+  if ((m = k.match(/^lay(\d+)$/))) return [NX(+m[1]) + 45, 11];
+  if ((m = k.match(/^come(\d+)o$/))) return [NX(+m[1]) + 31, 47];
+  if ((m = k.match(/^come(\d+)$/))) return [NX(+m[1]) + 19, 38];
+  if ((m = k.match(/^dc(\d+)o$/))) return [NX(+m[1]) + 59, 47];
+  if ((m = k.match(/^dc(\d+)$/))) return [NX(+m[1]) + 71, 38];
+  return [380, 195];
+}
+let chipLayer, puckEl;
+const chipEls = new Map();
+function buildFelt() {
+  felt.innerHTML = '';
+  for (const a of AREAS) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'ar' + (a.cls ? ' ' + a.cls : '');
+    el.dataset.bet = a.id;
+    const rc = propRect(a);
+    Object.assign(el.style, { left: rc.x + 'px', top: rc.y + 'px', width: rc.w + 'px', height: rc.h + 'px' });
+    if (a.clip) el.style.clipPath = a.clip;
+    el.innerHTML = a.id === 'field' ? fieldHTML() : a.html;
+    el.setAttribute('aria-label', nameOf(a.id));
+    a.el = el;
+    felt.appendChild(el);
+  }
+  felt.insertAdjacentHTML('beforeend', '<svg class="bigline" viewBox="0 0 70 190" preserveAspectRatio="none" aria-hidden="true"><line x1="70" y1="0" x2="0" y2="190" stroke="rgba(246,242,226,.82)" stroke-width="1.5"/></svg>');
+  chipLayer = document.createElement('div'); chipLayer.className = 'chips-l'; felt.appendChild(chipLayer);
+  chipEls.clear();
+  puckEl = document.createElement('div'); puckEl.className = 'puck'; felt.appendChild(puckEl);
+}
+const areaEl = id => (AREAS.find(a => a.id === id) || {}).el;
+function fitFelt() {
+  const wrap = $('#feltscroll');
+  const cw = wrap.clientWidth;
+  if (!cw) return;
+  const want = cw < 620;
+  if (want !== narrow) { narrow = want; buildFelt(); renderChips(); renderFelt(); }
+  felt.style.width = FW() + 'px'; felt.style.height = FH() + 'px';
+  let s = cw / FW();
+  if (innerWidth > 1060) s = Math.min(s, ($('.main').clientHeight - 36) / FH());
+  s = Math.max(0.5, Math.min(1.5, s));
+  felt.style.transform = `scale(${s})`;
+  $('#feltsize').style.width = FW() * s + 'px';
+  $('#feltsize').style.height = FH() * s + 'px';
+  wrap.style.justifyContent = FW() * s > cw + 1 ? 'flex-start' : 'center';
+}
+const isOdds = k => /Odds$|o$/.test(k) && k !== 'horn';
+function isOff(k) {
+  if (S.point !== null) return false;
+  if (/^(place|buy|hard)\d+$/.test(k)) return !S.settings.working;
+  if (/^come\d+o$/.test(k)) return !S.settings.comeOddsOn;
+  return false;
+}
+function renderChips(moves = []) {
+  for (const mv of moves) { const el = chipEls.get(mv.from); if (el) { chipEls.delete(mv.from); chipEls.set(mv.to, el); } }
+  const seen = new Set();
+  for (const [k, amt] of Object.entries(S.bets)) {
+    seen.add(k);
+    let el = chipEls.get(k);
+    if (!el) { el = document.createElement('div'); chipLayer.appendChild(el); chipEls.set(k, el); }
+    const [x, y] = anchor(k);
+    el.className = 'lchip' + (isOdds(k) ? ' odds' : '') + (/^(come|dc)\d+o?$/.test(k) ? ' click' : '') + (isOff(k) ? ' off' : '');
+    el.dataset.c = chipColor(amt);
+    el.dataset.chipbet = k;
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+    el.textContent = chipLabel(amt);
+    el.title = `${nameOf(k)} · ${fmt(amt)}`;
+    el.style.zIndex = isOdds(k) ? 3 : 2;
+  }
+  for (const [k, el] of chipEls) if (!seen.has(k)) { chipEls.delete(k); el.classList.add('gone'); setTimeout(() => el.remove(), 380); }
+}
+function fly(k, text, cls) {
+  const [x, y] = anchor(k);
+  const el = document.createElement('div');
+  el.className = 'fly ' + cls; el.textContent = text;
+  el.style.left = x + 'px'; el.style.top = (y - 6) + 'px';
+  felt.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+function renderFelt() {
+  const p = S.point, locked = S.phase !== 'bet';
+  felt.classList.toggle('locked', locked);
+  for (const a of AREAS) {
+    let off = false;
+    if ((a.id === 'come' || a.id === 'dc') && p === null) off = true;
+    if (a.id === 'pass' && p !== null && !S.bets.pass) off = true;
+    if (a.id === 'dp' && p !== null && !S.bets.dp) off = true;
+    a.el.classList.toggle('off', off && !locked);
+    a.el.classList.toggle('dim', (a.id === 'come' || a.id === 'dc') && p === null);
+    a.el.classList.toggle('hl', S.hover === a.id);
+  }
+  if (p === null) { puckEl.className = 'puck'; puckEl.textContent = 'OFF'; puckEl.style.left = '35px'; puckEl.style.top = '27px'; }
+  else { puckEl.className = 'puck on'; puckEl.textContent = 'ON'; puckEl.style.left = NX(p) + 45 + 'px'; puckEl.style.top = '40px'; }
+}
+
+/* ================= betting actions ================= */
+function addTarget(area) {
+  if (area === 'pass') return S.point === null ? 'pass' : 'passOdds';
+  if (area === 'dp') return S.point === null ? 'dp' : 'dpOdds';
+  let m;
+  if ((m = area.match(/^(come|dc)(\d+)o?$/))) return m[1] + m[2] + 'o';
+  return area;
+}
+const limit = room => room > 0 ? { ok: true, room, odds: true } : { msg: 'Odds are already at the table maximum', sub: `Current limit: ${S.settings.odds === '345' ? '3-4-5×' : S.settings.odds + '×'} odds` };
+function canAdd(k) {
+  const B = S.bets, p = S.point, cur = B[k] || 0, mode = S.settings.odds;
+  if (k === 'pass' || k === 'dp') {
+    if (p !== null) return { msg: 'Line bets go down on the come-out roll', sub: 'While the point is on, use Come or Don’t come instead.' };
+    return { ok: true, room: MAXBET - cur };
+  }
+  if (k === 'passOdds') return B.pass ? limit(RULES.oddsMax(B.pass, p, mode) - cur) : { msg: 'Bet the pass line first', sub: 'Odds sit behind a pass line bet.' };
+  if (k === 'dpOdds') return B.dp ? limit(RULES.layMax(B.dp, p, mode) - cur) : { msg: 'Bet don’t pass first', sub: 'Lay odds sit behind a don’t pass bet.' };
+  if (k === 'come' || k === 'dc') {
+    if (p === null) return { msg: 'Come bets open once a point is set', sub: 'On the come-out roll, bet the pass line or don’t pass.' };
+    return { ok: true, room: MAXBET - cur };
+  }
+  let m;
+  if ((m = k.match(/^come(\d+)o$/))) { const n = +m[1]; return B['come' + n] ? limit(RULES.oddsMax(B['come' + n], n, mode) - cur) : { msg: 'No come bet on ' + n }; }
+  if ((m = k.match(/^dc(\d+)o$/))) { const n = +m[1]; return B['dc' + n] ? limit(RULES.layMax(B['dc' + n], n, mode) - cur) : { msg: 'No don’t come bet on ' + n }; }
+  return { ok: true, room: MAXBET - cur };
+}
+function addBet(area) {
+  if (S.phase !== 'bet') return;
+  unlockAudio();
+  const k = addTarget(area), c = canAdd(k);
+  if (!c.ok) { toast(c.msg, c.sub || '', 'bad'); sfx('deny'); return; }
+  if (c.room <= 0) { toast('Table limit reached', `Each bet takes up to ${fmt(MAXBET)}`, 'bad'); sfx('deny'); return; }
+  let amt = Math.min(S.chip, c.room, S.bank);
+  if (amt <= 0) { toast('Not enough credits', S.bank + onTable() < 100 ? 'Press ROLL to top up' : 'Take a bet down or use a smaller chip', 'bad'); sfx('deny'); return; }
+  S.bets[k] = (S.bets[k] || 0) + amt;
+  S.bank -= amt;
+  S.undo.push([k, amt]);
+  sfx('chip');
+  if (c.odds && amt < S.chip && amt === c.room) toast('Odds at maximum', `${nameOf(k)}: ${fmt(S.bets[k])}`, 'gold');
+  render(); save();
+}
+function removeKeyFor(area) {
+  const B = S.bets; let m;
+  if (area === 'pass' || area === 'passOdds') {
+    if (B.passOdds) return ['passOdds'];
+    if (S.point !== null) return [null, 'The pass line is a contract bet once the point is set. Only the odds can come down.'];
+    return ['pass'];
+  }
+  if (area === 'dp' || area === 'dpOdds') return [B.dpOdds ? 'dpOdds' : 'dp'];
+  if ((m = area.match(/^come(\d+)o?$/))) { const n = m[1]; if (B['come' + n + 'o']) return ['come' + n + 'o']; return [null, 'A come bet on a number is a contract bet. Only its odds can come down.']; }
+  if ((m = area.match(/^dc(\d+)o?$/))) { const n = m[1]; return [B['dc' + n + 'o'] ? 'dc' + n + 'o' : 'dc' + n]; }
+  return [area];
+}
+function removeBet(area) {
+  if (S.phase !== 'bet') return;
+  const [k, msg] = removeKeyFor(area);
+  if (!k) { toast('That bet has to stay', msg, 'bad'); sfx('deny'); return; }
+  if (!S.bets[k]) return;
+  S.bank += S.bets[k]; delete S.bets[k];
+  S.undo = S.undo.filter(([kk]) => kk !== k);
+  sfx('chip'); render(); save();
+}
+function undo() {
+  if (S.phase !== 'bet' || !S.undo.length) return;
+  const [k, amt] = S.undo.pop();
+  const cur = S.bets[k] || 0, r = Math.min(amt, cur);
+  if (r > 0) { if (cur - r > 0) S.bets[k] = cur - r; else delete S.bets[k]; S.bank += r; }
+  sfx('chip'); render(); save();
+}
+function clearable(k) {
+  if (/^(come|dc)\d+$/.test(k)) return false;
+  if ((k === 'pass' || k === 'dp') && S.point !== null) return false;
+  return true;
+}
+function clearAll() {
+  if (S.phase !== 'bet') return;
+  let n = 0;
+  for (const k of Object.keys(S.bets)) if (clearable(k)) { S.bank += S.bets[k]; delete S.bets[k]; n++; }
+  // odds on a flat that stays are removable too; flats that stay keep nothing else
+  S.undo = [];
+  if (n) { sfx('chip'); toast('Bets taken down', 'Contract bets stay on the table', 'gold'); } else toast('Nothing to take down', 'Line and come bets in action have to stay', 'bad');
+  render(); save();
+}
+function maxOdds() {
+  if (S.phase !== 'bet') return;
+  if (S.point === null && !PT.some(n => S.bets['come' + n] || S.bets['dc' + n])) { toast('No odds to take yet', 'Odds go behind line bets once a point is set, or behind come bets on a number', 'bad'); return; }
+  const mode = S.settings.odds, list = [];
+  if (S.point !== null) {
+    if (S.bets.pass) list.push(['passOdds', RULES.oddsMax(S.bets.pass, S.point, mode)]);
+    if (S.bets.dp) list.push(['dpOdds', RULES.layMax(S.bets.dp, S.point, mode)]);
+  }
+  for (const n of PT) {
+    if (S.bets['come' + n]) list.push(['come' + n + 'o', RULES.oddsMax(S.bets['come' + n], n, mode)]);
+    if (S.bets['dc' + n]) list.push(['dc' + n + 'o', RULES.layMax(S.bets['dc' + n], n, mode)]);
+  }
+  let added = 0, short = false;
+  for (const [k, max] of list) {
+    const want = max - (S.bets[k] || 0);
+    if (want <= 0) continue;
+    const amt = Math.min(want, S.bank);
+    if (amt < want) short = true;
+    if (amt <= 0) break;
+    S.bets[k] = (S.bets[k] || 0) + amt; S.bank -= amt; S.undo.push([k, amt]); added += amt;
+  }
+  if (added) { sfx('chip'); toast('Max odds', `${fmt(added)} added${short ? ' · limited by your credits' : ''}`, 'gold'); }
+  else toast(list.length ? 'Odds already at maximum' : 'No line or come bets to back', '', 'bad');
+  render(); save();
+}
+
+/* ================= roll & settle ================= */
+async function roll() {
+  if (S.phase !== 'bet') return;
+  unlockAudio();
+  if (S.bank + onTable() < 100) { CasinoWallet.noteReset(); S.bank += START; S.stats.refills++; toast('Credits topped up', `${fmt(START)} added`, 'gold'); render(); save(); return; }
+  if (!onTable()) { toast('Place a bet to roll', S.point === null ? 'Start with the pass line or don’t pass' : 'Add a bet anywhere on the layout', 'bad'); sfx('deny'); return; }
+  S.phase = 'roll'; S.undo = []; S.take = false; S.hover = null;
+  setCall(null);
+  render();
+  const vals = await rollDice();
+  await sleep(RM ? 80 : 280);
+  settle(vals[0], vals[1]);
+}
+const WORD = { 2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine', 10: 'ten', 11: 'eleven', 12: 'twelve' };
+const cap = s => s[0].toUpperCase() + s.slice(1);
+function callFor(d1, d2, t, outcome, point) {
+  const hard = d1 === d2;
+  let base;
+  if (t === 2) base = 'Aces, two craps';
+  else if (t === 3) base = 'Ace-deuce, three craps';
+  else if (t === 12) base = 'Boxcars, twelve craps';
+  else if (t === 11) base = 'Yo-leven';
+  else if (t === 7) base = 'Seven';
+  else if (t === 5) base = 'Five, no field five';
+  else if (t === 9) base = 'Nine, center field nine';
+  else base = hard ? `${cap(WORD[t])} the hard way` : `${cap(WORD[t])}, easy ${WORD[t]}`;
+  if (outcome === 'natural') return [t === 7 ? 'Seven, front line winner!' : 'Yo-leven, front line winner!', 'good'];
+  if (outcome === 'craps') return [`${base}. Line away`, 'bad'];
+  if (outcome === 'point') return [`${base}. The point is ${t}`, ''];
+  if (outcome === 'made') return [`${base}. Winner! Pay the line`, 'good'];
+  if (outcome === 'sevenout') return ['Seven out, line away', 'bad'];
+  return [base, ''];
+}
+function settle(d1, d2) {
+  const before = S.point;
+  const r = RULES.resolve(S.bets, S.point, d1, d2, rulesCfg());
+  const moves = r.ev.filter(e => e.type === 'move').map(e => ({ from: e.k, to: e.to }));
+  let won = 0, lost = 0;
+  for (const e of r.ev) {
+    if (e.type === 'win') { won += e.amt; fly(e.k, fmtS(e.amt), 'w'); }
+    else if (e.type === 'lose') { lost += e.amt; fly(e.k, fmtS(-e.amt), 'l'); }
+    else if (e.type === 'back') fly(e.k, 'Returned', 'b');
+    else if (e.type === 'push') fly(e.k, 'Push', 'b');
+  }
+  S.bank += r.bank; S.bets = r.bets; S.point = r.point; S.lastWin = won;
+  const st = S.stats, t = r.total;
+  st.rolls++; st.counts[t]++; if (t === 7) st.sevens++;
+  st.hand++; st.longest = Math.max(st.longest, st.hand);
+  if (r.outcome === 'made') st.made++;
+  if (r.outcome === 'sevenout') { st.sevenOuts++; st.hand = 0; }
+  st.bigWin = Math.max(st.bigWin, won);
+  S.hist.push({ d: [d1, d2], t, o: r.outcome });
+  if (S.hist.length > 40) S.hist.shift();
+  const [say, cls] = callFor(d1, d2, t, r.outcome, before);
+  setCall([d1, d2], say, cls);
+  S.phase = 'bet';
+  renderChips(moves);
+  render(); save();
+  if (won > 0) { toast(`Win ${fmt(won)}`, lost ? `${fmt(lost)} lost on other bets` : '', 'win'); sfx(won >= 5000 ? 'big' : 'win'); led('win'); }
+  else if (lost > 0) { sfx('lose'); led(r.outcome === 'sevenout' ? 'lose' : 'bet'); }
+  else led('bet');
+}
+function setCall(d, say, cls = '') {
+  const c = $('#callout');
+  if (!d) { c.classList.remove('show'); return; }
+  $('#calloutTot').innerHTML = `${dieSVG(d[0], 26)}${dieSVG(d[1], 26)}<b>${d[0] + d[1]}</b>`;
+  const s = $('#calloutSay'); s.textContent = say; s.className = 'say ' + cls;
+  c.classList.add('show');
+}
+function setSay(say, cls) { const s = $('#calloutSay'); s.textContent = say; s.className = 'say ' + cls; $('#callout').classList.add('show'); $('#calloutTot').innerHTML = ''; }
+
+/* ================= dome renderer ================= */
+const canvas = $('#dome'), ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1, backLayer = null, frontLayer = null, feltTex = null;
+const EYE = [0, 15.4, 14.4], TARGET = [0, 1.05, 0], FOVY = 30 * Math.PI / 180;
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const crs = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const nrm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+const LIGHT = nrm([-0.35, 1, 0.42]);
+const cam = { f: null, r: null, u: null, F: 1, cx: 0, cy: 0 };
+function proj(p) {
+  const d = sub(p, EYE), z = dot(d, cam.f);
+  return [cam.cx + dot(d, cam.r) / z * cam.F, cam.cy - dot(d, cam.u) / z * cam.F, z];
+}
+function setupCamera() {
+  cam.f = nrm(sub(TARGET, EYE)); cam.r = nrm(crs(cam.f, [0, 1, 0])); cam.u = crs(cam.r, cam.f);
+  cam.F = 1; cam.cx = 0; cam.cy = 0;
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  const pts = [];
+  for (let i = 0; i < 96; i++) { const a = i / 96 * TAU; pts.push([Math.cos(a) * 8.0, 0, Math.sin(a) * 8.0]); }
+  for (let la = 0; la <= 90; la += 10) for (let i = 0; i < 48; i++) { const a = i / 48 * TAU, c = Math.cos(la * Math.PI / 180); pts.push([Math.cos(a) * c * 6.1, Math.sin(la * Math.PI / 180) * 6.1, Math.sin(a) * c * 6.1]); }
+  for (const p of pts) { const q = proj(p); x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); }
+  const pad = Math.min(W, H) * 0.035;
+  cam.F = Math.min((W - 2 * pad) / (x1 - x0), (H - 2 * pad) / (y1 - y0));
+  cam.cx = W / 2 - (x0 + x1) / 2 * cam.F;
+  cam.cy = H / 2 - (y0 + y1) / 2 * cam.F + H * 0.02;
+}
+const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
+
+function makeFeltTexture(size) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d', { willReadFrequently: true }), R = size / 2;
+  let gr = g.createRadialGradient(R * 0.9, R * 0.85, R * 0.1, R, R, R);
+  gr.addColorStop(0, '#16784A'); gr.addColorStop(0.7, '#0F5E39'); gr.addColorStop(1, '#0A472B');
+  g.fillStyle = gr; g.fillRect(0, 0, size, size);
+  const id = g.getImageData(0, 0, size, size), d = id.data;
+  for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - 0.5) * 16; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+  g.putImageData(id, 0, 0);
+  g.strokeStyle = 'rgba(242,193,78,.85)'; g.lineWidth = Math.max(1.5, size * 0.006);
+  g.beginPath(); g.arc(R, R, R * 0.955, 0, TAU); g.stroke();
+  g.lineWidth = Math.max(1, size * 0.0025);
+  g.beginPath(); g.arc(R, R, R * 0.84, 0, TAU); g.stroke();
+  const text = 'BUBBLE DOME ✦ SEVEN ✦ YO-LEVEN ✦ HARD WAYS ✦ ';
+  g.fillStyle = 'rgba(246,242,226,.72)';
+  g.font = `600 ${Math.round(size * 0.042)}px Oswald, "Arial Narrow", sans-serif`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  const rr = R * 0.897, full = text.repeat(3);
+  const circ = TAU * rr;
+  const widths = [...full].map(ch => g.measureText(ch).width + size * 0.004);
+  const totalW = widths.reduce((a, b) => a + b, 0);
+  const scaleW = circ / totalW;
+  let ang = -Math.PI / 2;
+  [...full].forEach((ch, i) => {
+    const w = widths[i] * scaleW, a = ang + w / 2 / rr;
+    g.save(); g.translate(R + Math.cos(a) * rr, R + Math.sin(a) * rr); g.rotate(a + Math.PI / 2); g.fillText(ch, 0, 0); g.restore();
+    ang += w / rr;
+  });
+  g.strokeStyle = 'rgba(242,193,78,.28)'; g.lineWidth = Math.max(1, size * 0.002);
+  g.beginPath(); g.arc(R, R, R * 0.2, 0, TAU); g.stroke();
+  for (let i = 0; i < 7; i++) {
+    const a = i / 7 * TAU, rj = i === 6 ? 0 : R * 0.42, x = R + (i === 6 ? 0 : Math.cos(a) * rj), y = R + (i === 6 ? 0 : Math.sin(a) * rj);
+    const jr = size * 0.012;
+    const jg = g.createRadialGradient(x, y, 0, x, y, jr * 1.6);
+    jg.addColorStop(0, '#020403'); jg.addColorStop(0.55, '#0a1510'); jg.addColorStop(0.62, 'rgba(200,205,210,.55)'); jg.addColorStop(1, 'rgba(200,205,210,0)');
+    g.fillStyle = jg; g.beginPath(); g.arc(x, y, jr * 1.6, 0, TAU); g.fill();
+  }
+  return g.getImageData(0, 0, size, size);
+}
+
+function buildLayers() {
+  setupCamera();
+  const feltPx = Math.abs(proj([6, 0, 0])[0] - proj([-6, 0, 0])[0]);
+  feltTex = makeFeltTexture(Math.max(256, Math.min(1400, Math.round(feltPx * 1.15))));
+  const T = feltTex.width, td = feltTex.data;
+  backLayer = mk();
+  const g = backLayer.getContext('2d');
+  const img = g.createImageData(W, H), D = img.data;
+  const f = cam.f, r = cam.r, u = cam.u;
+  const edges = [6.0, 6.8, 7.0, 7.55, 7.7];
+  const band = (rho, X, Z) => {
+    if (rho < 6.0) {
+      const tx = Math.min(T - 1, Math.max(0, Math.floor((X / 6 + 1) / 2 * T))), tz = Math.min(T - 1, Math.max(0, Math.floor((Z / 6 + 1) / 2 * T)));
+      const i = (tz * T + tx) * 4;
+      let L = 0.5 + 0.72 * Math.exp(-((X + 0.8) ** 2 + (Z - 0.4) ** 2) / 24);
+      if (rho > 5.1) L *= 1 - 0.42 * ((rho - 5.1) / 0.9) ** 2;
+      return [td[i] * L, td[i + 1] * L, td[i + 2] * L];
+    }
+    if (rho < 6.8) return [26, 29, 34];
+    if (rho < 7.0 || (rho >= 7.55 && rho < 7.7)) { const s = 0.7 + 0.5 * Math.max(0, (-X * 0.35 - Z * 0.4) / rho + 0.3); return [120 * s, 126 * s, 136 * s]; }
+    if (rho < 7.55) return [7, 8, 10];
+    const hl = 1 + 0.7 * Math.exp(-((X + 3.5) ** 2 + (Z + 5) ** 2) / 22);
+    const fade = Math.max(0, Math.min(1, (13 - rho) / 5));
+    return [6 + (13 * hl - 6) * fade, 8 + (16 * hl - 8) * fade, 11 + (21 * hl - 11) * fade];
+  };
+  for (let py = 0; py < H; py++) {
+    const sy = -(py + 0.5 - cam.cy) / cam.F;
+    for (let px = 0; px < W; px++) {
+      const sx = (px + 0.5 - cam.cx) / cam.F;
+      const dx = f[0] + r[0] * sx + u[0] * sy, dy = f[1] + r[1] * sx + u[1] * sy, dz = f[2] + r[2] * sx + u[2] * sy;
+      const o = (py * W + px) * 4;
+      let c;
+      if (dy >= -1e-4) c = [6, 8, 11];
+      else {
+        const t = -EYE[1] / dy, X = EYE[0] + t * dx, Z = EYE[2] + t * dz, rho = Math.hypot(X, Z);
+        const pw = t / cam.F * 1.2;
+        c = band(rho, X, Z);
+        for (const e of edges) {
+          if (Math.abs(rho - e) < pw) {
+            const a = band(e - pw, X, Z), b = band(e + pw, X, Z), m = (rho - (e - pw)) / (2 * pw);
+            c = [a[0] + (b[0] - a[0]) * m, a[1] + (b[1] - a[1]) * m, a[2] + (b[2] - a[2]) * m];
+            break;
+          }
+        }
+      }
+      D[o] = c[0]; D[o + 1] = c[1]; D[o + 2] = c[2]; D[o + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  drawRing(g, false);
+  frontLayer = mk();
+  const h = frontLayer.getContext('2d');
+  drawRing(h, true);
+  drawDome(h);
+}
+function drawRing(g, front) {
+  const R0 = 6.38, rt = 0.34, N = 120, K = 8, cz = proj([0, 0, 0])[2];
+  const P = (a, b) => [(R0 + rt * Math.cos(b)) * Math.cos(a), rt * Math.sin(b), (R0 + rt * Math.cos(b)) * Math.sin(a)];
+  const quads = [];
+  for (let i = 0; i < N; i++) {
+    const a0 = i / N * TAU, a1 = (i + 1) / N * TAU, am = (a0 + a1) / 2;
+    const isFront = proj([Math.cos(am) * R0, 0, Math.sin(am) * R0])[2] < cz;
+    if (isFront !== front) continue;
+    for (let j = 0; j < K; j++) {
+      const b0 = j / K * Math.PI, b1 = (j + 1) / K * Math.PI, bm = (b0 + b1) / 2;
+      const n = [Math.cos(bm) * Math.cos(am), Math.sin(bm), Math.cos(bm) * Math.sin(am)];
+      const c = P(am, bm), v = nrm(sub(EYE, c));
+      if (dot(n, v) <= 0) continue;
+      const refl = sub(mul(n, 2 * dot(n, v)), v);
+      const diff = Math.max(0, dot(n, LIGHT)), spec = Math.pow(Math.max(0, dot(refl, LIGHT)), 28);
+      const env = 0.25 + 0.45 * Math.max(0, refl[1]);
+      const I = Math.min(1.6, 0.12 + 0.35 * diff + env + 1.3 * spec);
+      quads.push({ z: proj(c)[2], pts: [P(a0, b0), P(a1, b0), P(a1, b1), P(a0, b1)].map(proj), col: `rgb(${Math.min(255, 150 * I)},${Math.min(255, 156 * I)},${Math.min(255, 166 * I)})` });
+    }
+  }
+  quads.sort((a, b) => b.z - a.z);
+  g.lineJoin = 'round';
+  for (const q of quads) {
+    g.beginPath(); g.moveTo(q.pts[0][0], q.pts[0][1]); for (let i = 1; i < 4; i++) g.lineTo(q.pts[i][0], q.pts[i][1]); g.closePath();
+    g.fillStyle = q.col; g.fill(); g.strokeStyle = q.col; g.lineWidth = 0.9; g.stroke();
+  }
+}
+function drawDome(g) {
+  const Rg = 6.05, Dl = Math.hypot(...EYE), n = nrm(EYE);
+  const C = mul(EYE, Rg * Rg / (Dl * Dl)), rho = Rg * Math.sqrt(1 - Rg * Rg / (Dl * Dl));
+  const a = nrm(crs(n, [0, 1, 0])), b = crs(a, n);
+  const s0 = -C[1] / (rho * b[1]);
+  const al = Math.asin(Math.max(-1, Math.min(1, s0)));
+  const t0 = al, t1 = Math.PI - al;
+  const arc = [];
+  for (let i = 0; i <= 120; i++) { const t = t0 + (t1 - t0) * i / 120; arc.push(add(C, add(mul(a, rho * Math.cos(t)), mul(b, rho * Math.sin(t))))); }
+  const pa = arc.map(proj);
+  const e0 = arc[arc.length - 1], s = arc[0];
+  let ae = Math.atan2(e0[2], e0[0]), as = Math.atan2(s[2], s[0]);
+  // walk the base circle from the arc's end back to its start through the front (z > 0)
+  const front = [];
+  let dA = as - ae; while (dA < 0) dA += TAU;
+  const mid = ae + dA / 2, dir = Math.sin(mid) > 0 ? 1 : -1;
+  if (dir < 0) { dA = TAU - dA; }
+  for (let i = 0; i <= 90; i++) { const aa = ae + dir * dA * i / 90; front.push(proj([Math.cos(aa) * Rg, 0.02, Math.sin(aa) * Rg])); }
+  const cen = proj([0, Rg * 0.42, 0]), top = proj([0, Rg, 0]);
+  const rad = Math.max(...pa.map(p => Math.hypot(p[0] - cen[0], p[1] - cen[1])));
+  g.save();
+  g.beginPath(); g.moveTo(pa[0][0], pa[0][1]); for (const p of pa) g.lineTo(p[0], p[1]); for (const p of front) g.lineTo(p[0], p[1]); g.closePath();
+  let gr = g.createRadialGradient(cen[0], cen[1], rad * 0.1, cen[0], cen[1], rad * 1.02);
+  gr.addColorStop(0, 'rgba(200,225,255,0.012)'); gr.addColorStop(0.72, 'rgba(190,220,255,0.045)'); gr.addColorStop(0.93, 'rgba(210,232,255,0.14)'); gr.addColorStop(1, 'rgba(225,240,255,0.26)');
+  g.fillStyle = gr; g.fill();
+  g.clip();
+  // window reflection streaks
+  const streak = (th, la0, la1, wFrac, alpha) => {
+    const pts = [];
+    for (let i = 0; i <= 30; i++) { const la = (la0 + (la1 - la0) * i / 30) * Math.PI / 180; pts.push(proj([Math.cos(th) * Math.cos(la) * Rg, Math.sin(la) * Rg, Math.sin(th) * Math.cos(la) * Rg])); }
+    g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (const p of pts) g.lineTo(p[0], p[1]);
+    g.lineCap = 'round'; g.strokeStyle = `rgba(255,255,255,${alpha})`; g.lineWidth = rad * wFrac; g.stroke();
+  };
+  streak(2.35, 18, 62, 0.09, 0.07); streak(2.35, 22, 58, 0.025, 0.2); streak(2.62, 26, 55, 0.012, 0.22);
+  streak(0.9, 30, 55, 0.04, 0.05);
+  // specular highlight of the key light
+  const hn = nrm(add(LIGHT, n));
+  const hp = proj(mul(hn, Rg));
+  gr = g.createRadialGradient(hp[0], hp[1], 0, hp[0], hp[1], rad * 0.13);
+  gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(hp[0] - rad * 0.2, hp[1] - rad * 0.2, rad * 0.4, rad * 0.4);
+  gr = g.createRadialGradient(hp[0], hp[1], 0, hp[0], hp[1], rad * 0.45);
+  gr.addColorStop(0, 'rgba(255,255,255,0.12)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(hp[0] - rad * 0.5, hp[1] - rad * 0.5, rad, rad);
+  g.restore();
+  // rim
+  g.beginPath(); g.moveTo(pa[0][0], pa[0][1]); for (const p of pa) g.lineTo(p[0], p[1]);
+  g.strokeStyle = 'rgba(235,245,255,0.5)'; g.lineWidth = Math.max(1.2, rad * 0.006); g.stroke();
+  g.strokeStyle = 'rgba(235,245,255,0.12)'; g.lineWidth = Math.max(3, rad * 0.03); g.stroke();
+  g.beginPath(); g.moveTo(front[0][0], front[0][1]); for (const p of front) g.lineTo(p[0], p[1]);
+  g.strokeStyle = 'rgba(220,238,255,0.28)'; g.lineWidth = Math.max(1, rad * 0.008); g.stroke();
+  void top;
+}
+
+/* dice drawing */
+const FACE_DEF = [
+  { n: [1, 0, 0], val: 1, U: [0, 0, -1], V: [0, 1, 0] },
+  { n: [-1, 0, 0], val: 6, U: [0, 0, 1], V: [0, 1, 0] },
+  { n: [0, 1, 0], val: 2, U: [1, 0, 0], V: [0, 0, -1] },
+  { n: [0, -1, 0], val: 5, U: [1, 0, 0], V: [0, 0, 1] },
+  { n: [0, 0, 1], val: 3, U: [1, 0, 0], V: [0, 1, 0] },
+  { n: [0, 0, -1], val: 4, U: [-1, 0, 0], V: [0, 1, 0] },
+];
+const PIPS = { 1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]], 5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], 6: [[-1, -1], [-1, 0], [-1, 1], [1, -1], [1, 0], [1, 1]] };
+function hull(pts) {
+  pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const p of pts) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+function drawShadow(d) {
+  const R = PHYS.qmat(d.q), H = PHYS.H;
+  const pts = [];
+  for (const x of [-H, H]) for (const y of [-H, H]) for (const z of [-H, H]) {
+    const w = add(d.p, PHYS.mulv(R, [x, y, z]));
+    const t = w[1] / LIGHT[1];
+    pts.push(proj([w[0] - LIGHT[0] * t, 0.001, w[2] - LIGHT[2] * t]));
+  }
+  const hp = hull(pts);
+  const hgt = Math.max(0, d.p[1] - H);
+  ctx.save();
+  ctx.globalAlpha = Math.max(0.12, 0.55 - hgt * 0.07);
+  if ('filter' in ctx) ctx.filter = `blur(${(1.5 + hgt * 1.4) * DPR}px)`;
+  ctx.beginPath(); hp.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+  ctx.fillStyle = '#000'; ctx.fill();
+  ctx.restore();
+}
+function drawDie(d) {
+  const R = PHYS.qmat(d.q);
+  const faces = [];
+  for (const F of FACE_DEF) {
+    const nw = PHYS.mulv(R, F.n), cw = add(d.p, mul(nw, 0.5));
+    if (dot(nw, sub(EYE, cw)) <= 0) continue;
+    faces.push({ F, nw, cw, Uw: PHYS.mulv(R, F.U), Vw: PHYS.mulv(R, F.V), z: proj(cw)[2] });
+  }
+  faces.sort((a, b) => b.z - a.z);
+  const pc = proj(d.p), px = cam.F / pc[2];
+  const viewDir = nrm(sub(EYE, d.p));
+  for (const f of faces) {
+    const ins = 0.47;
+    const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => proj(add(f.cw, add(mul(f.Uw, a * ins), mul(f.Vw, b * ins)))));
+    const diff = Math.max(0, dot(f.nw, LIGHT)), fill = 0.18 * Math.max(0, dot(f.nw, viewDir));
+    const hv = nrm(add(LIGHT, viewDir)), spec = Math.pow(Math.max(0, dot(f.nw, hv)), 55);
+    const I = 0.3 + 0.62 * diff + fill;
+    const col = [Math.min(255, 200 * I + 40 * spec * 3), Math.min(255, 24 * I + 200 * spec), Math.min(255, 38 * I + 200 * spec)];
+    const cs = `rgb(${col[0] | 0},${col[1] | 0},${col[2] | 0})`;
+    ctx.beginPath(); corners.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+    ctx.fillStyle = cs; ctx.lineJoin = 'round'; ctx.lineWidth = px * 0.075; ctx.strokeStyle = cs; ctx.fill(); ctx.stroke();
+    ctx.lineWidth = Math.max(0.6, px * 0.012); ctx.strokeStyle = `rgba(255,${140 + 80 * spec | 0},${140 + 80 * spec | 0},${0.18 + 0.4 * spec})`; ctx.stroke();
+    const pipI = Math.min(1, 0.45 + 0.6 * diff + fill);
+    const pr = 0.092;
+    for (const [a, b] of PIPS[f.F.val]) {
+      const c3 = add(f.cw, add(add(mul(f.Uw, a * 0.25), mul(f.Vw, b * 0.25)), mul(f.nw, 0.002)));
+      const c = proj(c3), cu = proj(add(c3, mul(f.Uw, pr))), cv = proj(add(c3, mul(f.Vw, pr)));
+      ctx.save();
+      ctx.transform(cu[0] - c[0], cu[1] - c[1], cv[0] - c[0], cv[1] - c[1], c[0], c[1]);
+      ctx.beginPath(); ctx.arc(0, 0, 1, 0, TAU);
+      const v = 238 * pipI | 0;
+      ctx.fillStyle = `rgb(${v},${v - 4},${v - 12})`; ctx.fill();
+      ctx.lineWidth = 0.22; ctx.strokeStyle = 'rgba(70,0,8,.55)'; ctx.stroke();
+      ctx.restore();
+    }
+    if (spec > 0.05) {
+      ctx.beginPath(); corners.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+      ctx.fillStyle = `rgba(255,255,255,${Math.min(0.35, spec * 0.4)})`; ctx.fill();
+    }
+  }
+}
+function ledColor(ts) {
+  const m = LED.mode;
+  if (m === 'win' && ts < LED.until) return [88, 224, 143, 0.7 + 0.3 * Math.sin(ts / 70)];
+  if (m === 'lose' && ts < LED.until) return [255, 80, 60, 0.6 + 0.3 * Math.sin(ts / 90)];
+  if (m === 'roll') return [255, 176, 60, 0.9];
+  return [70, 150, 255, 0.45 + 0.25 * Math.sin(ts / 700)];
+}
+const LED = { mode: 'bet', until: 0 };
+function led(m) { LED.mode = m; LED.until = performance.now() + 1800; if (m === 'bet') LED.until = 0; }
+function drawLED(ts) {
+  const [r, g, b, a] = ledColor(ts);
+  const N = 128, pts = [];
+  for (let i = 0; i <= N; i++) { const t = i / N * TAU; pts.push(proj([Math.cos(t) * 7.27, 0.01, Math.sin(t) * 7.27])); }
+  const w = cam.F / proj([0, 0, 0])[2] * 0.13;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+  ctx.strokeStyle = `rgba(${r},${g},${b},${a * 0.35})`; ctx.lineWidth = w * 3.2; ctx.shadowColor = `rgba(${r},${g},${b},${a})`; ctx.shadowBlur = 14 * DPR; ctx.stroke();
+  ctx.shadowBlur = 0; ctx.strokeStyle = `rgba(${Math.min(255, r + 60)},${Math.min(255, g + 60)},${Math.min(255, b + 60)},${a})`; ctx.lineWidth = w; ctx.stroke();
+  if (LED.mode === 'roll') {
+    for (let k = 0; k < 4; k++) {
+      const start = ((ts / 1000 * 1.6 + k / 4) % 1) * N | 0;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) { const p = pts[(start + i) % N]; i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }
+      ctx.strokeStyle = 'rgba(255,240,200,.95)'; ctx.lineWidth = w * 1.3; ctx.shadowColor = 'rgba(255,200,90,1)'; ctx.shadowBlur = 16 * DPR; ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+let shake = 0;
+function draw(ts) {
+  if (!backLayer) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#06080B'; ctx.fillRect(0, 0, W, H);
+  if (shake > 0.001) { ctx.translate((rnd() - 0.5) * shake * 10 * DPR, (rnd() - 0.5) * shake * 10 * DPR); shake *= 0.88; }
+  ctx.drawImage(backLayer, 0, 0);
+  drawLED(ts);
+  for (const d of dice) drawShadow(d);
+  const order = dice.slice().sort((a, b) => proj(b.p)[2] - proj(a.p)[2]);
+  for (const d of order) drawDie(d);
+  ctx.drawImage(frontLayer, 0, 0);
+}
+function resize() {
+  const box = $('#domebox').getBoundingClientRect();
+  DPR = Math.min(2, devicePixelRatio || 1);
+  const w = Math.round(box.width * DPR), h = Math.round(box.height * DPR);
+  if (!w || !h || (w === W && h === H)) return;
+  W = w; H = h; canvas.width = W; canvas.height = H;
+  buildLayers();
+}
+
+/* dice simulation */
+const dice = [PHYS.makeDie(-1.1, 0.4), PHYS.makeDie(1.2, -0.5)];
+function initialDice() {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    dice.forEach((d, i) => {
+      d.p = [i ? 1.3 : -1.2, 1.2 + rnd(), i ? -0.6 : 0.5]; d.v = [0, 0, 0];
+      d.w = [rnd() * 8 - 4, rnd() * 8 - 4, rnd() * 8 - 4];
+      d.q = PHYS.qFromAxisAngle([rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], rnd() * TAU);
+      d.frozen = false; d.still = 0; d.avg = 5;
+    });
+    let t = 0;
+    while (t < 5 && !PHYS.settled(dice)) { PHYS.step(dice); t += PHYS.STEP; }
+    if (PHYS.settled(dice) && dice.every(d => PHYS.topFace(d).tilt > 0.985 && d.p[1] < PHYS.H + 0.05)) return;
+  }
+}
+let ROLL = null, acc = 0, lastTs = 0, lastClack = 0;
+function onHit(speed, kind) {
+  const now = performance.now();
+  if (now - lastClack < 28) return;
+  lastClack = now;
+  sfx('clack', Math.min(1, speed / 30), kind);
+}
+function rollDice() {
+  return new Promise(res => { ROLL = { t: 0, pops: PHYS.POPS.map(p => p.slice()), res, deadline: 10 }; acc = 0; led('roll'); });
+}
+function stepRoll() {
+  const R = ROLL;
+  while (R.pops.length && R.t >= R.pops[0][0]) { const s = R.pops.shift()[1]; PHYS.pop(dice, s, rnd); sfx('air', s); shake = Math.max(shake, 0.2 * s); }
+  PHYS.step(dice, onHit);
+  R.t += PHYS.STEP;
+  for (const d of dice) {
+    if (!(Math.hypot(d.p[0], d.p[1], d.p[2]) < 6.6) || d.p[1] < -0.6 || !Number.isFinite(d.p[0])) { d.p = [rnd() * 2 - 1, 1.6, rnd() * 2 - 1]; d.v = [0, 0, 0]; d.w = [0, 0, 0]; d.frozen = false; d.still = 0; }
+  }
+  if (!R.pops.length && R.t > 0.9 && PHYS.settled(dice)) {
+    const f = dice.map(PHYS.topFace);
+    const high = dice.some(d => d.p[1] > PHYS.H + 0.05);
+    if (f.every(x => x.tilt > 0.985) && !high) { ROLL = null; led('bet'); R.res(f.map(x => x.value)); return; }
+    setSay('No roll · a die is cocked, blowing again', 'bad');
+    R.pops = [[R.t + 0.45, 0.75], [R.t + 0.58, 0.55]];
+    R.deadline = R.t + 10;
+  }
+  if (R.t > R.deadline && !R.pops.length) { R.pops = [[R.t, 0.8]]; R.deadline = R.t + 10; }
+}
+function frame(ts) {
+  const dt = Math.min(0.05, (ts - (lastTs || ts)) / 1000); lastTs = ts;
+  if (ROLL) { acc += dt; let n = 0; while (ROLL && acc >= PHYS.STEP && n < 30) { stepRoll(); acc -= PHYS.STEP; n++; } }
+  draw(ts);
+  requestAnimationFrame(frame);
+}
+
+/* ================= audio ================= */
+let ac = null;
+function unlockAudio() {
+  if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } }
+  if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
+}
+function tone(freq, t0, dur, type = 'sine', vol = 0.1) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+  return o;
+}
+let noiseBuf = null;
+function noise(t0, dur, type, freq, vol, freqEnd, q = 1) {
+  if (!noiseBuf) { noiseBuf = ac.createBuffer(1, ac.sampleRate * 1.5, ac.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+  const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  src.buffer = noiseBuf; f.type = type; f.Q.value = q; f.frequency.setValueAtTime(freq, t0);
+  if (freqEnd) f.frequency.exponentialRampToValueAtTime(freqEnd, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f).connect(g).connect(ac.destination); src.start(t0, Math.random() * 0.5); src.stop(t0 + dur + 0.05);
+}
+function sfx(kind, s = 1, sub) {
+  if (!S.settings.sound || !ac || ac.state !== 'running') return;
+  const t = ac.currentTime;
+  try {
+    if (kind === 'chip') { tone(2400, t, 0.045, 'triangle', 0.06); tone(3300, t + 0.025, 0.05, 'triangle', 0.045); }
+    else if (kind === 'deny') tone(180, t, 0.15, 'square', 0.035);
+    else if (kind === 'air') { noise(t, 0.34, 'bandpass', 500, 0.32 * s, 1800, 0.7); tone(70, t, 0.16, 'sine', 0.18 * s); }
+    else if (kind === 'clack') {
+      const v = 0.04 + 0.22 * s;
+      if (sub === 'dice') { noise(t, 0.04, 'highpass', 3200, v, 0, 0.8); tone(2600 + Math.random() * 500, t, 0.025, 'triangle', v * 0.35); }
+      else if (sub === 'dome') { noise(t, 0.05, 'bandpass', 2200, v * 0.8, 0, 2); tone(1400 + Math.random() * 300, t, 0.05, 'sine', v * 0.25); }
+      else noise(t, 0.05, 'lowpass', 900, v * 0.7, 0, 0.7);
+    }
+    else if (kind === 'win') [659, 784, 988].forEach((f, i) => tone(f, t + i * 0.08, 0.28, 'triangle', 0.08));
+    else if (kind === 'big') [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, t + i * 0.09, 0.4, 'triangle', 0.09));
+    else if (kind === 'lose') { const o = tone(300, t, 0.35, 'sine', 0.07); o.frequency.exponentialRampToValueAtTime(150, t + 0.33); }
+  } catch (e) {}
+}
+
+/* ================= toast ================= */
+let toastTimer;
+function toast(title, sub = '', kind = '') {
+  const t = $('#toast');
+  t.querySelector('.t').textContent = title; t.querySelector('.s').textContent = sub;
+  t.className = 'toast ' + kind;
+  if (innerWidth <= 1060) {
+    const r = $('#domebox').getBoundingClientRect();
+    t.style.top = Math.max(70, Math.min(innerHeight - 260, r.bottom - r.height * 0.16)) + 'px'; t.style.bottom = 'auto';
+  } else { t.style.top = ''; t.style.bottom = ''; }
+  void t.offsetWidth; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ================= rendering ================= */
+function renderHeader() {
+  $('#mCred').textContent = fmt(S.bank);
+  $('#mBet').textContent = fmt(onTable());
+  const w = $('#mWin'); w.textContent = fmt(S.lastWin); w.classList.toggle('win', S.lastWin > 0);
+  const pm = $('#puckMini');
+  pm.className = 'puckmini' + (S.point !== null ? ' on' : '');
+  pm.textContent = S.point !== null ? S.point : 'OFF';
+  $('#pointTxt').textContent = S.point !== null ? `On ${S.point}` : 'Come-out';
+  const sb = $('#soundBtn');
+  sb.classList.toggle('off', !S.settings.sound);
+  sb.innerHTML = S.settings.sound
+    ? '<svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>'
+    : '<svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>';
+}
+function renderHist() {
+  const h = $('#hist');
+  const list = S.hist.slice(-16).reverse();
+  h.innerHTML = list.length ? list.map(r => `<div class="hr${r.t === 7 ? ' seven' : ''}${r.o === 'point' || r.o === 'made' ? ' ptk' : ''}" title="${r.d[0]} + ${r.d[1]}"><span class="dd">${dieSVG(r.d[0], 13)}${dieSVG(r.d[1], 13)}</span><span>${r.t}</span></div>`).join('') : '<span class="empty">No rolls yet</span>';
+}
+function renderStatus() {
+  const st = $('#status');
+  if (S.phase === 'roll') { st.innerHTML = '<span class="g">Dice in the air · no more bets</span>'; return; }
+  if (S.take) { st.innerHTML = '<span class="g">Take down:</span> tap a bet to return it to your credits. Contract bets stay.'; return; }
+  if (S.hover) {
+    const k = S.hover, tgt = addTarget(k), amt = S.bets[tgt] || (k !== tgt ? 0 : 0);
+    const txt = payText(k) || payText(tgt);
+    st.innerHTML = `<b>${nameOf(k === tgt ? k : tgt)}</b> · ${txt}${amt ? ` · on it: <b>${fmt(amt)}</b>` : ''}`;
+    return;
+  }
+  if (S.bank + onTable() < 100) { st.innerHTML = 'Out of credits. Press <b>ROLL</b> to top up with <b>$1,000</b>.'; return; }
+  if (S.point === null) st.innerHTML = onTable() ? `Come-out roll · <b>${fmt(onTable())}</b> on the table · press <b>ROLL</b>` : 'Come-out roll · bet the <b>pass line</b> or <b>don’t pass</b>, then press ROLL';
+  else st.innerHTML = `Point is <b>${S.point}</b> · tap the pass line to add odds · come bets are open`;
+}
+function renderDock() {
+  const bet = S.phase === 'bet';
+  const ch = $('#chips');
+  if (!ch.children.length) {
+    CHIPS.forEach((v, i) => {
+      const b = document.createElement('button');
+      b.className = 'chip'; b.dataset.c = chipColor(v); b.dataset.v = v; b.textContent = chipLabel(v);
+      b.title = `${fmt(v)} chip (${i + 1})`; b.setAttribute('aria-label', `Select ${fmt(v)} chip`);
+      b.addEventListener('click', () => { S.chip = v; sfx('chip'); render(); save(); });
+      ch.appendChild(b);
+    });
+  }
+  [...ch.children].forEach(b => { const on = +b.dataset.v === S.chip; b.classList.toggle('sel', on); b.setAttribute('aria-pressed', on); });
+  $('#bUndo').disabled = !bet || !S.undo.length;
+  $('#bTake').disabled = !bet; $('#bTake').setAttribute('aria-pressed', S.take);
+  $('#bClear').disabled = !bet || !Object.keys(S.bets).some(clearable);
+  $('#bOdds').disabled = !bet;
+  const rb = $('#bRoll');
+  rb.disabled = !bet;
+  rb.textContent = S.bank + onTable() < 100 ? 'TOP UP' : 'ROLL';
+  rb.style.fontSize = rb.textContent === 'TOP UP' ? '15px' : '';
+  rb.classList.toggle('go', bet && onTable() > 0);
+}
+function render() { renderHeader(); renderChips(); renderFelt(); renderHist(); renderStatus(); renderDock(); }
+
+/* ================= sheets ================= */
+let sheetOpen = null, confirmReset = false;
+function openSheet(w) { sheetOpen = w; confirmReset = false; renderSheet(); $('#sheet').hidden = false; const f = $('#sheetBody button'); if (f) f.focus(); }
+function closeSheet() { $('#sheet').hidden = true; sheetOpen = null; }
+function renderSheet() {
+  const b = $('#sheetBody'), st = S.stats, set = S.settings;
+  const head = (t, sub) => `<div class="sheet-head"><div><h2>${t}</h2><p class="sub">${sub}</p></div><button class="ibtn" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
+  const cell = (l, v, c = '') => `<div class="stat"><div class="l">${l}</div><div class="v ${c}">${v}</div></div>`;
+  if (sheetOpen === 'stats') {
+    const net = S.bank + onTable() - START * (1 + st.refills);
+    const exp = { 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 5, 9: 4, 10: 3, 11: 2, 12: 1 };
+    const N = st.rolls;
+    b.innerHTML = head('Session stats', 'Saved in this browser.') + `
+      <div class="stats">
+        ${cell('Credits', fmt(S.bank))}${cell('On the table', fmt(onTable()))}${cell('Net result', fmtS(net), net > 0 ? 'pos' : net < 0 ? 'neg' : '')}
+        ${cell('Rolls', N)}${cell('Points made', st.made)}${cell('Seven-outs', st.sevenOuts)}
+        ${cell('Current hand', st.hand + ' rolls')}${cell('Longest hand', st.longest + ' rolls')}${cell('Biggest win', st.bigWin ? fmt(st.bigWin) : '—', st.bigWin ? 'pos' : '')}
+      </div>
+      <h3>How often each total came up</h3>
+      <div class="freqwrap"><table class="freq"><tr><th>Total</th>${[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(t => `<th>${t}</th>`).join('')}</tr>
+        <tr><th>Rolled</th>${[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(t => `<td>${st.counts[t]}</td>`).join('')}</tr>
+        <tr><th>Share</th>${[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(t => `<td>${N ? Math.round(st.counts[t] / N * 100) + '%' : '—'}</td>`).join('')}</tr>
+        <tr><th>Expected</th>${[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(t => `<td>${(exp[t] / 36 * 100).toFixed(1)}%</td>`).join('')}</tr></table></div>
+      <p class="sub" style="margin-top:12px">The dice are real physics: each roll comes from how the air throws them in the dome, not from a number picked in advance.</p>`;
+  } else if (sheetOpen === 'help') {
+    b.innerHTML = head('Rules and payouts', 'Standard casino craps, played the way electronic bubble craps machines run it.') + `
+      <h3>How a round works</h3>
+      <ul class="help">
+        <li>The first roll of a round is the <b>come-out</b>. 7 or 11 wins for the pass line, 2, 3 or 12 (craps) loses.</li>
+        <li>A 4, 5, 6, 8, 9 or 10 becomes the <b>point</b> and the puck turns ON. The shooter keeps rolling until the point comes again (pass wins) or a 7 shows (seven-out, pass loses).</li>
+        <li>The machine blows air to throw both dice in the dome. If a die lands cocked or on top of the other, it is <b>no roll</b> and the air blows again.</li>
+      </ul>
+      <h3>Line bets</h3>
+      <ul class="help">
+        <li><b>Pass line</b> and <b>don’t pass</b> go down on the come-out. Don’t pass wins on 2 or 3, pushes on 12 (bar 12), loses on 7 or 11, then wins on a 7 before the point.</li>
+        <li><b>Come</b> and <b>don’t come</b> work the same way, starting with the next roll. They can only be made while a point is on. A come bet that lands on a number moves to that box.</li>
+        <li>Pass line and come bets on a number are <b>contract bets</b> and can’t be taken down. Don’t bets can.</li>
+        <li>A winning pass or don’t pass bet stays up for the next come-out, and a come or don’t come bet that wins before it moves stays in its box. A come or don’t come bet that wins after moving to a number is paid and returned with its odds.</li>
+      </ul>
+      <h3>Odds</h3>
+      <ul class="help">
+        <li>Once a point is set, tap the pass line or don’t pass bar to add <b>odds</b>, or tap a come chip on a number. Odds pay true odds with no house edge.</li>
+        <li>Limit: <b>${set.odds === '345' ? '3-4-5×' : set.odds + '×'}</b>${set.odds === '345' ? ' (3× on 4 and 10, 4× on 5 and 9, 5× on 6 and 8; lay up to 6× the flat bet)' : ''}.</li>
+        <li>Come bet odds are ${set.comeOddsOn ? '<b>working</b>' : '<b>off</b>'} on the come-out roll. Don’t come lay odds always work.</li>
+      </ul>
+      <h3>Payouts</h3>
+      <table class="pt">
+        <tr><th>Bet</th><th>Pays</th></tr>
+        <tr><td>Pass, don’t pass, come, don’t come</td><td>1:1</td></tr>
+        <tr><td>Odds on 4 or 10 / 5 or 9 / 6 or 8</td><td>2:1 · 3:2 · 6:5</td></tr>
+        <tr><td>Lay odds on 4 or 10 / 5 or 9 / 6 or 8</td><td>1:2 · 2:3 · 5:6</td></tr>
+        <tr><td>Place 4 or 10 / 5 or 9 / 6 or 8</td><td>9:5 · 7:5 · 7:6</td></tr>
+        <tr><td>Buy (true odds, 5% commission on the win)</td><td>2:1 · 3:2 · 6:5</td></tr>
+        <tr><td>Lay (5% commission on the win, always working)</td><td>1:2 · 2:3 · 5:6</td></tr>
+        <tr><td>Field 3, 4, 9, 10, 11 / 2 / 12</td><td>1:1 · 2:1 · ${set.field12}:1</td></tr>
+        <tr><td>Big 6, Big 8 (always working)</td><td>1:1</td></tr>
+        <tr><td>Hard 4 or 10 / hard 6 or 8</td><td>7:1 · 9:1</td></tr>
+        <tr><td>Any seven</td><td>4:1</td></tr>
+        <tr><td>Any craps (2, 3, 12)</td><td>7:1</td></tr>
+        <tr><td>Aces (2) or midnight (12)</td><td>30:1</td></tr>
+        <tr><td>Ace-deuce (3) or yo-leven (11)</td><td>15:1</td></tr>
+        <tr><td>Horn (¼ each on 2, 3, 11, 12)</td><td>net 27:4 or 3:1</td></tr>
+        <tr><td>C &amp; E (½ any craps, ½ eleven)</td><td>net 3:1 or 7:1</td></tr>
+      </table>
+      <h3>Good to know</h3>
+      <ul class="help">
+        <li>Place, buy and hardway bets are ${set.working ? '<b>working</b>' : '<b>off</b>'} on the come-out roll. You can change this in settings.</li>
+        <li>One-roll bets (field and the center bets) are settled on every roll. Winning bets stay up.</li>
+        <li>Payouts are exact to the cent, with fractions of a cent dropped. Bet place 6 and 8 in multiples of $6, 5 and 9 in multiples of $5, and odds on 5 and 9 in even amounts for exact payouts.</li>
+        <li>Right-click or long-press a bet (or use Take down) to remove it. Each bet takes up to ${fmt(MAXBET)} before odds.</li>
+      </ul>
+      <h3>Keyboard</h3>
+      <div class="keys" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px 16px;font-size:13.5px">
+        <div style="display:flex;justify-content:space-between;color:var(--muted)">Roll<kbd>Space</kbd></div><div style="display:flex;justify-content:space-between;color:var(--muted)">Chips<kbd>1–5</kbd></div>
+        <div style="display:flex;justify-content:space-between;color:var(--muted)">Undo<kbd>Z</kbd></div><div style="display:flex;justify-content:space-between;color:var(--muted)">Max odds<kbd>O</kbd></div>
+        <div style="display:flex;justify-content:space-between;color:var(--muted)">Take down<kbd>X</kbd></div><div style="display:flex;justify-content:space-between;color:var(--muted)">Sound<kbd>M</kbd></div>
+      </div>`;
+  } else if (sheetOpen === 'settings') {
+    const sw = (id, name, d, on) => `<div class="setting"><div><div class="n">${name}</div><div class="d">${d}</div></div><input type="checkbox" class="switch" id="set-${id}" data-set="${id}" ${on ? 'checked' : ''} aria-label="${name}"></div>`;
+    const seg = (attr, opts, cur) => `<div class="seg" role="group">${opts.map(([v, l]) => `<button data-${attr}="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join('')}</div>`;
+    b.innerHTML = head('Table settings', 'House options that vary from casino to casino.') + `
+      <div class="setting"><div><div class="n">Odds limit</div><div class="d">Most bubble craps machines offer 3-4-5× odds. New limits apply to odds you add from now on.</div></div>${seg('odds', [['345', '3-4-5×'], [10, '10×'], [100, '100×']], set.odds)}</div>
+      <div class="setting"><div><div class="n">Field 12 pays</div><div class="d">Triple is the common Las Vegas rule.</div></div>${seg('f12', [[3, 'Triple'], [2, 'Double']], set.field12)}</div>
+      ${sw('working', 'Place, buy and hardways work on the come-out', 'Off is the standard rule: a come-out 7 won’t take them.', set.working)}
+      ${sw('comeOddsOn', 'Come odds work on the come-out', 'Off is the standard rule: odds are returned if the come-out roll decides the bet.', set.comeOddsOn)}
+      ${sw('sound', 'Sound effects', 'Air blast, dice, chips and wins.', set.sound)}
+      <h3>Credits</h3>
+      ${confirmReset
+        ? `<div class="confirm"><span style="flex:1;min-width:180px">Clear the table, reset credits to ${fmt(START)} and wipe all stats?</span><button class="btn danger" id="doReset">Reset</button><button class="btn" id="noReset">Cancel</button></div>`
+        : `<button class="btn" id="askReset" ${S.phase !== 'bet' ? 'disabled' : ''}>Reset credits and stats</button>`}`;
+  }
+}
+
+/* ================= events ================= */
+let lpTimer = null, lpFired = false;
+felt.addEventListener('click', e => {
+  if (lpFired) { lpFired = false; return; }
+  const chip = e.target.closest('[data-chipbet]');
+  const area = chip ? chip.dataset.chipbet : (e.target.closest('[data-bet]') || {}).dataset?.bet;
+  if (!area) return;
+  if (S.take) removeBet(area); else addBet(area);
+});
+felt.addEventListener('contextmenu', e => {
+  const chip = e.target.closest('[data-chipbet]');
+  const area = chip ? chip.dataset.chipbet : (e.target.closest('[data-bet]') || {}).dataset?.bet;
+  if (!area) return;
+  e.preventDefault(); removeBet(area);
+});
+felt.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch') return;
+  const chip = e.target.closest('[data-chipbet]');
+  const area = chip ? chip.dataset.chipbet : (e.target.closest('[data-bet]') || {}).dataset?.bet;
+  if (!area) return;
+  clearTimeout(lpTimer);
+  lpTimer = setTimeout(() => { lpFired = true; removeBet(area); }, 550);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t => felt.addEventListener(t, () => clearTimeout(lpTimer)));
+felt.addEventListener('pointerover', e => {
+  if (e.pointerType === 'touch') return;
+  const chip = e.target.closest('[data-chipbet]');
+  const t = chip ? null : e.target.closest('[data-bet]');
+  const k = chip ? chip.dataset.chipbet : t ? t.dataset.bet : null;
+  if (k !== S.hover) { S.hover = k; renderFelt(); renderStatus(); }
+});
+felt.addEventListener('pointerleave', () => { S.hover = null; renderFelt(); renderStatus(); });
+$('#bUndo').addEventListener('click', undo);
+$('#bTake').addEventListener('click', () => { S.take = !S.take; render(); });
+$('#bClear').addEventListener('click', clearAll);
+$('#bOdds').addEventListener('click', maxOdds);
+$('#bRoll').addEventListener('click', roll);
+$('#soundBtn').addEventListener('click', () => { S.settings.sound = !S.settings.sound; unlockAudio(); save(); renderHeader(); });
+document.addEventListener('pointerdown', unlockAudio);
+document.addEventListener('click', e => {
+  const o = e.target.closest('[data-open]'); if (o) { openSheet(o.dataset.open); return; }
+  if (e.target.closest('[data-close]') || e.target === $('#sheet')) { closeSheet(); return; }
+  const od = e.target.closest('[data-odds]'); if (od) { S.settings.odds = od.dataset.odds === '345' ? '345' : +od.dataset.odds; save(); renderSheet(); render(); return; }
+  const f12 = e.target.closest('[data-f12]'); if (f12) { S.settings.field12 = +f12.dataset.f12; areaEl('field').innerHTML = fieldHTML(); save(); renderSheet(); render(); return; }
+  const id = e.target.id;
+  if (id === 'askReset') { confirmReset = true; renderSheet(); $('#doReset').focus(); return; }
+  if (id === 'noReset') { confirmReset = false; renderSheet(); return; }
+  if (id === 'doReset') {
+    CasinoWallet.noteReset();
+    S.bank = START; S.bets = {}; S.point = null; S.undo = []; S.lastWin = 0; S.hist = []; S.stats = defStats();
+    confirmReset = false; setCall(null); save(); renderSheet(); render(); toast('Fresh start', fmt(START) + ' in credits', 'gold');
+  }
+});
+document.addEventListener('change', e => {
+  const k = e.target.dataset && e.target.dataset.set;
+  if (!k) return;
+  S.settings[k] = e.target.checked;
+  if (k === 'sound' && S.settings.sound) unlockAudio();
+  save(); render(); renderSheet();
+  const el = document.getElementById('set-' + k); if (el) el.focus();
+});
+document.addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (sheetOpen) { if (e.key === 'Escape') closeSheet(); return; }
+  const k = e.key.toLowerCase();
+  if (k === ' ' && e.target.tagName !== 'BUTTON') { e.preventDefault(); roll(); return; }
+  if (/^[1-5]$/.test(k)) { S.chip = CHIPS[+k - 1]; render(); save(); return; }
+  if (k === 'z') undo();
+  else if (k === 'x') { S.take = !S.take; render(); }
+  else if (k === 'c') clearAll();
+  else if (k === 'o') maxOdds();
+  else if (k === 'm') { S.settings.sound = !S.settings.sound; save(); renderHeader(); }
+  else if (k === 'escape' && S.take) { S.take = false; render(); }
+});
+let rz = 0;
+function onResize() { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { resize(); fitFelt(); }); }
+addEventListener('resize', onResize);
+if (window.ResizeObserver) { new ResizeObserver(onResize).observe($('#domebox')); new ResizeObserver(() => fitFelt()).observe($('#feltscroll')); }
+
+/* ================= boot ================= */
+buildFelt();
+initialDice();
+render();
+resize(); fitFelt();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { W = 0; resize(); fitFelt(); });
+if (S.hist.length) { const l = S.hist[S.hist.length - 1]; setCall(l.d, callFor(l.d[0], l.d[1], l.t, l.o, null)[0], callFor(l.d[0], l.d[1], l.t, l.o, null)[1]); }
+requestAnimationFrame(frame);
+})();
+
 </script>
 </body>
 </html>
