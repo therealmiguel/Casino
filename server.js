@@ -16,7 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
-const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'profile.html'];
+const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'crash.html', 'baccarat-live.html', 'profile.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
   const preferred = [path.join(__dirname, 'public'), __dirname];
@@ -177,12 +177,32 @@ function announce(text) {
 const P = require('./progress')(A, { meta: META, save: saveMeta, announce, flag: (id, kind, detail, ip) => flag(id, kind, detail, ip), beforeSeasonReset: () => live.kickAll() });
 A.setProgress(P);
 const games = require('./games')(A, { flag: (id, kind, detail) => flag(id, kind, detail), isClosed: () => META.settings.closed, P });
-const live = require('./live')({
+const vipOf = pid => { const r = A.get(pid); return !!(r && P.vipOf(r)); };
+let live2 = null;
+const live1 = require('./live')({
   A, cleanName: A.cleanName, flag,
   saveState: s => { liveState = s; liveDirty = true; },
   auth: (id, token, ip) => authPlayer(id, token, ip),
   isClosed: () => META.settings.closed,
-  vip: pid => { const r = A.get(pid); return !!(r && P.vipOf(r)); },
+  vip: vipOf,
+  extraRisk: () => (live2 ? live2.atRisk() : {}),
+});
+live2 = require('./live2')({
+  A, cleanName: A.cleanName, flag, vip: vipOf,
+  auth: (id, token, ip) => authPlayer(id, token, ip),
+  isClosed: () => META.settings.closed,
+  persist: () => live1.persist(),
+});
+// one face for every live table: blackjack, roulette and Hold'em (live.js); Crash, baccarat and chat (live2.js)
+const LIVE2_GAMES = ['cr', 'bc'];
+const live = Object.assign({}, live1, {
+  summary: () => Object.assign(live1.summary(), live2.summary()),
+  where: pid => live1.where(pid).concat(live2.where(pid)),
+  kick: pid => live1.kick(pid) + live2.kick(pid),
+  kickAll: () => { live1.kickAll(); for (const pid of live2.allPids()) live2.kick(pid); },
+  onlineNow: () => live2.onlineNow(live1.onlineNow()),
+  stream: (req, res, url, ip) => (LIVE2_GAMES.includes(url.searchParams.get('game')) ? live2 : live1).stream(req, res, url, ip),
+  action: (game, b, ip) => (LIVE2_GAMES.includes(game) ? live2 : live1).action(game, b, ip),
 });
 
 /* ---------------- leaderboard stream ---------------- */
@@ -262,18 +282,18 @@ async function playerApi(req, res, p, ip) {
   if (p === '/api/players') {
     const who = authPlayer(id, b.token, ip, { create: true, allowBanned: true });
     if (who.error) return send(res, who.code, { error: who.error });
-    if (b.name) A.setName(id, b.name);
+    const nameError = b.name ? A.setName(id, b.name) : '';
     if (b.cash !== undefined) {
       const claimed = Math.round(Number(b.cash) || 0), real = A.cash(id);
       if (Math.abs(claimed - real) > 100) flag(id, claimed > real + 1000000 ? 'tamper' : 'legacy', `Reported a bankroll of ${A.usd(claimed)} (real: ${A.usd(real)}). Ignored.`, ip);
     }
-    return send(res, 200, { ok: true, ignored: true, cents: who.rec.bal });
+    return send(res, 200, { ok: true, ignored: true, cents: who.rec.bal, nameError });
   }
   if (p === '/api/me') {
     const who = authPlayer(id, b.token, ip, { create: true, allowBanned: true });
     if (who.error) return send(res, who.code, { error: who.error });
-    if (b.name) A.setName(id, b.name);
-    return send(res, 200, withPop(id, meBody(id, b.ctx)));
+    const nameError = b.name ? A.setName(id, b.name) : '';
+    return send(res, 200, withPop(id, Object.assign(meBody(id, b.ctx), { nameError })));
   }
   const who = authPlayer(id, b.token, ip);
   if (who.error) return send(res, who.code, { error: who.error });
@@ -346,6 +366,7 @@ async function adminApi(req, res, sub, ip) {
       players: A.players.size, named, banned, online, money, house: A.house, live: live.summary(), settings: META.settings,
       security: META.security.slice(-80).reverse(), audit: META.audit.slice(-40).reverse(), bigWins: bigWins.slice(0, 12),
       startedAt: STARTED, storage: USE_REDIS ? 'upstash' : 'file',
+      chat: live2.chatRecent(),
       jackpot: P.jackpot(), events: META.events, season: META.season, hall: META.hall.slice(0, 6), tour: { ...META.tour, prizes: META.tourPrizes, board: P.tourBoard().slice(0, 10), history: META.tourHistory.slice(0, 5) },
     });
   }
@@ -394,6 +415,8 @@ async function adminApi(req, res, sub, ip) {
       }
       case 'ban': r.banned = { t: Date.now(), reason: A.cleanName(b.reason || '').slice(0, 80) || 'Suspended' }; live.kick(id); A.touch(id); audit('ban', `${who}: ${r.banned.reason}`, ip); break;
       case 'unban': r.banned = null; A.touch(id); audit('unban', who, ip); break;
+      case 'mute': { const min = Math.min(10080, Math.max(1, Math.round(Number(b.minutes) || 30))); r.muted = Date.now() + min * 60000; A.touch(id); audit('mute', `${who}: muted in chat for ${min >= 60 ? Math.round(min / 60) + ' h' : min + ' min'}`, ip); break; }
+      case 'unmute': r.muted = 0; A.touch(id); audit('mute', `${who}: can chat again`, ip); break;
       case 'hide': r.hidden = !r.hidden; A.touch(id); audit('board', `${who}: ${r.hidden ? 'hidden from' : 'back on'} the leaderboard`, ip); break;
       case 'kick': audit('kick', `${who}: removed from ${live.kick(id)} live table(s)`, ip); break;
       case 'resetStats': r.st = Object.assign(r.st, { hands: 0, spins: 0, rolls: 0, bigWin: 0, blackjacks: 0, bestMult: 0, pointsMade: 0 }); r.resets = 0; r.peak = A.cash(id); A.touch(id); audit('stats', `${who}: stats cleared`, ip); break;
@@ -485,6 +508,8 @@ async function adminApi(req, res, sub, ip) {
     P.jackpot().pool = pool; P.jackpot().seed = seed; saveMeta(); audit('jackpot', `Pool ${A.usd(pool)}, restarts at ${A.usd(seed)}`, ip);
     return send(res, 200, { ok: true });
   }
+  if (sub === '/api/chatclear') { const room = String(b.room || 'all'); live2.chatClear(room); audit('chat', room === 'all' ? 'All table chats cleared' : `Chat cleared at ${room}`, ip); return send(res, 200, { ok: true }); }
+  if (sub === '/api/chatdel') { live2.chatDelete(Number(b.msg)); audit('chat', 'Chat message removed', ip); return send(res, 200, { ok: true }); }
   if (sub === '/api/clearlog') { META.security = []; saveMeta(); audit('log', 'Security log cleared', ip); return send(res, 200, { ok: true }); }
   if (sub === '/api/export') {
     const all = {}; for (const [id, r] of A.players) { const o = Object.assign({}, r); delete o.tokenHash; all[id] = o; }
@@ -521,12 +546,22 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/live/stream') { if (!ready) return send(res, 503, { error: 'Opening.' }); return live.stream(req, res, url, ip); }
     if (p === '/api/live/summary') return send(res, 200, live.summary());
-    if ((p === '/api/live/bj' || p === '/api/live/rl' || p === '/api/live/pk' || p === '/api/live/claim') && req.method === 'POST') {
+    if (p === '/api/chat/stream') { if (!ready) return send(res, 503, { error: 'Opening.' }); return live2.chatStream(req, res, url, ip); }
+    if (p === '/api/chat' && req.method === 'POST') {
+      if (!ready) return send(res, 503, { error: 'The casino is opening. Try again in a few seconds.' });
+      const b = await jsonBody(req);
+      if (!b) return send(res, 400, { error: 'Send JSON.' });
+      if (!allow('ip:' + ip, 40, 80) || !allow('chat:' + String(b.id || ''), 2, 6)) return send(res, 429, { error: 'Slow down a little.' });
+      const r = live2.chatPost(b, ip);
+      return send(res, r.code, r.body);
+    }
+    const lm = p.match(/^\/api\/live\/(bj|rl|pk|cr|bc|claim)$/);
+    if (lm && req.method === 'POST') {
       if (!ready) return send(res, 503, { error: 'The casino is opening. Try again in a few seconds.' });
       const b = await jsonBody(req);
       if (!b) return send(res, 400, { error: 'Send JSON.' });
       if (!allow('ip:' + ip, 40, 80) || !allow('p:' + String(b.id || ''), 14, 30)) return send(res, 429, { error: 'Slow down a little.' });
-      const r = p === '/api/live/claim' ? live.claim(b, ip) : live.action(p.endsWith('bj') ? 'bj' : p.endsWith('pk') ? 'pk' : 'rl', b, ip);
+      const r = lm[1] === 'claim' ? live.claim(b, ip) : live.action(lm[1], b, ip);
       if (r.flag) flag(String(b.id || ''), 'invalid', r.flag, ip);
       return send(res, r.code, A.get(String(b.id || '')) ? withPop(String(b.id), r.body) : r.body);
     }

@@ -8,7 +8,7 @@ const F = Number(process.env.LIVE_TIME_SCALE) || 1;   // for automated tests onl
 const RR = require('./roulette_rules');
 const { createPoker } = require('./poker');
 
-module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, flag, vip }) {
+module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, flag, vip, extraRisk }) {
   const maxFor = pid => (vip && vip(pid) ? 500000 : 100000);
   /* ---------------- connections & notices ---------------- */
   const conns = new Set();                 // { res, game, pid, name }
@@ -489,6 +489,7 @@ module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, 
       if (c) atRisk[s.pid] = (atRisk[s.pid] || 0) + c;
     }
     if (RL.phase !== 'result') for (const [pid, b] of RL.bets) atRisk[pid] = (atRisk[pid] || 0) + b.total;
+    if (extraRisk) for (const [pid, c] of Object.entries(extraRisk())) atRisk[pid] = (atRisk[pid] || 0) + c;
     saveState({ v: 2, atRisk, pokerSeated });
   }
 

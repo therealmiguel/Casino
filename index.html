@@ -81,6 +81,8 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
 .lt .ic{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;flex:none;font-size:28px}
 .lt .ic.bj{background:radial-gradient(circle at 40% 30%,#1B4D57,#0A2227);color:#F0CD85}
 .lt .ic.pk{background:radial-gradient(circle at 40% 30%,#1C6B45,#0A2E1D);color:#F7F2E7}
+.lt .ic.cr{background:radial-gradient(circle at 40% 30%,#1A2A5A,#060914);color:#FF8A3D}
+.lt .ic.bc{background:radial-gradient(circle at 40% 30%,#14603F,#0A3624)}
 .lt .ic.rl{background:radial-gradient(circle at 40% 30%,#1D2230,#08090E);color:#FFD447}
 .lt .tx{flex:1;min-width:0}
 .lt h3{margin:0;font:400 22px/1.15 var(--display);color:var(--ivory)}
@@ -201,7 +203,7 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
     <div class="bulbs" id="bulbs" aria-hidden="true"></div>
     <div class="eyebrow">Open all night · Tables live</div>
     <h1>Miguel's Casino</h1>
-    <p class="lede">Pick a table. Blackjack, lightning roulette, bubble craps, two slot machines, Plinko and Mines, all under one roof.</p>
+    <p class="lede">Pick a table. Blackjack, lightning roulette, bubble craps, two slot machines, Plinko, Mines and Rocket Crash, all under one roof.</p>
     <div class="bank">
       <div class="meter"><span>Your bankroll</span><b id="bankroll">$1,000.00</b></div>
       <button class="topup" id="topup" hidden>Get $1,000 in chips</button>
@@ -404,12 +406,34 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
   }
 })();
 </script>
+    <a class="table" href="crash.html">
+      <div class="art" style="background:radial-gradient(70% 60% at 70% 0%,#1A2A5A,transparent 70%),#060914">
+        <svg viewBox="0 0 320 200" aria-hidden="true">
+          <defs><linearGradient id="crf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF8A3D" stop-opacity=".45"/><stop offset="1" stop-color="#FF8A3D" stop-opacity="0"/></linearGradient></defs>
+          <g fill="#fff" opacity=".6"><circle cx="40" cy="30" r="1"/><circle cx="120" cy="50" r="1.2"/><circle cx="260" cy="24" r="1"/><circle cx="290" cy="90" r="1.3"/><circle cx="200" cy="70" r="1"/></g>
+          <path d="M40 160 L40 40 M40 160 L290 160" stroke="rgba(150,180,255,.25)" stroke-width="1.5"/>
+          <path d="M40 160 C120 158 180 140 222 96 L222 160 Z" fill="url(#crf)"/>
+          <path d="M40 160 C120 158 180 140 222 96" stroke="#FF8A3D" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <g transform="translate(228 90) rotate(-42)"><path d="M-14 -5 Q-30 0 -14 5Z" fill="#FFE6A0"/><path d="M18 0 Q8 -9 -14 -7 L-14 7 Q8 9 18 0Z" fill="#E9EEF8"/><path d="M18 0 Q14 -4 10 -5.5 L10 5.5 Q14 4 18 0Z" fill="#FF4D6A"/><circle cx="2" cy="0" r="3.4" fill="#4FD8FF"/></g>
+          <text x="170" y="62" text-anchor="middle" font-family="Impact,system-ui" font-size="34" fill="#fff">4.82×</text>
+        </svg>
+      </div>
+      <div class="info">
+        <span class="kind">Live · new</span>
+        <h2>Rocket Crash</h2>
+        <p>Everyone online rides the same rocket. Cash out before it blows up: half the rounds pass 2×, some fly past 100×.</p>
+        <div class="foot">
+          <div class="chips"><span>Bets</span><b>$1 – $1,000</b></div>
+          <span class="play">Play <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </div>
+      </div>
+    </a>
   </main>
 
 
   <section class="live-sec" id="liveSec" hidden aria-labelledby="liveTitle">
     <div class="head">
-      <div><div class="eyebrow">Play together</div><h2 id="liveTitle">Live tables</h2><p>Sit down with everyone online right now. One dealer, one wheel, one poker table, same cards for all.</p></div>
+      <div><div class="eyebrow">Play together</div><h2 id="liveTitle">Live tables</h2><p>Sit down with everyone online right now. Blackjack, roulette, Hold’em, baccarat and Crash: one dealer, same cards for everyone, with table chat.</p></div>
       <div class="live" id="liveNow"><i></i><span>Open</span></div>
     </div>
     <div class="lives">
@@ -426,6 +450,16 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
       <a class="lt" href="poker-live.html">
         <div class="ic pk">&#9827;&#xFE0E;</div>
         <div class="tx"><h3>Hold'em Live</h3><div class="now" id="ltPk">6 seats · $5/$10 no limit</div><div class="seatdots" id="ltPkDots"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+        <span class="play">Join</span>
+      </a>
+      <a class="lt" href="crash.html">
+        <div class="ic cr"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M4 20c4-1 9-5 12-12l3-3-1 5c-2 6-7 10-14 10z" fill="currentColor" opacity=".35"/><path d="M14.5 4.5c2.5-1 5-1 5-1s0 2.5-1 5l-5 5-4-4 5-5z" fill="currentColor"/><circle cx="16" cy="8" r="1.4" fill="#0B1226"/><path d="M9.5 10.5 7 10l-2 2 3 1M13.5 14.5 14 17l-2 2-1-3" fill="currentColor"/></svg></div>
+        <div class="tx"><h3>Rocket Crash</h3><div class="now" id="ltCr">Everyone rides the same rocket</div></div>
+        <span class="play">Join</span>
+      </a>
+      <a class="lt" href="baccarat-live.html">
+        <div class="ic bc"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><rect x="3" y="5" width="10" height="14" rx="2" fill="#F3EEDF" transform="rotate(-10 8 12)"/><rect x="10" y="5" width="10" height="14" rx="2" fill="#F3EEDF" transform="rotate(8 15 12)"/><text x="15.5" y="15" text-anchor="middle" font-size="7" font-weight="800" fill="#C21F2E" font-family="system-ui" transform="rotate(8 15 12)">9</text></svg></div>
+        <div class="tx"><h3>Baccarat Live</h3><div class="now" id="ltBc">Player, Banker or Tie</div></div>
         <span class="play">Join</span>
       </a>
     </div>
@@ -463,6 +497,41 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
 
 <script>window.CASINO_CTX = 'lobby';</script>
 <script>
+// A word filter for chat and player names (English and German).
+// Text is normalised first (accents, look-alike digits and symbols, repeated letters), so "f.u.u.c.k" or "sch3isse" still match.
+'use strict';
+const WordFilter = (() => {
+  // stems: matched anywhere inside a word
+  const STEMS = [
+    'fuck', 'fuk', 'fck', 'shit', 'bitch', 'cunt', 'pussy', 'whore', 'slut', 'nigg', 'niga', 'nigr', 'faggot', 'fagot', 'retard', 'wank', 'twat', 'asshole', 'dildo', 'porn', 'jizz', 'hitler',
+    'scheis', 'fotze', 'wichs', 'arschloch', 'schwuchtel', 'hurensohn', 'missgeburt', 'fick', 'nutte', 'neger', 'kanake', 'spast', 'behindert', 'schlampe', 'muschi', 'pimmel',
+  ];
+  // whole words only (these are parts of ordinary words too)
+  const WORDS = ['fag', 'fags', 'dick', 'dicks', 'cock', 'cocks', 'kys', 'hure', 'huren', 'arsch', 'cum', 'tits', 'nazi', 'nazis', 'kkk', 'rape', 'raped', 'rapist', 'penis', 'vagina'];
+  const MAP = { '0': 'o', '1': 'i', '!': 'i', '|': 'i', '3': 'e', '4': 'a', '@': 'a', '5': 's', '$': 's', '7': 't', '8': 'b', '9': 'g', 'ß': 'ss', 'ä': 'a', 'ö': 'o', 'ü': 'u', '€': 'e', '+': 't' };
+  const norm = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .replace(/[0-9!|@$€+ß]/g, c => MAP[c] || c).replace(/[äöü]/g, c => MAP[c]);
+  // the words of a message, each normalised; runs of single letters are joined (catches "f u c k")
+  function pieces(text) {
+    const n = norm(text);
+    const raw = n.split(/[^a-z]+/).filter(Boolean);
+    const words = raw.map(w => w.replace(/(.)\1+/g, '$1'));
+    const runs = []; let cur = '';
+    for (const w of raw) { if (w.length === 1) cur += w; else { if (cur.length >= 3) runs.push(cur); cur = ''; } }
+    if (cur.length >= 3) runs.push(cur);
+    return { words, runs: runs.map(r => r.replace(/(.)\1+/g, '$1')) };
+  }
+  const STEMS_D = STEMS.map(s => s.replace(/(.)\1+/g, '$1'));
+  function bad(text) {
+    const { words, runs } = pieces(text);
+    return [...words, ...runs].some(w => WORDS.includes(w) || STEMS_D.some(s => w.includes(s)));
+  }
+  // chat: hide bad words with stars, keep the rest of the message
+  function clean(text) {
+    return String(text || '').replace(/[\p{L}\p{N}$@!|€+.*_-]+/gu, tok => (bad(tok) ? '*'.repeat(Math.min(8, tok.length)) : tok));
+  }
+  return { bad, clean };
+})();
 /* Miguel's Casino (online): the casino's server keeps every bankroll and decides every game.
    This page only shows a copy of your balance and sends your moves. */
 window.CASINO_ONLINE = true;
@@ -569,6 +638,7 @@ window.CasinoBoard = (() => {
     if (!(await connect())) return false;
     const r = await CasinoNet.api('api/me', { name: name(), ctx: window.CASINO_CTX || 'lobby' });
     if (r.ok) meInfo = r.body;
+    if (r.ok && r.body.nameError) { try { localStorage.setItem(NAME_KEY, r.body.name || ''); } catch (e) {} dispatchEvent(new CustomEvent('casino:nameError', { detail: r.body.nameError })); }
     return r.ok;
   }
   function schedule(ms = 2500) { clearTimeout(timer); timer = setTimeout(push, ms); }
@@ -793,11 +863,13 @@ window.CasinoSound = (() => {
     const n = input.value.replace(/\s+/g, ' ').trim();
     if (n.length < 2) { err.textContent = 'Use at least 2 characters.'; input.focus(); return; }
     if (n.length > 18) { err.textContent = 'Keep it to 18 characters or fewer.'; input.focus(); return; }
+    if (window.WordFilter && WordFilter.bad(n)) { err.textContent = 'Pick a friendlier name.'; input.focus(); return; }
     CasinoBoard.setName(n);
     modal.hidden = true;
     renderBoard();
   });
   if (!CasinoBoard.name()) askName();
+  addEventListener('casino:nameError', e => { askName(); err.textContent = e.detail; });
 
   // ---------- leaderboard ----------
   const $ = id => document.getElementById(id);
@@ -946,6 +1018,8 @@ window.CasinoSound = (() => {
           [...$('ltBjDots').children].forEach((d, i) => d.classList.toggle('on', i < s.bj.seated));
           if (s.pk) { $('ltPk').innerHTML = s.pk.seated ? `<b>${s.pk.seated} of 6 seats taken</b> · ${['waiting'].includes(s.pk.street) ? 'waiting for players' : 'hand in progress'}` : '6 seats · $5/$10 no limit'; [...$('ltPkDots').children].forEach((d, i) => d.classList.toggle('on', i < s.pk.seated)); }
           $('ltRl').innerHTML = s.rl.players ? `<b>${s.rl.players} at the wheel</b> · ${PH[s.rl.phase] || ''}` : 'Shared wheel · nobody yet';
+          if (s.cr) $('ltCr').innerHTML = s.cr.players ? `<b>${s.cr.players} on board</b> · ${s.cr.phase === 'running' ? 'rocket flying' : s.cr.phase === 'betting' ? 'taking bets' : 'between rounds'}` : `Everyone rides the same rocket${s.cr.last ? ` · last ${s.cr.last.toFixed(2)}×` : ''}`;
+          if (s.bc) $('ltBc').innerHTML = s.bc.players ? `<b>${s.bc.players} at the table</b> · ${s.bc.phase === 'dealing' ? 'dealing' : PH[s.bc.phase] || ''}` : 'Player, Banker or Tie · nobody yet';
         } catch (e) {}
       };
       poll(); setInterval(poll, 5000);

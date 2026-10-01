@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Baccarat Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#07120D; --felt:#0E4A31; --felt-2:#0A3624; --panel:#0E1A14; --panel-2:#16261D; --edge:rgba(230,200,130,.18);
+  --text:#F3EEDF; --muted:#A9B5A4; --gold:#E8C170; --gold-2:#F8E2A6; --blue:#3E8BFF; --red:#E5414E; --green:#34C77B;
+  --display:"Cinzel","Georgia",serif; --body:"Manrope","Segoe UI",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --cw:clamp(52px,6.2vw,84px);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;color:var(--text);font-family:var(--body);background:var(--bg);overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold-2);outline-offset:2px}
+.app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr)}
+.bar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:linear-gradient(180deg,rgba(8,16,12,.96),rgba(8,16,12,.86));border-bottom:1px solid var(--edge)}
+.title{font:700 22px/1 var(--display);letter-spacing:.08em;color:var(--gold-2);white-space:nowrap}
+.livepill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(52,199,123,.12);border:1px solid rgba(52,199,123,.4);font:800 11px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--green)}
+.livepill i{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.35}}
+.bar .sp{flex:1}
+.balpill{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
+.balpill span{font:700 10px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.balpill b{font:700 18px var(--mono);color:var(--gold-2);font-variant-numeric:tabular-nums}
+.ibtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--edge);background:var(--panel-2);display:grid;place-items:center;cursor:pointer;flex:none}
+.ibtn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.ibtn.off{color:var(--muted)}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;padding:16px;min-height:0}
+.table{position:relative;border-radius:28px;padding:22px 22px 18px;display:flex;flex-direction:column;gap:16px;min-height:0;overflow:auto;
+  background:radial-gradient(90% 70% at 50% 25%,#14603F,var(--felt) 45%,var(--felt-2));box-shadow:inset 0 0 0 2px rgba(232,193,112,.35),inset 0 0 0 10px rgba(5,25,15,.5),inset 0 0 0 12px rgba(232,193,112,.25),0 30px 80px rgba(0,0,0,.6)}
+.hands{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.hand{border-radius:18px;padding:12px 14px 14px;background:rgba(0,0,0,.18);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);transition:box-shadow .3s,background .3s}
+.hand.win{background:rgba(0,0,0,.28)}
+.hand.p.win{box-shadow:inset 0 0 0 2px var(--blue),0 0 40px rgba(62,139,255,.35)}
+.hand.b.win{box-shadow:inset 0 0 0 2px var(--red),0 0 40px rgba(229,65,78,.35)}
+.hhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.hhead b{font:700 17px var(--display);letter-spacing:.14em}
+.hand.p .hhead b{color:#9CC4FF} .hand.b .hhead b{color:#FF9EA6}
+.score{min-width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font:700 20px var(--mono);background:rgba(0,0,0,.4);box-shadow:inset 0 0 0 2px rgba(255,255,255,.12)}
+.hand.p .score{box-shadow:inset 0 0 0 2px rgba(62,139,255,.7)} .hand.b .score{box-shadow:inset 0 0 0 2px rgba(229,65,78,.7)}
+.cards{display:flex;gap:10px;min-height:calc(var(--cw) * 1.42);align-items:center}
+.cd{width:var(--cw);height:calc(var(--cw) * 1.4);border-radius:9px;position:relative;perspective:600px;flex:none;animation:dealIn .35s ease}
+@keyframes dealIn{from{transform:translate(0,-40px) rotate(-8deg);opacity:0}}
+.cd.side{margin:0 calc(var(--cw) * .2);transform:rotate(90deg)}
+.cd .in{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .45s ease}
+.cd.up .in{transform:rotateY(180deg)}
+.cd .f,.cd .k{position:absolute;inset:0;border-radius:9px;backface-visibility:hidden}
+.cd .k{background:repeating-linear-gradient(45deg,#6E1621 0 6px,#86202D 6px 12px);box-shadow:inset 0 0 0 3px #F3EEDF,inset 0 0 0 5px #6E1621,0 4px 10px rgba(0,0,0,.4)}
+.cd .f{transform:rotateY(180deg);background:linear-gradient(180deg,#FFFDF7,#F1EBDD);box-shadow:0 4px 10px rgba(0,0,0,.4);color:#1A1A1A}
+.cd .f.red{color:#C21F2E}
+.cd .f i{position:absolute;left:7%;top:5%;font:800 calc(var(--cw) * .27)/1 var(--body);font-style:normal;text-align:center}
+.cd .f i small{display:block;font-size:.8em;margin-top:1px}
+.cd .f em{position:absolute;inset:0;display:grid;place-items:center;font:400 calc(var(--cw) * .58)/1 serif;font-style:normal}
+.status{text-align:center;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.status b{font:700 clamp(18px,2.6vw,26px) var(--display);letter-spacing:.08em;color:var(--gold-2)}
+.status span{font-weight:700;color:#CFE3D4;font-size:14px}
+.status .net{font:700 18px var(--mono)}
+.timer{width:min(320px,70%);height:6px;border-radius:999px;background:rgba(0,0,0,.3);overflow:hidden;margin-top:4px}
+.timer i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--gold-2));border-radius:inherit;transition:width .2s linear}
+.spots{display:grid;grid-template-columns:1fr 1.6fr 1.1fr 1.6fr 1fr;gap:10px}
+.spot{position:relative;border:0;border-radius:18px;padding:14px 8px 12px;cursor:pointer;text-align:center;background:rgba(0,0,0,.2);box-shadow:inset 0 0 0 1.5px rgba(232,193,112,.45);transition:background .15s,transform .1s;min-height:108px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px}
+.spot:hover:not(:disabled){background:rgba(0,0,0,.3)}
+.spot:active:not(:disabled){transform:scale(.98)}
+.spot:disabled{cursor:default}
+.spot b{font:700 clamp(13px,1.6vw,18px) var(--display);letter-spacing:.1em}
+.spot small{font:700 12px var(--mono);color:var(--muted)}
+.spot.player b{color:#9CC4FF} .spot.banker b{color:#FF9EA6} .spot.tie b{color:#8FF0B8}
+.spot.player{box-shadow:inset 0 0 0 2px rgba(62,139,255,.55)} .spot.banker{box-shadow:inset 0 0 0 2px rgba(229,65,78,.55)} .spot.tie{box-shadow:inset 0 0 0 2px rgba(52,199,123,.55)}
+.spot.won{animation:won .7s ease 3 alternate}
+@keyframes won{to{background:rgba(248,226,166,.18)}}
+.stack{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:34px}
+.chipv{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:800 9.5px var(--mono);color:#fff;box-shadow:inset 0 0 0 3px rgba(255,255,255,.75),inset 0 0 0 5px rgba(0,0,0,.25),0 3px 6px rgba(0,0,0,.5)}
+.amt{font:700 12.5px var(--mono);color:var(--gold-2)}
+.tray{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+.chip{width:52px;height:52px;border-radius:50%;border:0;cursor:pointer;font:800 13px var(--mono);color:#fff;position:relative;box-shadow:inset 0 0 0 4px rgba(255,255,255,.85),inset 0 0 0 7px rgba(0,0,0,.2),0 5px 12px rgba(0,0,0,.5);transition:transform .12s}
+.chip[aria-pressed="true"]{transform:translateY(-6px);box-shadow:inset 0 0 0 4px #fff,inset 0 0 0 7px rgba(0,0,0,.2),0 0 0 3px var(--gold-2),0 8px 18px rgba(0,0,0,.5)}
+.c1{background:#9AA3AE}.c5{background:#C8303B}.c25{background:#1F8A55}.c100{background:#1E1E24}.c500{background:#6A2FB0}.c1000{background:#C99A2E}
+.tb{height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--edge);background:rgba(0,0,0,.25);font-weight:800;cursor:pointer}
+.tb:disabled{opacity:.4;cursor:not-allowed}
+.rail{display:flex;flex-direction:column;gap:14px;min-height:0}
+.box{background:linear-gradient(180deg,var(--panel),#0A140F);border:1px solid var(--edge);border-radius:18px;padding:14px}
+.box h3{margin:0 0 10px;font:700 11px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between}
+.bead{display:grid;grid-template-rows:repeat(6,1fr);grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;background:#F3EEDF;border-radius:10px;padding:6px;aspect-ratio:2/1}
+.bead i{border-radius:50%;display:grid;place-items:center;font:800 9px var(--body);font-style:normal;color:#fff;position:relative;aspect-ratio:1}
+.bead i.P{background:var(--blue)} .bead i.B{background:var(--red)} .bead i.T{background:var(--green)}
+.bead i.pp::before,.bead i.bp::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;border:1px solid #fff}
+.bead i.pp::before{left:-1px;bottom:-1px;background:var(--blue)} .bead i.bp::after{right:-1px;top:-1px;background:var(--red)}
+.counts{display:flex;gap:10px;margin-top:10px;font:700 13px var(--mono)}
+.counts span{flex:1;text-align:center;padding:5px 0;border-radius:8px;background:rgba(0,0,0,.25)}
+.counts .P{color:#9CC4FF}.counts .B{color:#FF9EA6}.counts .T{color:#8FF0B8}
+.plist{display:flex;flex-direction:column;gap:4px;max-height:100%;overflow:auto}
+.pr{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:7px 10px;border-radius:10px;background:rgba(0,0,0,.25);font-size:13.5px}
+.pr .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.pr.me{box-shadow:inset 0 0 0 1px rgba(232,193,112,.6)}
+.pr .s{font:800 11px var(--mono);padding:2px 6px;border-radius:6px}
+.pr .s.P{background:rgba(62,139,255,.25);color:#9CC4FF}.pr .s.B{background:rgba(229,65,78,.25);color:#FF9EA6}.pr .s.T{background:rgba(52,199,123,.25);color:#8FF0B8}
+.pr .v{font:700 12.5px var(--mono);text-align:right;min-width:62px}
+.pos{color:var(--green)} .neg{color:#FF7A85}
+.box.grow{flex:1;min-height:120px;display:flex;flex-direction:column}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#16261D;border:1px solid var(--edge);padding:10px 16px;border-radius:12px;font-weight:700;z-index:50;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.modal{position:fixed;inset:0;background:rgba(2,8,5,.75);display:grid;place-items:center;z-index:60;padding:16px}
+.modal .card{max-width:560px;width:100%;max-height:86vh;overflow:auto;background:var(--panel);border:1px solid var(--edge);border-radius:18px;padding:22px}
+.modal h2{font:700 22px var(--display);margin:0 0 10px;color:var(--gold-2)}
+.modal p,.modal li{color:#D7E2D6;line-height:1.55;font-size:14.5px}
+.modal .x{float:right}
+@media (max-width:980px){
+  body{overflow:auto}
+  .app{height:auto;min-height:100%}
+  .main{grid-template-columns:minmax(0,1fr);padding:10px;gap:10px}
+  .table{overflow:visible;padding:16px 12px}
+  .spots{grid-template-columns:1fr 1fr 1fr;}
+  .spot.player{grid-column:1;grid-row:1}.spot.tie{grid-column:2;grid-row:1}.spot.banker{grid-column:3;grid-row:1}
+  .spot.pp{grid-column:1/2;grid-row:2;min-height:80px}.spot.bp{grid-column:3/4;grid-row:2;min-height:80px}
+  .hands{gap:10px}
+  :root{--cw:clamp(40px,11vw,70px)}
+}
+@media (max-width:520px){.bar{gap:8px;padding:8px 10px}.title{font-size:16px}.livepill{display:none}.ibtn{width:34px;height:34px}.balpill b{font-size:15px}.chip{width:46px;height:46px}.cards{gap:5px}}
+.lobbylink{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:999px;border:1px solid rgba(232,193,112,.45);color:#F7DFA3;text-decoration:none;font:600 13px system-ui,-apple-system,"Segoe UI",sans-serif;white-space:nowrap;flex:none;background:rgba(0,0,0,.2)}
+.lobbylink:hover{background:rgba(232,193,112,.14)}
+.lobbylink svg{width:15px;height:15px}
+@media (max-width:640px){.lobbylink span{display:none}.lobbylink{padding:0 9px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <a href="index.html" class="lobbylink" title="Back to Miguel's Casino" aria-label="Back to Miguel's Casino lobby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Lobby</span></a>
+    <div class="title">Baccarat</div>
+    <span class="livepill"><i></i>Live</span>
+    <div class="sp"></div>
+    <div class="balpill"><span>Balance</span><b id="bal">$0</b></div>
+    <button class="ibtn" id="sndBtn" title="Sound" aria-label="Sound on or off"><svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg></button>
+    <button class="ibtn" id="infoBtn" title="How to play" aria-label="How to play"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></button>
+  </header>
+  <main class="main">
+    <section class="table" aria-label="Baccarat table">
+      <div class="hands">
+        <div class="hand p" id="hP"><div class="hhead"><b>Player</b><div class="score" id="sP">–</div></div><div class="cards" id="cP"></div></div>
+        <div class="hand b" id="hB"><div class="hhead"><b>Banker</b><div class="score" id="sB">–</div></div><div class="cards" id="cB"></div></div>
+      </div>
+      <div class="status" id="status" aria-live="polite"><b id="stT">Connecting…</b><span id="stS"></span><div class="timer" id="timer" hidden><i id="timerBar"></i></div></div>
+      <div class="spots" id="spots">
+        <button class="spot pp" data-k="pp"><b>P Pair</b><small>11 : 1</small><div class="stack"></div></button>
+        <button class="spot player" data-k="player"><b>Player</b><small>1 : 1</small><div class="stack"></div></button>
+        <button class="spot tie" data-k="tie"><b>Tie</b><small>8 : 1</small><div class="stack"></div></button>
+        <button class="spot banker" data-k="banker"><b>Banker</b><small>0.95 : 1</small><div class="stack"></div></button>
+        <button class="spot bp" data-k="bp"><b>B Pair</b><small>11 : 1</small><div class="stack"></div></button>
+      </div>
+      <div class="tray" id="tray">
+        <button class="chip c1" data-v="100">1</button><button class="chip c5" data-v="500">5</button><button class="chip c25" data-v="2500" aria-pressed="true">25</button><button class="chip c100" data-v="10000">100</button><button class="chip c500" data-v="50000">500</button><button class="chip c1000" data-v="100000" hidden id="vipChip">1K</button>
+        <button class="tb" id="clear">Clear</button><button class="tb" id="rebet">Rebet</button><button class="tb" id="double">×2</button>
+      </div>
+    </section>
+    <aside class="rail">
+      <div class="box"><h3><span>Bead road</span><span id="shoe"></span></h3><div class="bead" id="bead" aria-label="Recent results"></div><div class="counts"><span class="P" id="nP">P 0</span><span class="B" id="nB">B 0</span><span class="T" id="nT">T 0</span></div></div>
+      <div class="box grow"><h3><span>At the table</span><span id="nPl"></span></h3><div class="plist" id="plist"></div></div>
+    </aside>
+  </main>
+</div>
+<div class="modal" id="info" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="infoT">
+    <button class="ibtn x" id="infoX" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <h2 id="infoT">How to play</h2>
+    <p>Bet on which hand ends closer to 9: Player or Banker, or on a Tie. Cards count at face value, aces are 1 and tens and pictures are 0. Only the last digit of the total counts, so 7 + 8 = 5.</p>
+    <p>Both hands get two cards. With 8 or 9 (a "natural") nobody draws. Otherwise the Player draws a third card on 0 to 5, and the Banker draws by the standard table rules. The dealer handles all of it.</p>
+    <ul><li>Player pays 1 : 1.</li><li>Banker pays 0.95 : 1 (a 5% commission, because the Banker wins a little more often).</li><li>Tie pays 8 : 1, and Player and Banker bets are returned on a tie.</li><li>Player Pair and Banker Pair pay 11 : 1 when that hand's first two cards are the same rank.</li></ul>
+    <p>Everyone at the table plays the same hand, dealt from an 8-deck shoe by the casino's server. Player and Banker take $1 to $1,000; Tie and pairs up to $200 (VIPs can bet five times as much).</p>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script>window.CASINO_CTX = 'live';</script>
+<script>
+// A word filter for chat and player names (English and German).
+// Text is normalised first (accents, look-alike digits and symbols, repeated letters), so "f.u.u.c.k" or "sch3isse" still match.
+'use strict';
+const WordFilter = (() => {
+  // stems: matched anywhere inside a word
+  const STEMS = [
+    'fuck', 'fuk', 'fck', 'shit', 'bitch', 'cunt', 'pussy', 'whore', 'slut', 'nigg', 'niga', 'nigr', 'faggot', 'fagot', 'retard', 'wank', 'twat', 'asshole', 'dildo', 'porn', 'jizz', 'hitler',
+    'scheis', 'fotze', 'wichs', 'arschloch', 'schwuchtel', 'hurensohn', 'missgeburt', 'fick', 'nutte', 'neger', 'kanake', 'spast', 'behindert', 'schlampe', 'muschi', 'pimmel',
+  ];
+  // whole words only (these are parts of ordinary words too)
+  const WORDS = ['fag', 'fags', 'dick', 'dicks', 'cock', 'cocks', 'kys', 'hure', 'huren', 'arsch', 'cum', 'tits', 'nazi', 'nazis', 'kkk', 'rape', 'raped', 'rapist', 'penis', 'vagina'];
+  const MAP = { '0': 'o', '1': 'i', '!': 'i', '|': 'i', '3': 'e', '4': 'a', '@': 'a', '5': 's', '$': 's', '7': 't', '8': 'b', '9': 'g', 'ß': 'ss', 'ä': 'a', 'ö': 'o', 'ü': 'u', '€': 'e', '+': 't' };
+  const norm = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .replace(/[0-9!|@$€+ß]/g, c => MAP[c] || c).replace(/[äöü]/g, c => MAP[c]);
+  // the words of a message, each normalised; runs of single letters are joined (catches "f u c k")
+  function pieces(text) {
+    const n = norm(text);
+    const raw = n.split(/[^a-z]+/).filter(Boolean);
+    const words = raw.map(w => w.replace(/(.)\1+/g, '$1'));
+    const runs = []; let cur = '';
+    for (const w of raw) { if (w.length === 1) cur += w; else { if (cur.length >= 3) runs.push(cur); cur = ''; } }
+    if (cur.length >= 3) runs.push(cur);
+    return { words, runs: runs.map(r => r.replace(/(.)\1+/g, '$1')) };
+  }
+  const STEMS_D = STEMS.map(s => s.replace(/(.)\1+/g, '$1'));
+  function bad(text) {
+    const { words, runs } = pieces(text);
+    return [...words, ...runs].some(w => WORDS.includes(w) || STEMS_D.some(s => w.includes(s)));
+  }
+  // chat: hide bad words with stars, keep the rest of the message
+  function clean(text) {
+    return String(text || '').replace(/[\p{L}\p{N}$@!|€+.*_-]+/gu, tok => (bad(tok) ? '*'.repeat(Math.min(8, tok.length)) : tok));
+  }
+  return { bad, clean };
+})();
+/* Miguel's Casino (online): the casino's server keeps every bankroll and decides every game.
+   This page only shows a copy of your balance and sends your moves. */
+window.CASINO_ONLINE = true;
+window.CasinoNet = (() => {
+  const SEAT_KEY = 'miguels-casino-seat';
+  function seat() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(SEAT_KEY)); } catch (e) {}
+    if (!s || !s.id || !s.token) {
+      const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
+      s = { id: 'p-' + hex(12), token: hex(24) };
+      try { localStorage.setItem(SEAT_KEY, JSON.stringify(s)); } catch (e) {}
+    }
+    return s;
+  }
+  // POST to the casino with this browser's seat; returns { ok, status, body }
+  async function api(path, body = {}) {
+    const s = seat();
+    let r, j = {};
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id: s.id, token: s.token }, body)) });
+        j = await r.json().catch(() => ({}));
+        if (r.status === 429 && attempt < 2) { await new Promise(res => setTimeout(res, 700 * (attempt + 1))); continue; }
+        if (r.status === 503 && /opening/i.test(j.error || '') && attempt < 2) { await new Promise(res => setTimeout(res, 2500)); continue; }
+        break;
+      } catch (e) {
+        if (attempt === 2) return { ok: false, status: 0, body: { error: 'No connection to the casino. Check your internet and try again.' } };
+        await new Promise(res => setTimeout(res, 800));
+      }
+    }
+    if (typeof j.cents === 'number') CasinoWallet._server(j.cents);
+    if (Array.isArray(j.pop) && j.pop.length) CasinoUI.popups(j.pop);
+    if (r.status === 403 && /suspended/i.test(j.error || '')) CasinoUI.suspended();
+    return { ok: r.ok, status: r.status, body: j };
+  }
+  return { seat, api };
+})();
+
+window.CasinoWallet = (() => {
+  const START = 100000, CACHE = 'miguels-casino-cache';
+  let cache = null;
+  try { cache = JSON.parse(localStorage.getItem(CACHE)); } catch (e) {}
+  const mine = cache && cache.id === CasinoNet.seat().id;
+  let bal = mine && Number.isFinite(cache.cents) ? cache.cents : 0;
+  let info_ = { peak: mine ? cache.peak || 0 : 0, resets: mine ? cache.resets || 0 : 0 };
+  let view = null, onExternal = null, isBusy = () => false;
+  const listeners = [];
+  const cents = () => bal;
+  function bind(v, ext, busy) { view = v; onExternal = ext; if (busy) isBusy = busy; }
+  function remember() { try { localStorage.setItem(CACHE, JSON.stringify({ id: CasinoNet.seat().id, cents: bal, peak: info_.peak, resets: info_.resets })); } catch (e) {} }
+  // the server just told us the balance
+  function _server(c) { bal = c; remember(); listeners.forEach(f => { try { f(c); } catch (e) {} }); }
+  // move this page's own balance to match the server (only while nothing is in play)
+  function apply(c) {
+    if (view && onExternal) { const d = c - view(); if (d) onExternal(d); }
+    _server(c);
+  }
+  async function refresh() {
+    if (isBusy()) return null;
+    const r = await CasinoNet.api('api/me', { name: CasinoBoard.name(), ctx: window.CASINO_CTX || 'lobby' });
+    if (r.ok) { info_ = { peak: r.body.peak, resets: r.body.resets }; if (!isBusy()) apply(r.body.cents); CasinoUI.notice(r.body.notice); CasinoUI.mode(r.body); if (r.body.banned) CasinoUI.suspended(); }
+    return r.ok ? r.body : null;
+  }
+  // a fresh $1,000, only when you are out of chips everywhere
+  async function reset() {
+    const r = await CasinoNet.api('api/wallet/reset');
+    if (r.ok) { info_.resets = r.body.resets; apply(r.body.cents); }
+    return r;
+  }
+  const info = () => ({ cents: bal, peak: Math.max(info_.peak || 0, bal), resets: info_.resets || 0 });
+  const onChange = f => listeners.push(f);
+  let last = 0;
+  const maybeRefresh = () => { if (Date.now() - last > 4000) { last = Date.now(); refresh(); } };
+  addEventListener('focus', maybeRefresh);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeRefresh(); });
+  // money only moves on the server now, so these do nothing
+  const sync = () => {}, pull = () => {}, add = () => {}, noteReset = () => {};
+  return { cents, bind, sync, pull, add, noteReset, info, refresh, reset, apply, onChange, _server, START };
+})();
+
+window.CasinoBoard = (() => {
+  const NAME_KEY = 'miguels-casino-name';
+  let ready = null, mode = null, denied = false, meInfo = null, timer = null;
+  function name() { try { return (localStorage.getItem(NAME_KEY) || '').trim(); } catch (e) { return ''; } }
+  function setName(n) { try { localStorage.setItem(NAME_KEY, n); } catch (e) {} push(); }
+  function connect() {
+    if (ready) return ready;
+    ready = (async () => {
+      if (!/^https?:$/.test(location.protocol)) return false;
+      const r = await CasinoNet.api('api/me', { name: name(), ctx: window.CASINO_CTX || 'lobby' });
+      if (!r.ok) { if (r.status === 403) { denied = true; mode = 'server'; return true; } ready = null; return false; }
+      meInfo = r.body; mode = 'server';
+      CasinoWallet.apply(r.body.cents);
+      CasinoUI.notice(r.body.notice);
+      CasinoUI.mode(r.body);
+      if (r.body.banned) CasinoUI.suspended();
+      if (r.body.name && !name()) { try { localStorage.setItem(NAME_KEY, r.body.name); } catch (e) {} }
+      return true;
+    })().catch(() => { ready = null; return false; });
+    return ready;
+  }
+  async function push() {
+    if (!(await connect())) return false;
+    const r = await CasinoNet.api('api/me', { name: name(), ctx: window.CASINO_CTX || 'lobby' });
+    if (r.ok) meInfo = r.body;
+    if (r.ok && r.body.nameError) { try { localStorage.setItem(NAME_KEY, r.body.name || ''); } catch (e) {} dispatchEvent(new CustomEvent('casino:nameError', { detail: r.body.nameError })); }
+    return r.ok;
+  }
+  function schedule(ms = 2500) { clearTimeout(timer); timer = setTimeout(push, ms); }
+  function subscribe(onRows, onError) {
+    let es = null, poll = null;
+    const load = () => fetch('api/players', { cache: 'no-store' }).then(r => r.json()).then(onRows).catch(() => {});
+    if (window.EventSource) {
+      es = new EventSource('api/stream');
+      es.addEventListener('players', e => { try { onRows(JSON.parse(e.data)); } catch (x) {} });
+      es.addEventListener('notice', e => { try { CasinoUI.notice(JSON.parse(e.data)); } catch (x) {} });
+      es.addEventListener('jackpot', e => { try { dispatchEvent(new CustomEvent('casino:jackpot', { detail: JSON.parse(e.data) })); } catch (x) {} });
+      es.onerror = () => { if (onError && es.readyState === 2) onError(); };
+    } else { load(); poll = setInterval(load, 8000); }
+    return () => { if (es) es.close(); if (poll) clearInterval(poll); };
+  }
+  const identity = () => CasinoNet.seat();
+  const snapshot = () => null;
+  return { name, setName, connect, push, schedule, snapshot, subscribe, identity, get uid() { return CasinoNet.seat().id; }, get mode() { return mode; }, get denied() { return denied; }, get me() { return meInfo; } };
+})();
+
+// announcements from the casino, and the notice for a suspended account
+window.CasinoUI = (() => {
+  let bar = null, shownKey = '';
+  const css = `.mc-notice{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:9999;max-width:min(680px,calc(100% - 24px));display:flex;gap:10px;align-items:center;padding:10px 12px 10px 16px;border-radius:14px;
+    font:600 14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1B1206;background:linear-gradient(180deg,#FFE9A8,#F2C65A);box-shadow:0 12px 30px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.2);animation:mcIn .35s ease}
+    .mc-notice.party{background:linear-gradient(90deg,#FF9AD5,#FFD36E,#8EF0B4);} .mc-notice.warn{background:linear-gradient(180deg,#FFB4A8,#F2786D);}
+    .mc-notice.ban{background:linear-gradient(180deg,#3A1414,#220A0A);color:#FFD9D2;box-shadow:0 12px 30px rgba(0,0,0,.5),0 0 0 1px #F2786D}
+    .mc-notice b{font-weight:800}
+    .mc-pops{position:fixed;left:14px;bottom:14px;z-index:9998;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:min(340px,calc(100% - 28px))}
+    .mc-pop{display:flex;gap:11px;align-items:center;padding:11px 14px 11px 11px;border-radius:14px;background:linear-gradient(180deg,#2A1B10,#170E08);color:#FFF4DA;box-shadow:0 0 0 1px rgba(247,223,163,.5),0 14px 34px rgba(0,0,0,.55);font:14px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;animation:mcPop .45s cubic-bezier(.2,1.3,.4,1);pointer-events:auto}
+    .mc-pop i{font-style:normal;font-size:26px;width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:rgba(247,223,163,.12);flex:none}
+    .mc-pop b{display:block;font-weight:800;color:#F7DFA3}
+    .mc-pop small{display:block;color:#D8C8A8;font-size:12.5px}
+    .mc-pop.out{animation:mcOut .35s ease forwards}
+    @keyframes mcPop{from{opacity:0;transform:translateX(-30px) scale(.9)}to{opacity:1;transform:none}}
+    @keyframes mcOut{to{opacity:0;transform:translateX(-30px)}}
+    .mc-tour{position:fixed;left:12px;bottom:110px;pointer-events:none;white-space:nowrap;z-index:9997;padding:7px 12px;border-radius:999px;font:800 11.5px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#1B1206;background:linear-gradient(90deg,#8EF0B4,#F2C65A);box-shadow:0 8px 20px rgba(0,0,0,.4)}
+    .mc-notice button{flex:none;border:0;background:rgba(0,0,0,.14);color:inherit;width:26px;height:26px;border-radius:50%;cursor:pointer;font:700 15px system-ui}
+    @keyframes mcIn{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}`;
+  function ensure() {
+    if (bar) return bar;
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    bar = document.createElement('div'); bar.className = 'mc-notice'; bar.hidden = true; bar.setAttribute('role', 'status');
+    document.body.appendChild(bar);
+    return bar;
+  }
+  function show(text, kind, closable) {
+    const b = ensure();
+    b.className = 'mc-notice ' + (kind || '');
+    b.textContent = '';
+    const s = document.createElement('span'); s.textContent = text; b.appendChild(s);
+    if (closable) { const x = document.createElement('button'); x.type = 'button'; x.setAttribute('aria-label', 'Close'); x.textContent = '×'; x.onclick = () => { b.hidden = true; try { sessionStorage.setItem('mc-notice-closed', shownKey); } catch (e) {} }; b.appendChild(x); }
+    b.hidden = false;
+  }
+  let banned = false;
+  function notice(n) {
+    if (banned) return;
+    if (!document.body) { addEventListener('DOMContentLoaded', () => notice(n)); return; }
+    if (!n || !n.text) { if (bar && !banned) bar.hidden = true; return; }
+    shownKey = String(n.t || n.text);
+    let closed = ''; try { closed = sessionStorage.getItem('mc-notice-closed') || ''; } catch (e) {}
+    if (closed === shownKey) return;
+    show('📣 ' + n.text, n.kind === 'party' ? 'party' : n.kind === 'warn' ? 'warn' : '', true);
+  }
+  function suspended() {
+    banned = true;
+    if (!document.body) { addEventListener('DOMContentLoaded', suspended); return; }
+    show('Your account has been suspended by the casino, so you can’t play right now. Ask Miguel if you think this is a mistake.', 'ban', false);
+  }
+  // achievements, level ups, gifts: little cards in the corner, a moment after the result is on screen
+  let popBox = null, queue = [], showing = 0;
+  function popups(list) {
+    if (!document.body) { addEventListener('DOMContentLoaded', () => popups(list)); return; }
+    ensure();
+    if (!popBox) { popBox = document.createElement('div'); popBox.className = 'mc-pops'; popBox.setAttribute('aria-live', 'polite'); document.body.appendChild(popBox); }
+    const delay = window.CASINO_CTX === 'lobby' || !window.CASINO_CTX ? 300 : 2600;
+    list.forEach((p, i) => setTimeout(() => showPop(p), delay + i * 900));
+  }
+  function showPop(p) {
+    const el = document.createElement('div'); el.className = 'mc-pop';
+    const ic = document.createElement('i'); ic.textContent = p.icon || '⭐';
+    const tx = document.createElement('div'); const b = document.createElement('b'); b.textContent = (p.type === 'ach' ? 'Badge unlocked · ' : '') + p.title; const sm = document.createElement('small'); sm.textContent = p.text || '';
+    tx.append(b, sm); el.append(ic, tx); popBox.appendChild(el);
+    try { if (window.CasinoSound) CasinoSound.ding(); } catch (e) {}
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, 5200);
+  }
+  // playing with tournament chips: say so on every solo table
+  let ribbon = null;
+  function mode(me) {
+    if (!document.body) { addEventListener('DOMContentLoaded', () => mode(me)); return; }
+    const on = me && me.mode === 'tour' && window.CASINO_CTX === 'solo';
+    if (on && !ribbon) { ensure(); ribbon = document.createElement('div'); ribbon.className = 'mc-tour'; ribbon.textContent = '🏁 Tournament chips'; ribbon.title = 'You are playing with this week’s tournament chips. Switch back in the lobby.'; document.body.appendChild(ribbon); }
+    if (ribbon) ribbon.hidden = !on;
+  }
+  return { notice, suspended, popups, mode };
+})();
+
+// one volume for every game, and soft lounge music if you want it (set in the lobby)
+window.CasinoSound = (() => {
+  const KEY = 'miguels-casino-sound';
+  const load = () => { try { return Object.assign({ on: true, vol: 0.8, music: false, mvol: 0.4 }, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return { on: true, vol: 0.8, music: false, mvol: 0.4 }; } };
+  let cfg = load();
+  const masters = new Set();
+  const level = () => (cfg.on ? cfg.vol : 0);
+  const Base = window.AudioContext || window.webkitAudioContext;
+  const desc = Base && (Object.getOwnPropertyDescriptor(window.BaseAudioContext ? BaseAudioContext.prototype : Base.prototype, 'destination') || Object.getOwnPropertyDescriptor(Base.prototype, 'destination'));
+  if (Base && desc && desc.get) {
+    // every game's sounds go through one volume knob
+    class CasinoAudio extends Base {
+      constructor(...a) { super(...a); const g = Base.prototype.createGain.call(this); g.gain.value = level(); g.connect(desc.get.call(this)); this._mc = g; masters.add(g); }
+      get destination() { return this._mc || desc.get.call(this); }
+    }
+    try { window.AudioContext = CasinoAudio; if (window.webkitAudioContext) window.webkitAudioContext = CasinoAudio; } catch (e) {}
+  }
+  function apply() { masters.forEach(g => { try { g.gain.value = level(); } catch (e) {} }); music(); }
+  function set(k, v) { cfg[k] = v; try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} apply(); }
+  addEventListener('storage', e => { if (e.key === KEY) { cfg = load(); apply(); } });
+  // music: slow jazzy chords, made on the fly
+  let mctx = null, mgain = null, timer = null, step = 0;
+  const CHORDS = [[57, 60, 64, 67], [62, 65, 69, 72], [55, 59, 62, 65], [60, 64, 67, 71]];   // Am7, Dm7, G7, Cmaj7
+  const hz = n => 440 * Math.pow(2, (n - 69) / 12);
+  function note(f, t, d, type, v, dest) { const o = mctx.createOscillator(), g = mctx.createGain(); o.type = type; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g).connect(dest); o.start(t); o.stop(t + d + 0.05); }
+  function bar() {
+    const t = mctx.currentTime + 0.05, ch = CHORDS[step % 4], beat = 0.75;
+    const lp = mctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.connect(mgain);
+    ch.forEach(n => note(hz(n), t, beat * 4, 'triangle', 0.05, lp));
+    [0, 2].forEach(b => note(hz(ch[0] - 24), t + b * beat, beat * 1.6, 'sine', 0.12, mgain));
+    [1, 2.5, 3].forEach(b => note(hz(ch[(b * 2) % 4] + 12), t + b * beat, beat * 0.9, 'sine', 0.03, lp));
+    step++;
+  }
+  function music() {
+    const want = cfg.music && cfg.on;
+    if (!want) { if (timer) { clearInterval(timer); timer = null; } if (mgain) mgain.gain.value = 0; return; }
+    if (!Base) return;
+    if (!mctx) { try { mctx = new Base(); } catch (e) { return; } mgain = mctx.createGain(); mgain.connect(desc && desc.get ? desc.get.call(mctx) : mctx.destination); }
+    mgain.gain.value = cfg.mvol * 0.6;
+    if (mctx.state === 'suspended') mctx.resume().catch(() => {});
+    if (!timer && mctx.state === 'running') { bar(); timer = setInterval(bar, 3000); }
+  }
+  const unlock = () => { if (cfg.music) music(); };
+  document.addEventListener('pointerdown', unlock); document.addEventListener('keydown', unlock);
+  // a soft chime for badges and level ups
+  let dctx = null;
+  function ding() {
+    if (!cfg.on || !Base) return;
+    try {
+      if (!dctx) dctx = new window.AudioContext();
+      if (dctx.state !== 'running') return;
+      const t = dctx.currentTime;
+      [1047, 1319, 1568].forEach((f, i) => { const o = dctx.createOscillator(), g = dctx.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t + i * 0.08); g.gain.exponentialRampToValueAtTime(0.08, t + i * 0.08 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.08 + 0.5); o.connect(g).connect(dctx.destination); o.start(t + i * 0.08); o.stop(t + i * 0.08 + 0.55); });
+    } catch (e) {}
+  }
+  return { get: () => Object.assign({}, cfg), set, ding };
+})();
+</script>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const PREF = 'miguels-casino-baccarat';
+let pref = {}; try { pref = JSON.parse(localStorage.getItem(PREF)) || {}; } catch (e) {}
+const S = { V: null, off: 0, chip: pref.chip || 2500, snd: pref.snd !== false, local: {}, sent: {}, last: pref.last || {}, sendT: null, round: -1, shown: 0, resultShown: -1 };
+const savePref = () => { try { localStorage.setItem(PREF, JSON.stringify({ chip: S.chip, snd: S.snd, last: S.last })); } catch (e) {} };
+const money = c => (c < 0 ? '−' : '') + '$' + (Math.abs(c) / 100).toLocaleString('en-US', { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 });
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+let toastT;
+function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2600); }
+const now = () => Date.now() + S.off;
+const val = r => (r === 'A' ? 1 : ['10', 'J', 'Q', 'K'].includes(r) ? 0 : +r);
+const SPOTS = ['pp', 'player', 'tie', 'banker', 'bp'];
+const CHIP_CLASS = v => (v >= 100000 ? 'c1000' : v >= 50000 ? 'c500' : v >= 10000 ? 'c100' : v >= 2500 ? 'c25' : v >= 500 ? 'c5' : 'c1');
+
+/* ---------- sound ---------- */
+let ac = null;
+function unlock() { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (ac && ac.state === 'suspended') ac.resume().catch(() => {}); }
+function tone(f, d, type = 'sine', v = 0.06, when = 0) {
+  if (!S.snd || !ac) return;
+  const t = ac.currentTime + when, o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d + 0.02);
+}
+function swish() {
+  if (!S.snd || !ac) return;
+  const t = ac.currentTime, len = 0.16, buf = ac.createBuffer(1, ac.sampleRate * len, ac.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / d.length);
+  const src = ac.createBufferSource(), hp = ac.createBiquadFilter(), g = ac.createGain();
+  src.buffer = buf; hp.type = 'bandpass'; hp.frequency.value = 2500; g.gain.value = 0.18; src.connect(hp).connect(g).connect(ac.destination); src.start(t);
+}
+const chipSound = () => { tone(2400, 0.04, 'square', 0.03); tone(1800, 0.05, 'square', 0.02, 0.03); };
+const winSound = () => [0, 0.08, 0.16, 0.26].forEach((w, i) => tone([659, 784, 988, 1319][i], 0.3, 'triangle', 0.07, w));
+
+/* ---------- bets ---------- */
+const betting = () => S.V && (S.V.phase === 'betting' || S.V.phase === 'idle');
+const total = o => Object.values(o).reduce((a, b) => a + (b || 0), 0);
+function shownSpots() { return betting() ? S.local : (S.V ? S.V.me.spots : {}); }
+function scheduleSend() {
+  clearTimeout(S.sendT);
+  S.sendT = setTimeout(send, 220);
+}
+async function send() {
+  const bets = Object.assign({}, S.local);
+  const r = await CasinoNet.api('api/live/bc', { action: 'bets', bets, name: CasinoBoard.name() });
+  if (r.ok) { S.sent = bets; if (total(bets)) { S.last = bets; savePref(); } }
+  else { toast(r.body.error || 'Bet not taken. Try again.'); S.local = Object.assign({}, S.sent); renderSpots(); }
+  if (typeof r.body.cents === 'number') $('bal').textContent = money(r.body.cents);
+}
+function place(k) {
+  unlock();
+  if (!betting()) return toast('Bets are closed for this hand.');
+  const me = S.V.me;
+  const lim = k === 'player' || k === 'banker' ? me.max : me.sideMax;
+  if (k === 'player' && S.local.banker) return toast('Bet on Player or Banker, not both.');
+  if (k === 'banker' && S.local.player) return toast('Bet on Player or Banker, not both.');
+  const cur = S.local[k] || 0, add = Math.min(S.chip, lim - cur);
+  if (add <= 0) return toast(`That spot takes up to ${money(lim)}.`);
+  const avail = me.cents + total(S.sent) - total(S.local);
+  if (add > avail) return toast('Not enough in your bankroll.');
+  S.local[k] = cur + add; chipSound(); renderSpots(); scheduleSend();
+}
+$('spots').addEventListener('click', e => { const b = e.target.closest('.spot'); if (b && !b.disabled) place(b.dataset.k); });
+$('tray').addEventListener('click', e => { const c = e.target.closest('.chip'); if (!c) return; S.chip = +c.dataset.v; savePref(); renderTray(); });
+$('clear').onclick = () => { if (!betting()) return; S.local = {}; renderSpots(); scheduleSend(); };
+$('rebet').onclick = () => { if (!betting() || !total(S.last)) return; const need = total(S.last) - total(S.sent); if (need > S.V.me.cents) return toast('Not enough in your bankroll.'); S.local = Object.assign({}, S.last); chipSound(); renderSpots(); scheduleSend(); };
+$('double').onclick = () => {
+  if (!betting() || !total(S.local)) return;
+  const next = {}; for (const [k, v] of Object.entries(S.local)) next[k] = Math.min(v * 2, k === 'player' || k === 'banker' ? S.V.me.max : S.V.me.sideMax);
+  if (total(next) - total(S.sent) > S.V.me.cents) return toast('Not enough in your bankroll.');
+  S.local = next; chipSound(); renderSpots(); scheduleSend();
+};
+function renderTray() {
+  document.querySelectorAll('#tray .chip').forEach(c => c.setAttribute('aria-pressed', String(+c.dataset.v === S.chip)));
+  const open = betting();
+  $('clear').disabled = !open || !total(S.local); $('rebet').disabled = !open || !total(S.last); $('double').disabled = !open || !total(S.local);
+}
+function renderSpots() {
+  const sp = shownSpots();
+  document.querySelectorAll('#spots .spot').forEach(b => {
+    const v = sp[b.dataset.k] || 0;
+    b.querySelector('.stack').innerHTML = v ? `<div class="chipv ${CHIP_CLASS(v)}">${v >= 100000 ? (v / 100000) + 'K' : v >= 100 ? Math.round(v / 100) : ''}</div><div class="amt">${money(v)}</div>` : '';
+    b.disabled = !betting();
+  });
+  renderTray();
+}
+
+/* ---------- cards: shown in the order the dealer turns them ---------- */
+function cardEl(c, side) {
+  const red = c.s === '♥' || c.s === '♦';
+  const d = document.createElement('div'); d.className = 'cd' + (side ? ' side' : '');
+  d.innerHTML = `<div class="in"><div class="k"></div><div class="f${red ? ' red' : ''}"><i>${c.r}<small>${c.s}</small></i><em>${c.s}</em></div></div>`;
+  return d;
+}
+function revealTimes(V) {
+  return V.hand.order.map((_, k) => V.dealStart + (k < 4 ? k * V.cardMs : 4 * V.cardMs + (k - 4) * V.thirdMs) + 250);
+}
+let dealt = { round: -1, n: 0 };
+function renderHand() {
+  const V = S.V;
+  const H = V && V.hand;
+  if (!H) { if (dealt.round !== -2) { $('cP').innerHTML = ''; $('cB').innerHTML = ''; $('sP').textContent = '–'; $('sB').textContent = '–'; $('hP').classList.remove('win'); $('hB').classList.remove('win'); dealt = { round: -2, n: 0 }; } return; }
+  if (dealt.round !== V.round) { $('cP').innerHTML = ''; $('cB').innerHTML = ''; dealt = { round: V.round, n: 0, els: [] }; $('hP').classList.remove('win'); $('hB').classList.remove('win'); }
+  const times = V.phase === 'result' ? H.order.map(() => 0) : revealTimes(V);
+  const t = now();
+  // lay each card face down as it comes out of the shoe, then flip it
+  while (dealt.n < H.order.length && t >= times[dealt.n] - 380) {
+    const [who, i] = H.order[dealt.n];
+    const c = (who === 'p' ? H.P : H.B)[i];
+    const el = cardEl(c, i === 2);
+    (who === 'p' ? $('cP') : $('cB')).appendChild(el);
+    dealt.els.push(el); dealt.n++; swish();
+  }
+  let ps = [], bs = [];
+  dealt.els.forEach((el, k) => {
+    const up = t >= times[k];
+    if (up && !el.classList.contains('up')) el.classList.add('up');
+    if (up) { const [who, i] = H.order[k]; (who === 'p' ? ps : bs).push((who === 'p' ? H.P : H.B)[i]); }
+  });
+  const sc = cards => cards.reduce((a, c) => a + val(c.r), 0) % 10;
+  $('sP').textContent = ps.length ? sc(ps) : '–';
+  $('sB').textContent = bs.length ? sc(bs) : '–';
+  if (V.phase === 'result') { $('hP').classList.toggle('win', H.win === 'player'); $('hB').classList.toggle('win', H.win === 'banker'); }
+}
+function renderStatus() {
+  const V = S.V; if (!V) return;
+  const timer = $('timer');
+  if (V.phase === 'betting') {
+    const left = Math.max(0, V.deadline - now());
+    $('stT').textContent = 'Place your bets'; $('stS').textContent = `${Math.ceil(left / 1000)}s · ${V.shuffled ? 'new shoe' : `${V.shoeLeft} cards in the shoe`}`;
+    timer.hidden = false; $('timerBar').style.width = Math.min(100, left / 150) + '%';
+  } else if (V.phase === 'dealing') {
+    $('stT').textContent = 'No more bets'; $('stS').textContent = V.shuffled ? 'The dealer shuffled a fresh 8-deck shoe.' : 'Dealing…'; timer.hidden = true;
+  } else if (V.phase === 'result' && V.hand) {
+    const H = V.hand;
+    $('stT').textContent = H.win === 'tie' ? `Tie ${H.ps} – ${H.bs}` : `${H.win === 'player' ? 'Player' : 'Banker'} wins ${Math.max(H.ps, H.bs)} – ${Math.min(H.ps, H.bs)}`;
+    const r = V.me.result;
+    $('stS').innerHTML = (H.natural ? 'Natural. ' : '') + (H.pp ? 'Player pair! ' : '') + (H.bp ? 'Banker pair! ' : '') + (r ? `<span class="net ${r.net > 0 ? 'pos' : r.net < 0 ? 'neg' : ''}">${r.net > 0 ? '+' : ''}${money(r.net)}</span>` : '');
+    timer.hidden = true;
+  } else { $('stT').textContent = 'Waiting for players'; $('stS').textContent = 'Place a bet to start the next hand.'; timer.hidden = true; }
+}
+function renderSide() {
+  const V = S.V;
+  const road = V.road.slice(-72);
+  $('bead').innerHTML = road.map(x => `<i class="${x.w.toUpperCase()}${x.pp ? ' pp' : ''}${x.bp ? ' bp' : ''}" title="${x.w === 'p' ? 'Player' : x.w === 'b' ? 'Banker' : 'Tie'} ${x.ps}-${x.bs}">${x.w === 't' ? x.ps : x.w === 'p' ? x.ps : x.bs}</i>`).join('') + '<i style="visibility:hidden"></i>'.repeat(Math.max(0, 72 - road.length));
+  const n = k => V.road.filter(x => x.w === k).length;
+  $('nP').textContent = `P ${n('p')}`; $('nB').textContent = `B ${n('b')}`; $('nT').textContent = `T ${n('t')}`;
+  $('shoe').textContent = `${V.shoeLeft} cards left`;
+  const list = V.players.slice().sort((a, b) => b.bet - a.bet);
+  $('plist').innerHTML = list.map(p => `<div class="pr${p.me ? ' me' : ''}"><span class="n">${esc(p.name)}</span>${p.side ? `<span class="s ${p.side}">${p.side}</span>` : '<span></span>'}<span class="v ${p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : ''}">${p.net !== null && p.net !== undefined ? (p.net > 0 ? '+' : '') + money(p.net) : p.bet ? money(p.bet) : '—'}</span></div>`).join('') || '<div class="pr"><span class="n" style="color:var(--muted);font-weight:600">Nobody yet</span></div>';
+  $('nPl').textContent = V.players.length ? `${V.players.length}` : '';
+}
+function onState(V) {
+  S.off = V.now - Date.now();
+  const prev = S.V;
+  S.V = V;
+  $('bal').textContent = money(V.me.cents);
+  $('vipChip').hidden = V.me.max <= 100000;
+  // a new betting round: start from nothing; keep what the server holds otherwise
+  if (V.phase === 'betting' && (!prev || prev.phase !== 'betting')) { S.local = Object.assign({}, V.me.spots); S.sent = Object.assign({}, V.me.spots); }
+  if (V.phase === 'idle' && (!prev || prev.phase !== 'idle')) { S.local = Object.assign({}, V.me.spots); S.sent = Object.assign({}, V.me.spots); }
+  if (V.phase === 'result' && S.resultShown !== V.round) {
+    S.resultShown = V.round;
+    const H = V.hand;
+    document.querySelectorAll('#spots .spot').forEach(b => {
+      const k = b.dataset.k;
+      const won = (k === H.win) || (k === 'pp' && H.pp) || (k === 'bp' && H.bp);
+      b.classList.toggle('won', won);
+    });
+    if (V.me.result && V.me.result.net > 0) winSound();
+  }
+  if (V.phase !== 'result') document.querySelectorAll('#spots .spot.won').forEach(b => b.classList.remove('won'));
+  renderSpots(); renderStatus(); renderSide();
+}
+function loop() { requestAnimationFrame(loop); if (S.V) { renderHand(); if (S.V.phase === 'betting') renderStatus(); } }
+$('sndBtn').onclick = () => { S.snd = !S.snd; $('sndBtn').classList.toggle('off', !S.snd); savePref(); unlock(); };
+$('sndBtn').classList.toggle('off', !S.snd);
+$('infoBtn').onclick = () => { $('info').hidden = false; };
+$('infoX').onclick = () => { $('info').hidden = true; };
+$('info').addEventListener('click', e => { if (e.target.id === 'info') $('info').hidden = true; });
+renderTray(); requestAnimationFrame(loop);
+CasinoBoard.connect().then(ok => {
+  if (!ok) { $('stT').textContent = 'Baccarat needs the casino server'; return; }
+  const s = CasinoNet.seat();
+  const open = () => {
+    const es = new EventSource(`api/live/stream?game=bc&id=${encodeURIComponent(s.id)}&token=${encodeURIComponent(s.token)}&name=${encodeURIComponent(CasinoBoard.name())}`);
+    es.addEventListener('state', e => { try { onState(JSON.parse(e.data)); } catch (x) { console.error(x); } });
+    es.onerror = () => { if (es.readyState === 2) setTimeout(open, 3000); };
+  };
+  open();
+});
+window.__bacc = { S };
+})();
+</script>
+<script>window.CASINO_ROOM = 'bc';</script>
+<script>
+/* Miguel's Casino: table chat and emoji reactions for the live tables. */
+(() => {
+  const ROOM = window.CASINO_ROOM;
+  if (!ROOM || !window.EventSource || !/^https?:$/.test(location.protocol)) return;
+  const REACTS = ['👍', '😂', '🔥', '😮', '😭', '🎉', '💰', '🍀'];
+  const css = `
+  .mcc-btn{position:fixed;right:0;top:56%;z-index:9990;width:44px;height:48px;border-radius:14px 0 0 14px;border:1px solid rgba(255,230,160,.35);border-right:0;background:rgba(20,14,24,.9);backdrop-filter:blur(6px);color:#FFE6A0;display:grid;place-items:center;cursor:pointer;box-shadow:0 10px 26px rgba(0,0,0,.45)}
+  .mcc-btn svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .mcc-btn i{position:absolute;top:-6px;left:-6px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#FF4F7A;color:#fff;font:800 11px/20px system-ui,sans-serif;font-style:normal;text-align:center}
+  .mcc{position:fixed;right:52px;top:max(70px,calc(56% - 300px));z-index:9991;width:min(340px,calc(100vw - 28px));height:min(440px,calc(100dvh - 160px));display:flex;flex-direction:column;border-radius:16px;overflow:hidden;background:rgba(16,11,20,.94);backdrop-filter:blur(10px);border:1px solid rgba(255,230,160,.22);box-shadow:0 24px 60px rgba(0,0,0,.6);font:500 14px/1.4 Manrope,system-ui,sans-serif;color:#F3EEE6}
+  .mcc[hidden],.mcc .err[hidden],.mcc-btn i[hidden]{display:none}
+  .mcc header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid rgba(255,230,160,.12);font-weight:800;letter-spacing:.02em}
+  .mcc header span{flex:1}
+  .mcc header small{color:#A79C8C;font-weight:600}
+  .mcc header button{width:30px;height:30px;border-radius:8px;border:0;background:rgba(255,255,255,.06);color:inherit;cursor:pointer;font-size:16px}
+  .mcc .list{flex:1;overflow:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px;overscroll-behavior:contain}
+  .mcc .m{word-wrap:break-word;overflow-wrap:anywhere}
+  .mcc .m b{font-weight:800;margin-right:4px}
+  .mcc .m em{font-style:normal;font:700 10px/1 system-ui,sans-serif;padding:2px 5px;border-radius:999px;background:rgba(255,230,160,.14);color:#FFE6A0;margin-right:5px;vertical-align:1px}
+  .mcc .m.sys{color:#A79C8C;font-size:12.5px;text-align:center}
+  .mcc .reacts{display:flex;justify-content:space-between;padding:6px 10px;border-top:1px solid rgba(255,230,160,.12)}
+  .mcc .reacts button{border:0;background:none;font-size:21px;cursor:pointer;border-radius:8px;padding:2px 4px;transition:transform .12s}
+  .mcc .reacts button:hover{transform:scale(1.25);background:rgba(255,255,255,.06)}
+  .mcc form{display:flex;gap:6px;padding:8px 10px 10px}
+  .mcc input{flex:1;min-width:0;height:40px;border-radius:10px;border:1px solid rgba(255,230,160,.2);background:rgba(0,0,0,.35);color:inherit;padding:0 12px;font:inherit;outline:0}
+  .mcc input:focus{border-color:#FFE6A0}
+  .mcc form button{height:40px;padding:0 14px;border-radius:10px;border:0;background:linear-gradient(180deg,#FFE27A,#E9A83A);color:#2A1800;font-weight:800;cursor:pointer}
+  .mcc .err{color:#FF8FA8;font-size:12.5px;padding:0 12px 6px;min-height:0}
+  .mcc-fly{position:fixed;bottom:80px;z-index:9989;font-size:34px;pointer-events:none;animation:mccfly 2.6s ease-out forwards}
+  .mcc-fly small{display:block;font:700 10px system-ui,sans-serif;color:#fff;text-shadow:0 1px 3px #000;text-align:center;margin-top:-4px}
+  @keyframes mccfly{0%{transform:translateY(0) scale(.6);opacity:0}12%{opacity:1;transform:translateY(-30px) scale(1.1)}100%{transform:translateY(-55vh) translateX(var(--dx)) scale(1);opacity:0}}
+  @media (max-width:560px){.mcc{left:8px;right:8px;top:auto;bottom:calc(8px + env(safe-area-inset-bottom));width:auto;height:min(62dvh,440px)}}
+  `;
+  const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  const btn = document.createElement('button');
+  btn.className = 'mcc-btn'; btn.title = 'Table chat'; btn.setAttribute('aria-label', 'Open the table chat');
+  btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg><i hidden>0</i>';
+  const box = document.createElement('section');
+  box.className = 'mcc'; box.hidden = true; box.setAttribute('aria-label', 'Table chat');
+  box.innerHTML = `<header><span>Table chat</span><small id="mccN"></small><button type="button" aria-label="Close the chat">✕</button></header>
+    <div class="list" role="log" aria-live="polite"></div>
+    <div class="reacts">${REACTS.map(e => `<button type="button" data-e="${e}" aria-label="React ${e}">${e}</button>`).join('')}</div>
+    <div class="err" hidden></div>
+    <form><input maxlength="140" placeholder="Say something nice…" aria-label="Message" autocomplete="off"><button>Send</button></form>`;
+  const add = () => { document.body.appendChild(btn); document.body.appendChild(box); };
+  if (document.body) add(); else addEventListener('DOMContentLoaded', add);
+  const list = box.querySelector('.list'), input = box.querySelector('input'), err = box.querySelector('.err'), badge = btn.querySelector('i');
+  let unread = 0, open = false;
+  const COLORS = ['#FFD36E', '#7FE3C4', '#8EC5FF', '#FF9DC0', '#C7A6FF', '#FFB07A', '#9EF07A', '#7AE0FF'];
+  const color = p => COLORS[parseInt(String(p || '0').slice(0, 4), 16) % COLORS.length];
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  function setOpen(v) {
+    open = v; box.hidden = !v; btn.setAttribute('aria-expanded', String(v));
+    if (v) { unread = 0; badge.hidden = true; list.scrollTop = list.scrollHeight; setTimeout(() => input.focus({ preventScroll: true }), 50); }
+  }
+  btn.onclick = () => setOpen(!open);
+  box.querySelector('header button').onclick = () => setOpen(false);
+  function line(m) {
+    const d = document.createElement('div'); d.className = 'm'; d.dataset.id = m.id;
+    const t = new Date(m.t);
+    d.title = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    d.innerHTML = `${m.lvl ? `<em>Lv ${m.lvl}</em>` : ''}<b style="color:${color(m.p)}">${esc(m.name)}</b>${esc(m.text)}`;
+    return d;
+  }
+  function append(m) {
+    list.querySelectorAll('.m.empty').forEach(el => el.remove());
+    const near = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+    list.appendChild(line(m));
+    while (list.children.length > 80) list.firstChild.remove();
+    if (near || !open) list.scrollTop = list.scrollHeight;
+    if (!open) { unread++; badge.hidden = false; badge.textContent = unread > 9 ? '9+' : unread; }
+  }
+  function sys(text) { const d = document.createElement('div'); d.className = 'm sys'; d.textContent = text; list.appendChild(d); list.scrollTop = list.scrollHeight; }
+  function fly(e, name) {
+    const d = document.createElement('div'); d.className = 'mcc-fly';
+    d.style.left = (12 + Math.random() * 70) + 'vw'; d.style.setProperty('--dx', ((Math.random() - 0.5) * 120) + 'px');
+    d.innerHTML = `${e}<small>${esc(name || '')}</small>`;
+    document.body.appendChild(d); setTimeout(() => d.remove(), 2700);
+  }
+  let es = null;
+  function connect() {
+    const s = CasinoNet.seat();
+    es = new EventSource(`api/chat/stream?room=${ROOM}&id=${encodeURIComponent(s.id)}&token=${encodeURIComponent(s.token)}`);
+    es.addEventListener('history', e => { list.innerHTML = ''; let h = []; try { h = JSON.parse(e.data); } catch (x) {} if (!h.length) { sys('No messages yet. Say hi to the table.'); list.lastChild.classList.add('empty'); } h.forEach(m => list.appendChild(line(m))); list.scrollTop = list.scrollHeight; });
+    es.addEventListener('msg', e => { try { append(JSON.parse(e.data)); } catch (x) {} });
+    es.addEventListener('react', e => { try { const r = JSON.parse(e.data); fly(r.e, r.name); } catch (x) {} });
+    es.addEventListener('clear', () => { list.innerHTML = ''; sys('The casino cleared the chat.'); });
+    es.addEventListener('del', e => { try { const id = JSON.parse(e.data).id; const el = list.querySelector(`[data-id="${id}"]`); if (el) el.remove(); } catch (x) {} });
+  }
+  function showErr(t) { err.textContent = t; err.hidden = !t; if (t) setTimeout(() => { if (err.textContent === t) { err.hidden = true; } }, 4000); }
+  box.querySelector('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const text = input.value.trim(); if (!text) return;
+    if (window.WordFilter && WordFilter.bad(WordFilter.clean(text))) { showErr('Keep the chat friendly. That message wasn’t sent.'); return; }
+    const r = await CasinoNet.api('api/chat', { room: ROOM, text });
+    if (r.ok) { input.value = ''; showErr(''); } else showErr(r.body.error || 'Not sent. Try again.');
+  });
+  box.querySelector('.reacts').addEventListener('click', async e => {
+    const b = e.target.closest('[data-e]'); if (!b) return;
+    const r = await CasinoNet.api('api/chat', { room: ROOM, react: b.dataset.e });
+    if (!r.ok && r.status !== 429) showErr(r.body.error || '');
+  });
+  // stop the game's own keyboard shortcuts while typing
+  input.addEventListener('keydown', e => e.stopPropagation());
+  connect();
+})();
+</script>
+</body>
+</html>

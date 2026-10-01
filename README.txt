@@ -9,6 +9,8 @@ What's in this folder
   progress.js       levels, VIP, daily bonus, challenges, badges, Mega Jackpot,
                     weekly tournament, seasons, tips and happy hours
   cascade_engine.js the rules and payouts of Cosmic Cascade
+  live2.js          the live Rocket Crash and Baccarat tables, and the table chat
+  wordfilter.js     keeps swear words and slurs out of chat and player names
   bj_solo.js        the blackjack dealer for the solo table
   roulette_rules.js, craps_rules.js, slot_engine.js   the rules and payouts of each game
   live.js           the live tables: shared blackjack (5 seats), roulette and Hold'em
@@ -91,6 +93,7 @@ STEP 4: THE ADMIN ROOM (only for you)
     - see the house books: what each game took in and paid out
     - post an announcement banner, gift chips to everyone, close the casino
       for a moment, lock out new players, and download a backup
+    - read the table chat, remove messages, clear it, and mute a player
     - start a happy hour (wins boosted x1.5, x2 or x3 on one game or all),
       double XP, or give everyone free spins
     - set the weekly tournament prizes, end the tournament or the season early,

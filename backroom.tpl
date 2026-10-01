@@ -158,7 +158,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
       <div class="card">
         <h2>Security log <small>attempts to cheat, wrong keys, odd requests</small></h2>
         <p class="help"><b>Tamper</b>: someone sent a fake bankroll to the old leaderboard address. <b>Wrong key</b>: someone tried to play as another player. <b>Invalid</b>: a bet the tables don't allow (usually edited by hand). <b>Rate limit</b>: requests faster than a person can play. <b>Admin login</b>: a wrong password on this page. <b>Chip dump?</b>: someone lost a big poker pot to a player on the same network, which is how alt accounts pass money to a main account. <b>Old page</b>: an out-of-date page reported a different bankroll (harmless, it's ignored).</p>
-        <div class="row" style="margin-bottom:10px"><select id="secKind" style="max-width:220px" aria-label="Kind"><option value="">All kinds</option><option>tamper</option><option>wrong-key</option><option>invalid</option><option>rate-limit</option><option>admin-login</option><option>chip-dump</option><option>legacy</option></select><div class="sp"></div><button class="btn small bad" id="clearLog">Clear log</button></div>
+        <div class="row" style="margin-bottom:10px"><select id="secKind" style="max-width:220px" aria-label="Kind"><option value="">All kinds</option><option>tamper</option><option>wrong-key</option><option>invalid</option><option>rate-limit</option><option>admin-login</option><option>chip-dump</option><option>chat</option><option>legacy</option></select><div class="sp"></div><button class="btn small bad" id="clearLog">Clear log</button></div>
         <ul class="log" id="seclog"></ul>
       </div>
     </section>
@@ -210,6 +210,12 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
             <div class="switch"><div><b>Lock new players out</b><span>Only people who already have a seat can play.</span></div><button class="btn" id="swLocked"></button></div>
           </div>
           <div class="card">
+            <h2>Table chat</h2>
+            <p class="help">The latest messages from every live table. Swear words are starred out automatically; messages that are still rude aren't sent and show up in the security log. Mute someone from their profile.</p>
+            <ul class="log" id="chatList" style="max-height:260px;overflow:auto"></ul>
+            <div class="row" style="margin-top:10px"><button class="btn small bad" id="chatClear">Clear every table's chat</button></div>
+          </div>
+          <div class="card">
             <h2>Season</h2>
             <p class="help" id="seasonNow"></p>
             <div class="row"><button class="btn bad" id="seasonEnd">End the season now</button></div>
@@ -253,7 +259,7 @@ const ago = t => { if (!t) return '—'; const s = (Date.now() - t) / 1000; if (
 const when = t => new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const COLORS = ['#E8C170', '#E07A5F', '#81B29A', '#9C89B8', '#F2CC8F', '#6FB1D6', '#E5989B', '#B5E48C'];
 const tint = s => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
-const GAMES = { bonus: 'Bonuses & challenges', jackpot: 'Mega jackpot', tournament: 'Tournament prizes', event: 'Happy hour & free spins', tip: 'Tip', season: 'Season', slots2: 'Cosmic Cascade', plinko: 'Plinko', mines: 'Mines', crash: 'Crash', 'live-bc': 'Live baccarat', slots: 'Dynamite Diggers', roulette: 'Voltage Roulette', blackjack: 'Brass Table Blackjack', craps: 'Bubble Dome Craps', 'live-bj': 'Live blackjack', 'live-rl': 'Live roulette', poker: 'Hold’em (player vs player)', live: 'Live tables', admin: 'Casino', reset: 'Fresh $1,000', import: 'Upgrade', join: 'Joined', table: 'Poker chips' };
+const GAMES = { crash: 'Crash', bonus: 'Bonuses & challenges', jackpot: 'Mega jackpot', tournament: 'Tournament prizes', event: 'Happy hour & free spins', tip: 'Tip', season: 'Season', slots2: 'Cosmic Cascade', plinko: 'Plinko', mines: 'Mines', crash: 'Crash', 'live-bc': 'Live baccarat', slots: 'Dynamite Diggers', roulette: 'Voltage Roulette', blackjack: 'Brass Table Blackjack', craps: 'Bubble Dome Craps', 'live-bj': 'Live blackjack', 'live-rl': 'Live roulette', poker: 'Hold’em (player vs player)', live: 'Live tables', admin: 'Casino', reset: 'Fresh $1,000', import: 'Upgrade', join: 'Joined', table: 'Poker chips' };
 let toastT;
 function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2600); }
 async function api(path, body) {
@@ -325,7 +331,7 @@ function renderOverview() {
     <p class="help" style="margin:10px 0 0">Server up since ${when(OV.startedAt)} · saved in ${esc(OV.storage)}</p>`;
   $('alerts').innerHTML = logItems(OV.security.filter(e => e.kind !== 'legacy').slice(0, 6)) || '<li class="empty" style="display:block">All quiet.</li>';
 }
-const KIND = { tamper: ['bad', 'Tamper'], 'wrong-key': ['bad', 'Wrong key'], 'chip-dump': ['warn', 'Chip dump?'], invalid: ['warn', 'Invalid'], 'rate-limit': ['warn', 'Rate limit'], 'admin-login': ['bad', 'Admin login'], legacy: ['info', 'Old page'] };
+const KIND = { tamper: ['bad', 'Tamper'], 'wrong-key': ['bad', 'Wrong key'], 'chip-dump': ['warn', 'Chip dump?'], chat: ['info', 'Chat'], invalid: ['warn', 'Invalid'], 'rate-limit': ['warn', 'Rate limit'], 'admin-login': ['bad', 'Admin login'], legacy: ['info', 'Old page'] };
 function logItems(list) {
   return list.map(e => {
     const [cls, lab] = KIND[e.kind] || ['info', e.kind];
@@ -406,6 +412,7 @@ function drawPlayer() {
       <div class="act"><b>Set bankroll</b><div class="row"><input type="number" id="aSet" min="0" step="0.01" placeholder="$" aria-label="New bankroll in dollars"><button class="btn small gold" data-op="setBalance">Set</button></div></div>
       <div class="act"><b>Give or take chips</b><div class="row"><input type="number" id="aAdj" step="0.01" placeholder="+500 or -200" aria-label="Amount in dollars"><button class="btn small gold" data-op="adjust">Apply</button></div></div>
       <div class="act"><b>Rename</b><div class="row"><input type="text" id="aName" maxlength="18" value="${esc(p.name)}" aria-label="New name"><button class="btn small" data-op="rename">Save</button></div></div>
+      <div class="act"><b>${p.muted > Date.now() ? `Muted until ${when(p.muted)}` : 'Mute in chat'}</b><div class="row">${p.muted > Date.now() ? '<button class="btn small" data-op="unmute">Unmute</button>' : '<select id="aMute" aria-label="How long"><option value="15">15 minutes</option><option value="60" selected>1 hour</option><option value="1440">1 day</option><option value="10080">1 week</option></select><button class="btn small" data-op="mute">Mute</button>'}</div></div>
       <div class="act"><b>${p.banned ? 'Suspended' : 'Suspend'}</b><div class="row">${p.banned ? '<button class="btn small" data-op="unban">Lift suspension</button>' : '<input type="text" id="aWhy" maxlength="80" placeholder="Reason" aria-label="Reason"><button class="btn small bad" data-op="ban">Suspend</button>'}</div></div>
     </div>
     <div class="row" style="margin-top:10px">
@@ -428,6 +435,7 @@ $('drawer').addEventListener('click', async e => {
   if (op === 'setBalance') { body.cents = dollars('aSet'); if (!Number.isFinite(body.cents)) return toast('Type an amount first'); if (!confirm(`Set ${current.name || 'this player'}'s bankroll to ${usd(body.cents)}?`)) return; }
   if (op === 'adjust') { body.cents = dollars('aAdj'); if (!Number.isFinite(body.cents) || !body.cents) return toast('Type an amount first'); }
   if (op === 'rename') body.name = $('aName').value;
+  if (op === 'mute') body.minutes = +$('aMute').value;
   if (op === 'ban') { body.reason = $('aWhy').value || 'Cheating'; if (!confirm(`Suspend ${current.name || 'this player'}? They can't play until you lift it.`)) return; }
   if (op === 'delete') { const n = prompt(`Delete ${current.name || 'this player'} for good? Their bankroll and history are gone and they start over as a new player.\n\nType DELETE to confirm.`); if (n !== 'DELETE') return; }
   try {
@@ -447,6 +455,8 @@ function renderControls() {
   const T = OV.tour || {};
   $('tourNow').innerHTML = `Week ${esc(T.week || '')} ends ${T.end ? when(T.end) : ''}. ${T.board && T.board.length ? 'Leading: ' + T.board.slice(0, 3).map((r, i) => `${['🥇', '🥈', '🥉'][i]} ${esc(r.name)} ${usd(r.bal)}`).join(' · ') : 'Nobody has joined yet.'} Prizes now: ${(T.prizes || []).map(usd).join(' / ')}. Players need 10 rounds to win a prize.`;
   if (T.prizes && !$('tp1').value) { $('tp1').value = T.prizes[0] / 100; $('tp2').value = T.prizes[1] / 100; $('tp3').value = T.prizes[2] / 100; }
+  const ROOMS = { bj: 'Blackjack', rl: 'Roulette', pk: 'Hold\u2019em', cr: 'Crash', bc: 'Baccarat' };
+  $('chatList').innerHTML = (OV.chat || []).map(m => `<li><span class="dim">${ago(m.t)} · ${ROOMS[m.room] || m.room}</span> <b>${esc(m.name)}</b>: ${esc(m.text)} <button class="btn small" data-chatdel="${m.id}" style="float:right;height:24px;padding:0 8px">Remove</button></li>`).join('') || '<li class="dim">No messages yet.</li>';
   const J = OV.jackpot || {};
   $('jpNow').textContent = `The pot is ${usd(Math.round(J.pool || 0))} and restarts at ${usd(J.seed || 0)} after a win.${J.last ? ` Last won by ${J.last.name}: ${usd(J.last.amount)} (${ago(J.last.t)}).` : ''}`;
   $('swClosed').textContent = st.closed ? 'Open the casino' : 'Close the casino'; $('swClosed').className = 'btn ' + (st.closed ? 'gold' : 'bad');
@@ -467,6 +477,8 @@ $('gSend').onclick = async () => {
   try { const r = await api('gift', { cents: c, to: $('gTo').value, note: $('gNote').value }); toast(`Sent to ${r.count} player${r.count === 1 ? '' : 's'}`); $('gAmt').value = ''; load(); } catch (x) { toast(x.message); }
 };
 const post = async (path, body, msg) => { try { await api(path, body); toast(msg); load(); } catch (x) { toast(x.message); } };
+$('chatClear').onclick = () => { if (confirm('Clear the chat at every live table?')) post('chatclear', { room: 'all' }, 'Chat cleared'); };
+$('chatList').addEventListener('click', e => { const b = e.target.closest('[data-chatdel]'); if (b) post('chatdel', { msg: +b.dataset.chatdel }, 'Message removed'); });
 $('hhGo').onclick = () => post('event', { boost: { game: $('hhGame').value, mult: +$('hhMult').value, hours: +$('hhHours').value } }, 'Happy hour started');
 $('hhStop').onclick = () => post('event', { boost: null }, 'Happy hour stopped');
 $('xpGo').onclick = () => post('event', { xp: { hours: +$('xpHours').value } }, 'Double XP started');

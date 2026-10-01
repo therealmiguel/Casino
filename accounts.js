@@ -1,6 +1,7 @@
 // Player accounts: the server keeps every bankroll. Browsers only ever see a copy.
 // Money changes only through debit/credit calls made by the games that run on this server.
 'use strict';
+const WF = require('./wordfilter');
 const crypto = require('crypto');
 
 const START = 100000;                 // $1,000 in cents
@@ -163,10 +164,12 @@ module.exports = function createAccounts(hooks = {}) {
     return { ok: true };
   }
   const usd = c => '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 });
+  // names with swear words or slurs are refused (the lobby says so before it even asks)
   function setName(id, name) {
     const rec = players.get(id), n = cleanName(name);
-    if (!rec || n.length < 2 || n === rec.name || rec.nameLocked) return;
-    rec.name = n; touch(id);
+    if (!rec || n.length < 2 || n === rec.name || rec.nameLocked) return '';
+    if (WF.bad(n)) return 'Pick a friendlier name.';
+    rec.name = n; touch(id); return '';
   }
   function me(id, ctx) {
     const rec = players.get(id);
