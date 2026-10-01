@@ -68,9 +68,29 @@ function play(S, action, body, wallet, rnd, limits) {
     if (S.dealt >= S.cutAt) S.shuffleDue = true;
     return c;
   };
+  // luck (admin only): with a bias set, the card that comes off the shoe is the best (or worst) of the next few
+  const drawFor = score => {
+    const B = S.bias;
+    if (!B || !B.look || Math.random() >= B.chance) return draw();
+    if (!S.shoe.length) buildShoe(S, rnd);
+    const n = Math.min(B.look, S.shoe.length);
+    let bi = S.shoe.length - 1, bs = -Infinity;
+    for (let k = 0; k < n; k++) { const idx = S.shoe.length - 1 - k, v = score(S.shoe[idx]) * B.dir; if (v > bs) { bs = v; bi = idx; } }
+    const c = S.shoe.splice(bi, 1)[0];
+    S.dealt++; if (S.dealt >= S.cutAt) S.shuffleDue = true;
+    return c;
+  };
+  const forPlayer = h => c => { const t = total(h.cards.concat([c])).total; return t > 21 ? -50 : t; };
+  const forDealer = () => c => {
+    const t = total(R.dealer.concat([c])).total;
+    if (t > 21) return 50;
+    if (R.dealer.length < 1) return -t;
+    const best = Math.max(0, ...R.hands.filter(h => !h.bust && !h.surrendered).map(h => total(h.cards).total).filter(x => x <= 21));
+    return t >= 17 && t >= best ? -30 - t : -t / 4;
+  };
   const cur = () => R.hands[R.active];
-  const give = (h, i) => { const c = draw(); h.cards.push(c); log.push({ to: 'p', hand: i, card: c }); return c; };
-  const giveD = () => { const c = draw(); R.dealer.push(c); log.push({ to: 'd', card: c }); return c; };
+  const give = (h, i) => { const c = drawFor(forPlayer(h)); h.cards.push(c); log.push({ to: 'p', hand: i, card: c }); return c; };
+  const giveD = () => { const c = drawFor(forDealer()); R.dealer.push(c); log.push({ to: 'd', card: c }); return c; };
   const dealerBJ = () => R.dealer.length === 2 && total(R.dealer).total === 21;
   let shuffled = false;
 

@@ -17,7 +17,8 @@ const rnd = n => crypto.randomInt(n);                         // whole number 0.
 const SLOT_BETS = [20, 40, 60, 100, 200, 400, 600, 1000, 2000, 5000, 10000];
 const VIP_SLOT_BETS = [20000, 50000];
 
-module.exports = function createGames(A, { flag, isClosed, P }) {
+module.exports = function createGames(A, { flag, isClosed, P, L }) {
+  const luck = L || { pick: (id, g) => g(), steer: () => 0, bias: () => null };
   const vip = id => !!(P && P.vipOf(A.get(id)));
   const wallet = id => ({ bal: () => A.get(id).bal, debit: c => A.debit(id, c, 'blackjack', 'Blackjack bet'), credit: c => A.credit(id, c, 'blackjack', 'Blackjack payout') });
   const bad = (id, what, msg, code = 400) => { flag(id, 'invalid', what); return { code, body: { error: msg } }; };
@@ -33,7 +34,7 @@ module.exports = function createGames(A, { flag, isClosed, P }) {
     const cost = freeSpin ? 0 : buy ? bet * SlotEngine.BUY_PRICE : bet;
     if (freeSpin) { rec.free.n--; A.touch(id); }
     else if (!A.debit(id, cost, 'slots', buy ? 'Dynamite Diggers bonus buy' : 'Dynamite Diggers spin')) return { code: 409, body: { error: 'Not enough in your bankroll.' } };
-    const plan = planSpin(buy);
+    const plan = luck.pick(id, () => planSpin(buy), p => Math.round(p.total * bet) - cost);
     const payout = Math.round(plan.total * bet);
     if (payout > 0) A.credit(id, payout, freeSpin ? 'event' : 'slots', freeSpin ? 'Free spin win' : 'Dynamite Diggers win');
     const jackpot = P && !A.inTour(rec, 'slots') && !freeSpin ? P.jackpotSpin(id, cost, 'slots', rng) : 0;
@@ -81,9 +82,8 @@ module.exports = function createGames(A, { flag, isClosed, P }) {
     }
     if (!staked) return { code: 400, body: { error: 'Place a bet first.' } };
     if (!A.debit(id, staked, 'roulette', 'Voltage Roulette bets')) return { code: 409, body: { error: 'Not enough in your bankroll.' } };
-    const strikes = lightning ? RR.genStrikes(rnd) : [];
-    const num = rnd(37);
-    const { total, mult } = RR.payout(bets, num, strikes, lightning);
+    const spin = luck.pick(id, () => { const strikes = lightning ? RR.genStrikes(rnd) : [], num = rnd(37); return Object.assign({ strikes, num }, RR.payout(bets, num, strikes, lightning)); }, o => o.total - staked);
+    const { strikes, num, total, mult } = spin;
     if (total > 0) A.credit(id, total, 'roulette', `Voltage Roulette: ${num}`);
     const tags = [];
     if (mult) tags.push('lightning'); if (mult === 500) tags.push('lightning-500');
@@ -106,12 +106,16 @@ module.exports = function createGames(A, { flag, isClosed, P }) {
     if (action === 'state') {
       // an unfinished hand from before (page closed) is stood and paid now
       const before = A.get(id).bal;
+      S.bias = luck.bias(id);
       const v = BJ.finishAbandoned(S, wallet(id), rnd);
+      delete S.bias;
       if (v) roundDone(id, S);
       return ok(id, { finished: v ? { paid: S.round.paid, net: S.round.paid - S.round.staked } : null, shoeLeft: S.shoe.length, shoeSize: S.shoeSize, shuffleDue: S.shuffleDue, decks: S.decks, before, limits: bjLimits(id) }, 'blackjack');
     }
     if (!BJ_ACTIONS.has(action)) return bad(id, `blackjack action ${action.slice(0, 20)}`, 'Unknown move.');
+    S.bias = luck.bias(id);
     const r = BJ.play(S, action, b, wallet(id), rnd, bjLimits(id));
+    delete S.bias;
     A.touch(id);
     if (r.error) return { code: 409, body: { error: r.error } };
     if (r.phase === 'done') roundDone(id, S);
@@ -204,9 +208,11 @@ module.exports = function createGames(A, { flag, isClosed, P }) {
     T.bets = next;
     if (action === 'sync') { A.touch(id); return ok(id, { bets: T.bets, point: T.point }, 'craps'); }
     if (!sum(T.bets)) return { code: 400, body: { error: 'Place a bet to roll.' } };
-    const d1 = rnd(6) + 1, d2 = rnd(6) + 1;
     const before = sum(T.bets);
-    const r = CRAPS.resolve(T.bets, T.point, d1, d2, { working: cfg.working, comeOddsOn: cfg.comeOddsOn, field12: cfg.field12 });
+    const rules = { working: cfg.working, comeOddsOn: cfg.comeOddsOn, field12: cfg.field12 };
+    const roll = luck.pick(id, () => { const a = rnd(6) + 1, b = rnd(6) + 1; return { a, b, r: CRAPS.resolve(JSON.parse(JSON.stringify(T.bets)), T.point, a, b, rules) }; },
+      o => o.r.ev.filter(e => e.type === 'win').reduce((x, e) => x + e.amt, 0) - o.r.ev.filter(e => e.type === 'lose').reduce((x, e) => x + e.amt, 0));
+    const d1 = roll.a, d2 = roll.b, r = roll.r;
     T.bets = r.bets; T.point = r.point;
     if (r.bank > 0) A.credit(id, r.bank, 'craps', `Craps roll ${d1 + d2}`);
     const won = r.ev.filter(e => e.type === 'win').reduce((a, e) => a + e.amt, 0);
@@ -219,7 +225,7 @@ module.exports = function createGames(A, { flag, isClosed, P }) {
     return ok(id, { dice: [d1, d2], bets: T.bets, point: T.point, bank: r.bank, outcome: r.outcome, before }, 'craps');
   }
 
-  const G2 = createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLOT_BETS, VIP_SLOT_BETS });
+  const G2 = createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLOT_BETS, VIP_SLOT_BETS, luck });
   function handle(game, id, body) {
     if (isClosed()) return { code: 503, body: { error: 'The casino is closed for a moment. Try again soon.' } };
     if (game === 'slots') return slots(id, body);

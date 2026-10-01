@@ -37,7 +37,8 @@ for (const R of Object.values(ROAD)) {
 }
 function roadMult(diff, k) { return ROAD[diff].mult[k]; }
 
-module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLOT_BETS, VIP_SLOT_BETS }) {
+module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLOT_BETS, VIP_SLOT_BETS, luck }) {
+  luck = luck || { pick: (id, g) => g(), steer: () => 0 };
   const betOk = (id, c, max) => Number.isInteger(c) && c >= 10 && c <= (vip(id) ? max * 5 : max);
 
   /* ---------- Plinko ---------- */
@@ -46,8 +47,8 @@ module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLO
     if (!PLINKO[rows] || !PLINKO[rows][risk]) return bad(id, `plinko board ${String(b.rows).slice(0, 8)}/${risk.slice(0, 8)}`, 'Pick 8, 12 or 16 rows and a risk.');
     if (!betOk(id, bet, 10000)) return bad(id, `plinko bet ${String(b.bet).slice(0, 20)}`, `Each ball takes $0.10 to $${vip(id) ? '500' : '100'}.`);
     if (!A.debit(id, bet, 'plinko', 'Plinko ball')) return { code: 409, body: { error: 'Not enough in your bankroll.' } };
-    const path = []; let k = 0;
-    for (let i = 0; i < rows; i++) { const r = rnd(2); path.push(r); k += r; }
+    const drop = luck.pick(id, () => { const path = []; let k = 0; for (let i = 0; i < rows; i++) { const r = rnd(2); path.push(r); k += r; } return { path, k }; }, o => Math.round(bet * PLINKO[rows][risk][o.k]) - bet);
+    const path = drop.path, k = drop.k;
     const mult = PLINKO[rows][risk][k];
     const paid = Math.round(bet * mult);
     if (paid > 0) A.credit(id, paid, 'plinko', `Plinko ${mult}×`);
@@ -86,6 +87,10 @@ module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLO
       const i = Math.round(Number(b.i));
       if (!(i >= 0 && i < 25)) return bad(id, `mines tile ${String(b.i).slice(0, 8)}`, 'That tile is not on the board.');
       if (G.open.includes(i)) return ok(id, minesView(G, false), 'mines');
+      // luck: quietly move a mine away from (or onto) the chosen tile
+      const st = luck.steer(id);
+      if (st > 0 && G.mines.includes(i)) { const free = [...Array(25).keys()].filter(t => t !== i && !G.open.includes(t) && !G.mines.includes(t)); if (free.length) { G.mines = G.mines.filter(t => t !== i).concat(free[rnd(free.length)]).sort((x, y) => x - y); } }
+      else if (st < 0 && !G.mines.includes(i)) { const j = G.mines[rnd(G.mines.length)]; G.mines = G.mines.filter(t => t !== j).concat(i).sort((x, y) => x - y); }
       if (G.mines.includes(i)) { G.boom = i; minesEnd(id, G, 0); A.touch(id); return ok(id, Object.assign(minesView(G, true), { hit: true }), 'mines'); }
       G.open.push(i); A.touch(id);
       const win = Math.round(G.bet * minesMult(G.m, G.open.length));
@@ -108,7 +113,7 @@ module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLO
     const buy = !!b.buy;
     const cost = buy ? bet * CE.BUY_PRICE : bet;
     if (!A.debit(id, cost, 'slots2', buy ? 'Cosmic Cascade bonus buy' : 'Cosmic Cascade spin')) return { code: 409, body: { error: 'Not enough in your bankroll.' } };
-    const plan = CE.play(rng, buy);
+    const plan = luck.pick(id, () => CE.play(rng, buy), p => Math.round(p.total * bet) - cost);
     const payout = Math.round(plan.total * bet);
     if (payout > 0) A.credit(id, payout, 'slots2', 'Cosmic Cascade win');
     const jackpot = P && !A.inTour(rec, 'slots2') ? P.jackpotSpin(id, cost, 'slots2', rng) : 0;
@@ -147,7 +152,9 @@ module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLO
     if (!G || !G.live) return { code: 409, body: { error: 'Start a crossing first.', live: false } };
     if (act === 'go') {
       // the server decides each lane at the moment the chicken steps into it
-      const hit = rnd(1000000) < ROAD[G.diff].q[G.step] * 1000000;
+      let hit = rnd(1000000) < ROAD[G.diff].q[G.step] * 1000000;
+      const st = luck.steer(id);
+      if (st > 0) hit = false; else if (st < 0) hit = true;
       if (hit) { G.dead = true; G.step++; roadEnd(id, G, 0); A.touch(id); return ok(id, Object.assign(roadView(G), { hit: true }), 'chicken'); }
       G.step++; A.touch(id);
       const win = Math.round(G.bet * roadMult(G.diff, G.step));

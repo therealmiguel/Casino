@@ -133,7 +133,7 @@ function mergeMeta(m) {
   META.security = Array.isArray(m.security) ? m.security : [];
   META.audit = Array.isArray(m.audit) ? m.audit : [];
   for (const [g, h] of Object.entries(m.house || {})) Object.assign(A.houseFor(g), h);
-  for (const k of ['jackpot', 'events', 'season', 'hall', 'tour', 'tourHistory', 'tourPrizes']) if (m[k] !== undefined && m[k] !== null) META[k] = m[k];
+  for (const k of ['jackpot', 'events', 'season', 'hall', 'tour', 'tourHistory', 'tourPrizes', 'rig']) if (m[k] !== undefined && m[k] !== null) META[k] = m[k];
 }
 let flushing = false, lastMeta = 0;
 async function flush(force) {
@@ -176,7 +176,12 @@ function announce(text) {
 }
 const P = require('./progress')(A, { meta: META, save: saveMeta, announce, flag: (id, kind, detail, ip) => flag(id, kind, detail, ip), beforeSeasonReset: () => live.kickAll() });
 A.setProgress(P);
-const games = require('./games')(A, { flag: (id, kind, detail) => flag(id, kind, detail), isClosed: () => META.settings.closed, P });
+// secret luck control for the admin room (see luck.js); never shown to players
+const LUCK = require('./luck')(A);
+const SOLO_GAMES = new Set(['slots', 'slots2', 'roulette', 'blackjack', 'craps', 'plinko', 'mines', 'chicken']);
+// the next result of a live table, set in the admin room; used once
+function takeRig(game) { const R = META.rig || {}; if (R[game] === undefined || R[game] === null) return null; const v = R[game]; delete R[game]; saveMeta(); return v; }
+const games = require('./games')(A, { flag: (id, kind, detail) => flag(id, kind, detail), isClosed: () => META.settings.closed, P, L: LUCK });
 const vipOf = pid => { const r = A.get(pid); return !!(r && P.vipOf(r)); };
 let live2 = null;
 const live1 = require('./live')({
@@ -186,16 +191,18 @@ const live1 = require('./live')({
   isClosed: () => META.settings.closed,
   vip: vipOf,
   extraRisk: () => (live2 ? live2.atRisk() : {}),
+  takeRig,
 });
 live2 = require('./live2')({
   A, cleanName: A.cleanName, flag, vip: vipOf,
   auth: (id, token, ip) => authPlayer(id, token, ip),
   isClosed: () => META.settings.closed,
   persist: () => live1.persist(),
+  takeRig,
   onFeed: items => { const msg = `event: feed\ndata: ${JSON.stringify(items)}\n\n`; for (const res of streams) res.write(msg); },
 });
 // every finished round also goes to the live tables' round recaps
-{ const round = A.round; A.round = (id, game, e) => { const r = round(id, game, e); try { live2.collect(game, id, e || {}); } catch (x) {} return r; }; }
+{ const round = A.round; A.round = (id, game, e) => { const r = round(id, game, e); try { live2.collect(game, id, e || {}); } catch (x) {} try { if (SOLO_GAMES.has(game)) LUCK.after(id); } catch (x) {} return r; }; }
 // one face for every live table: blackjack, roulette and Hold'em (live.js); Crash, baccarat and chat (live2.js)
 const LIVE2_GAMES = ['cr', 'bc', 'dc'];
 const live = Object.assign({}, live1, {
@@ -369,7 +376,7 @@ async function adminApi(req, res, sub, ip) {
       players: A.players.size, named, banned, online, money, house: A.house, live: live.summary(), settings: META.settings,
       security: META.security.slice(-80).reverse(), audit: META.audit.slice(-40).reverse(), bigWins: bigWins.slice(0, 12),
       startedAt: STARTED, storage: USE_REDIS ? 'upstash' : 'file',
-      chat: live2.chatRecent(),
+      chat: live2.chatRecent(), rig: META.rig || {},
       jackpot: P.jackpot(), events: META.events, season: META.season, hall: META.hall.slice(0, 6), tour: { ...META.tour, prizes: META.tourPrizes, board: P.tourBoard().slice(0, 10), history: META.tourHistory.slice(0, 5) },
     });
   }
@@ -378,7 +385,7 @@ async function adminApi(req, res, sub, ip) {
     for (const [id, r] of A.players) rows.push({
       id, name: r.name, bal: r.bal, cash: A.cash(id), peak: r.peak, resets: r.resets, rounds: r.st.rounds, wagered: r.st.wagered, paid: r.st.paid,
       bigWin: r.st.bigWin, joined: r.joined, seen: Math.max(r.seen || 0, r.lastPlay || 0), lastGame: r.lastGame || '', ip: r.ip, banned: r.banned, hidden: !!r.hidden,
-      flagged: r.flagged || '', alerts: r.alerts || 0, imported: r.imported, online: recent(r) || onlineMap.has(id), where: live.where(id),
+      flagged: r.flagged || '', alerts: r.alerts || 0, imported: r.imported, luck: r.luck ? (r.luck.force && r.luck.force.n > 0 ? (r.luck.force.result === 'win' ? 'win' : 'lose') : r.luck.mode || '') : '', online: recent(r) || onlineMap.has(id), where: live.where(id),
     });
     return send(res, 200, rows);
   }
@@ -388,7 +395,7 @@ async function adminApi(req, res, sub, ip) {
     if (!r) return send(res, 404, { error: 'No such player.' });
     const o = Object.assign({}, r); delete o.tokenHash; delete o.games;
     o.id = id; o.cash = A.cash(id); o.craps = r.games.craps || null; o.where = live.where(id);
-    o.level = P.levelOf((r.life || {}).xp || 0); o.xp = Math.floor((r.life || {}).xp || 0); o.badges = Object.keys((r.life || {}).ach || {}).length; delete o.life; delete o.hist; delete o.pop;
+    o.luckText = LUCK.describe(r.luck); o.level = P.levelOf((r.life || {}).xp || 0); o.xp = Math.floor((r.life || {}).xp || 0); o.badges = Object.keys((r.life || {}).ach || {}).length; delete o.life; delete o.hist; delete o.pop;
     o.security = META.security.filter(e => e.id === id).slice(-40).reverse();
     o.sameIp = r.ip ? [...A.players].filter(([pid, x]) => pid !== id && x.ip === r.ip).map(([pid, x]) => ({ id: pid, name: x.name || '(no name)' })).slice(0, 20) : [];
     return send(res, 200, o);
@@ -419,6 +426,21 @@ async function adminApi(req, res, sub, ip) {
       case 'ban': r.banned = { t: Date.now(), reason: A.cleanName(b.reason || '').slice(0, 80) || 'Suspended' }; live.kick(id); A.touch(id); audit('ban', `${who}: ${r.banned.reason}`, ip); break;
       case 'unban': r.banned = null; A.touch(id); audit('unban', who, ip); break;
       case 'mute': { const min = Math.min(10080, Math.max(1, Math.round(Number(b.minutes) || 30))); r.muted = Date.now() + min * 60000; A.touch(id); audit('mute', `${who}: muted in chat for ${min >= 60 ? Math.round(min / 60) + ' h' : min + ' min'}`, ip); break; }
+      case 'luck': {
+        const mode = ['lucky', 'unlucky'].includes(b.mode) ? b.mode : null;
+        if (!mode) { if (r.luck) r.luck.mode = null; if (!r.luck || !r.luck.force) r.luck = null; A.touch(id); audit('luck', `${who}: luck back to normal`, ip); break; }
+        const power = [1, 2, 3].includes(Number(b.power)) ? Number(b.power) : 1;
+        const hours = Number(b.hours) || 0, rounds = Math.round(Number(b.rounds) || 0);
+        r.luck = Object.assign(r.luck || {}, { mode, power, until: hours > 0 ? Date.now() + Math.min(720, hours) * 3600000 : 0, rounds: rounds > 0 ? Math.min(10000, rounds) : 0 });
+        A.touch(id); audit('luck', `${who}: ${LUCK.describe(r.luck)}`, ip); break;
+      }
+      case 'force': {
+        const n = Math.round(Number(b.n));
+        if (!['win', 'lose'].includes(b.result) || !(n >= 1 && n <= 100)) return send(res, 400, { error: 'Pick win or lose and 1 to 100 rounds.' });
+        r.luck = Object.assign(r.luck || {}, { force: { result: b.result, n } });
+        A.touch(id); audit('luck', `${who}: ${LUCK.describe(r.luck)}`, ip); break;
+      }
+      case 'luckoff': r.luck = null; A.touch(id); audit('luck', `${who}: luck back to normal`, ip); break;
       case 'unmute': r.muted = 0; A.touch(id); audit('mute', `${who}: can chat again`, ip); break;
       case 'hide': r.hidden = !r.hidden; A.touch(id); audit('board', `${who}: ${r.hidden ? 'hidden from' : 'back on'} the leaderboard`, ip); break;
       case 'kick': audit('kick', `${who}: removed from ${live.kick(id)} live table(s)`, ip); break;
@@ -510,6 +532,19 @@ async function adminApi(req, res, sub, ip) {
     if (!(pool >= 0 && pool <= 1e10) || !(seed >= 0 && seed <= 1e10)) return send(res, 400, { error: 'Pick amounts.' });
     P.jackpot().pool = pool; P.jackpot().seed = seed; saveMeta(); audit('jackpot', `Pool ${A.usd(pool)}, restarts at ${A.usd(seed)}`, ip);
     return send(res, 200, { ok: true });
+  }
+  if (sub === '/api/rig') {
+    const g = String(b.game || ''), v = b.value;
+    META.rig = META.rig || {};
+    if (v === null || v === '' || v === undefined) { delete META.rig[g]; saveMeta(); audit('rig', `Rig cleared for ${g}`, ip); return send(res, 200, { ok: true, rig: META.rig }); }
+    let ok = false, val = v;
+    if (g === 'cr') { val = Math.floor(Number(v) * 100) / 100; ok = val >= 1 && val <= 1000; }
+    else if (g === 'rl') { val = Math.round(Number(v)); ok = val >= 0 && val <= 36; }
+    else if (g === 'dc') { val = Math.round(Number(v)); ok = val >= 2 && val <= 12; }
+    else if (g === 'bc') { ok = ['player', 'banker', 'tie'].includes(v); }
+    if (!ok) return send(res, 400, { error: 'That result is not possible.' });
+    META.rig[g] = val; saveMeta(); audit('rig', `Next ${({ cr: 'Crash point', rl: 'roulette number', dc: 'Dice City total', bc: 'baccarat winner' })[g]} set to ${val}`, ip);
+    return send(res, 200, { ok: true, rig: META.rig });
   }
   if (sub === '/api/chatclear') { const room = String(b.room || 'all'); live2.chatClear(room); audit('chat', room === 'all' ? 'All table chats cleared' : `Chat cleared at ${room}`, ip); return send(res, 200, { ok: true }); }
   if (sub === '/api/chatdel') { live2.chatDelete(Number(b.msg)); audit('chat', 'Chat message removed', ip); return send(res, 200, { ok: true }); }

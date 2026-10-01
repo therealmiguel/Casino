@@ -210,6 +210,23 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
             <div class="switch"><div><b>Lock new players out</b><span>Only people who already have a seat can play.</span></div><button class="btn" id="swLocked"></button></div>
           </div>
           <div class="card">
+            <h2>Rig the next live round <small class="dim" style="font-size:12px">secret</small></h2>
+            <p class="help">Pick what the next round at a live table will be, for everyone at it. It's used once, then the table goes back to random. Blackjack and Hold'em can't be rigged per round (blackjack's shoe is shared and poker is player against player).</p>
+            <div class="row" style="flex-wrap:wrap;gap:8px">
+              <span style="min-width:140px">🚀 Crash crashes at</span><input type="number" id="rgCr" min="1" max="1000" step="0.01" placeholder="e.g. 1.00 or 50" style="max-width:150px" aria-label="Crash point"><button class="btn small" data-rig="cr">Set</button>
+            </div>
+            <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:8px">
+              <span style="min-width:140px">⚡ Roulette lands on</span><input type="number" id="rgRl" min="0" max="36" placeholder="0–36" style="max-width:150px" aria-label="Roulette number"><button class="btn small" data-rig="rl">Set</button>
+            </div>
+            <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:8px">
+              <span style="min-width:140px">🏙️ Dice City rolls</span><input type="number" id="rgDc" min="2" max="12" placeholder="2–12" style="max-width:150px" aria-label="Dice total"><button class="btn small" data-rig="dc">Set</button>
+            </div>
+            <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:8px">
+              <span style="min-width:140px">🎴 Baccarat winner</span><select id="rgBc" style="max-width:150px" aria-label="Baccarat winner"><option value="player">Player</option><option value="banker">Banker</option><option value="tie">Tie</option></select><button class="btn small" data-rig="bc">Set</button>
+            </div>
+            <p class="help" id="rigNow" style="margin-top:10px"></p>
+          </div>
+          <div class="card">
             <h2>Table chat</h2>
             <p class="help">The latest messages from every live table. Swear words are starred out automatically; messages that are still rude aren't sent and show up in the security log. Mute someone from their profile.</p>
             <ul class="log" id="chatList" style="max-height:260px;overflow:auto"></ul>
@@ -369,6 +386,7 @@ function tags(p) {
   if (p.banned) t.push('<span class="chip bad">Suspended</span>');
   if (p.hidden) t.push('<span class="chip plain">Hidden from board</span>');
   if (p.flagged) t.push('<span class="chip warn">Reset at upgrade</span>');
+  if (p.luck) t.push(`<span class="chip ${p.luck === 'lucky' || p.luck === 'win' ? 'good' : 'bad'}" title="Only you can see this">${({ lucky: '🍀 Lucky', unlucky: '💀 Unlucky', win: '🍀 Forced wins', lose: '💀 Forced losses' })[p.luck]}</span>`);
   if (p.where && p.where.length) t.push(`<span class="chip info">${esc(p.where.join(', '))}</span>`);
   return t.join('');
 }
@@ -407,6 +425,17 @@ function drawPlayer() {
       <div><span>Level</span><b>${p.level}</b></div><div><span>XP</span><b>${(p.xp || 0).toLocaleString()}</b></div><div><span>Badges</span><b>${p.badges || 0}</b></div></div>
     <p class="help" style="margin-top:8px"><a href="/profile.html?id=${encodeURIComponent(p.id)}" target="_blank" rel="noopener">Open their public profile →</a></p>
     ${p.craps && p.craps.bets && Object.keys(p.craps.bets).length ? `<p class="help" style="margin-top:8px">${usd(Object.values(p.craps.bets).reduce((a, b) => a + b, 0))} riding on their craps table${p.craps.point ? ` (point ${p.craps.point})` : ''}.</p>` : ''}
+    <h3>Luck <small class="dim">secret, only you can see this</small></h3>
+    <p class="help">${p.luckText ? `Right now: <b>${esc(p.luckText)}</b>.` : 'Normal luck: every game plays fair for them.'} Works on all solo games (slots, roulette, blackjack, craps, Plinko, Mines, Cluck Crossing). Each game re-rolls results that go against their luck, so it still looks natural.</p>
+    <div class="acts">
+      <div class="act"><b>Make them</b><div class="row" style="flex-wrap:wrap">
+        <select id="lMode" aria-label="Luck" style="max-width:130px"><option value="lucky">🍀 Lucky</option><option value="unlucky">💀 Unlucky</option></select>
+        <select id="lPower" aria-label="How much" style="max-width:150px"><option value="1">a bit</option><option value="2" selected>very</option><option value="3">always</option></select>
+        <select id="lFor" aria-label="For how long" style="max-width:170px"><option value="0">until I stop it</option><option value="r10">for 10 rounds</option><option value="r50">for 50 rounds</option><option value="h1">for 1 hour</option><option value="h24">for 1 day</option></select>
+        <button class="btn small gold" data-op="luck">Set</button></div></div>
+      <div class="act"><b>Force the next rounds</b><div class="row"><input type="number" id="fN" min="1" max="100" value="3" style="max-width:80px" aria-label="Rounds"><button class="btn small" data-op="forceWin">🍀 Win</button><button class="btn small" data-op="forceLose">💀 Lose</button></div></div>
+    </div>
+    <div class="row" style="margin-top:8px"><button class="btn small" data-op="luckoff" ${p.luck ? '' : 'disabled'}>Back to normal luck</button></div>
     <h3>Manage</h3>
     <div class="acts">
       <div class="act"><b>Set bankroll</b><div class="row"><input type="number" id="aSet" min="0" step="0.01" placeholder="$" aria-label="New bankroll in dollars"><button class="btn small gold" data-op="setBalance">Set</button></div></div>
@@ -436,6 +465,8 @@ $('drawer').addEventListener('click', async e => {
   if (op === 'adjust') { body.cents = dollars('aAdj'); if (!Number.isFinite(body.cents) || !body.cents) return toast('Type an amount first'); }
   if (op === 'rename') body.name = $('aName').value;
   if (op === 'mute') body.minutes = +$('aMute').value;
+  if (op === 'luck') { body.mode = $('lMode').value; body.power = +$('lPower').value; const f = $('lFor').value; if (f[0] === 'r') body.rounds = +f.slice(1); if (f[0] === 'h') body.hours = +f.slice(1); }
+  if (op === 'forceWin' || op === 'forceLose') { body.result = op === 'forceWin' ? 'win' : 'lose'; body.n = +$('fN').value; body.op = 'force'; }
   if (op === 'ban') { body.reason = $('aWhy').value || 'Cheating'; if (!confirm(`Suspend ${current.name || 'this player'}? They can't play until you lift it.`)) return; }
   if (op === 'delete') { const n = prompt(`Delete ${current.name || 'this player'} for good? Their bankroll and history are gone and they start over as a new player.\n\nType DELETE to confirm.`); if (n !== 'DELETE') return; }
   try {
@@ -457,6 +488,9 @@ function renderControls() {
   if (T.prizes && !$('tp1').value) { $('tp1').value = T.prizes[0] / 100; $('tp2').value = T.prizes[1] / 100; $('tp3').value = T.prizes[2] / 100; }
   const ROOMS = { bj: 'Blackjack', rl: 'Roulette', pk: 'Hold\u2019em', cr: 'Crash', bc: 'Baccarat', dc: 'Dice City' };
   $('chatList').innerHTML = (OV.chat || []).map(m => `<li><span class="dim">${ago(m.t)} · ${ROOMS[m.room] || m.room}</span> <b>${esc(m.name)}</b>: ${esc(m.text)} <button class="btn small" data-chatdel="${m.id}" style="float:right;height:24px;padding:0 8px">Remove</button></li>`).join('') || '<li class="dim">No messages yet.</li>';
+  const RG = OV.rig || {}, RGN = { cr: v => `Crash at ${v}×`, rl: v => `roulette ${v}`, dc: v => `Dice City ${v}`, bc: v => `baccarat ${v}` };
+  const rigs = Object.entries(RG).filter(([k, v]) => v !== null && v !== undefined && RGN[k]);
+  $('rigNow').innerHTML = rigs.length ? 'Waiting for the next round: ' + rigs.map(([k, v]) => `<b>${esc(RGN[k](v))}</b> <a href="#" data-unrig="${k}">cancel</a>`).join(' · ') : 'Nothing rigged. Every live table is random.';
   const J = OV.jackpot || {};
   $('jpNow').textContent = `The pot is ${usd(Math.round(J.pool || 0))} and restarts at ${usd(J.seed || 0)} after a win.${J.last ? ` Last won by ${J.last.name}: ${usd(J.last.amount)} (${ago(J.last.t)}).` : ''}`;
   $('swClosed').textContent = st.closed ? 'Open the casino' : 'Close the casino'; $('swClosed').className = 'btn ' + (st.closed ? 'gold' : 'bad');
@@ -477,6 +511,8 @@ $('gSend').onclick = async () => {
   try { const r = await api('gift', { cents: c, to: $('gTo').value, note: $('gNote').value }); toast(`Sent to ${r.count} player${r.count === 1 ? '' : 's'}`); $('gAmt').value = ''; load(); } catch (x) { toast(x.message); }
 };
 const post = async (path, body, msg) => { try { await api(path, body); toast(msg); load(); } catch (x) { toast(x.message); } };
+document.querySelectorAll('[data-rig]').forEach(b => b.onclick = () => { const g = b.dataset.rig, v = { cr: $('rgCr').value, rl: $('rgRl').value, dc: $('rgDc').value, bc: $('rgBc').value }[g]; if (v === '') return toast('Type a result first'); post('rig', { game: g, value: g === 'bc' ? v : +v }, 'Rigged for the next round'); });
+$('rigNow').addEventListener('click', e => { const a = e.target.closest('[data-unrig]'); if (a) { e.preventDefault(); post('rig', { game: a.dataset.unrig, value: null }, 'Rig cancelled'); } });
 $('chatClear').onclick = () => { if (confirm('Clear the chat at every live table?')) post('chatclear', { room: 'all' }, 'Chat cleared'); };
 $('chatList').addEventListener('click', e => { const b = e.target.closest('[data-chatdel]'); if (b) post('chatdel', { msg: +b.dataset.chatdel }, 'Message removed'); });
 $('hhGo').onclick = () => post('event', { boost: { game: $('hhGame').value, mult: +$('hhMult').value, hours: +$('hhHours').value } }, 'Happy hour started');

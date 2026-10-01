@@ -8,7 +8,7 @@ const F = Number(process.env.LIVE_TIME_SCALE) || 1;   // for automated tests onl
 const RR = require('./roulette_rules');
 const { createPoker } = require('./poker');
 
-module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, flag, vip, extraRisk }) {
+module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, flag, vip, extraRisk, takeRig }) {
   const maxFor = pid => (vip && vip(pid) ? 500000 : 100000);
   /* ---------------- connections & notices ---------------- */
   const conns = new Set();                 // { res, game, pid, name }
@@ -370,7 +370,8 @@ module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, 
     }
     RL.roundId++;
     RL.strikes = RR.genStrikes(rnd);
-    RL.n = rnd(37);
+    const rig = takeRig ? takeRig('rl') : null;
+    RL.n = Number.isInteger(rig) && rig >= 0 && rig <= 36 ? rig : rnd(37);
     RL.phase = 'spinning'; RL.spinStart = Date.now();
     const ms = (350 + RL.strikes.length * 650 + 400 + 5800 + 1500) * F;
     RL.deadline = RL.spinStart + ms;

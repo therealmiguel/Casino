@@ -6,7 +6,8 @@ const rnd = n => crypto.randomInt(n);
 const F = Number(process.env.LIVE_TIME_SCALE) || 1;   // for automated tests only
 const WF = require('./wordfilter');
 
-module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip, persist, onFeed }) {
+module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip, persist, onFeed, takeRig }) {
+  const rigOf = k => (takeRig ? takeRig(k) : null);
   const maxFor = pid => (vip && vip(pid) ? 500000 : 100000);
   const bal = pid => { const r = A.get(pid); return r ? r.bal : 0; };
   const nameOf = (pid, fallback) => cleanName(fallback) || (A.get(pid) || {}).name || 'Player';
@@ -45,7 +46,8 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
   function crLaunch() {
     if (!CR.bets.size) { if (present('cr')) crBetting(); else { CR.phase = 'idle'; CR.deadline = 0; changed('cr'); } return; }
     CR.round++;
-    CR.bust = bustPoint();
+    const rig = rigOf('cr');
+    CR.bust = rig >= 1 ? Math.min(CR_MAX, Math.floor(rig * 100) / 100) : bustPoint();
     CR.phase = 'running'; CR.start = Date.now() + 600 * F;     // a short "3, 2, 1" before lift-off
     CR.deadline = CR.start + timeFor(CR.bust);
     crTimer(CR.deadline - Date.now(), crBust);
@@ -170,7 +172,20 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
     if (![...BC.bets.values()].some(b => b.total > 0)) { if (present('bc')) bcBetting(); else { BC.phase = 'idle'; BC.deadline = 0; changed('bc'); } return; }
     if (BC.shoe.length < 20) newShoe(); else BC.shuffled = false;
     BC.round++;
-    BC.hand = playHand();
+    const want = rigOf('bc');
+    if (want === 'player' || want === 'banker' || want === 'tie') {
+      // deal from a copy of the shoe until the wanted side wins; the cards used are the ones dealt
+      let h = null;
+      for (let i = 0; i < 600; i++) {
+        const keep = BC.shoe.slice();
+        for (let k = keep.length - 1, m = Math.max(0, keep.length - 12); k > m; k--) { const j = m + rnd(k - m + 1); [keep[k], keep[j]] = [keep[j], keep[k]]; }
+        BC.shoe = keep; const save = keep.slice();
+        h = playHand();
+        if (h.win === want) break;
+        BC.shoe = save;
+      }
+      BC.hand = h;
+    } else BC.hand = playHand();
     BC.phase = 'dealing'; BC.dealStart = Date.now();
     const ms = 4 * BC_CARD_MS + (BC.hand.order.length - 4) * BC_THIRD_MS + 1200 * F;
     BC.deadline = BC.dealStart + ms;
@@ -268,7 +283,9 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
     DC_NUMS.forEach(n => { mb[n] = 1; sb[n] = 1; });
     const k = wpick(DC_NB);
     for (let i = 0; i < k; i++) { const n = DC_NUMS[rnd(11)], m = wpick(DC_MB), x = wpick(DC_SB); mb[n] *= m; sb[n] *= x; builds.push({ n, m, s: x }); }
-    const d = [1 + rnd(6), 1 + rnd(6)];
+    const want = rigOf('dc');
+    let d = [1 + rnd(6), 1 + rnd(6)];
+    if (Number.isInteger(want) && want >= 2 && want <= 12) { const pairs = []; for (let a = 1; a <= 6; a++) { const b = want - a; if (b >= 1 && b <= 6) pairs.push([a, b]); } d = pairs[rnd(pairs.length)]; }
     const start = Date.now();
     const rollAt = start + k * DC_BUILD_MS + 500 * F, landAt = rollAt + DC_ROLL_MS, doneAt = landAt + DC_DRIVE_MS;
     DC.R = { builds, mb, sb, dice: d, sum: d[0] + d[1], start, rollAt, landAt, doneAt };
