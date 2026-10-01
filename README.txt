@@ -94,6 +94,7 @@ STEP 4: THE ADMIN ROOM (only for you)
     - post an announcement banner, gift chips to everyone, close the casino
       for a moment, lock out new players, and download a backup
     - read the table chat, remove messages, clear it, and mute a player
+    - start the Casino Wheel: everyone online gets one free spin (up to $100,000)
     - start a happy hour (wins boosted x1.5, x2 or x3 on one game or all),
       double XP, or give everyone free spins
     - set the weekly tournament prizes, end the tournament or the season early,

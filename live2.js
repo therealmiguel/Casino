@@ -501,5 +501,5 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
   }
   const allPids = () => new Set([...CR.bets.keys(), ...BC.bets.keys(), ...DC.bets.keys()]);
   function onlineNow(m) { for (const c of conns) { if (!m.has(c.pid)) m.set(c.pid, []); m.get(c.pid).push(c.game); } return m; }
-  return { collect, feed: () => feed.slice(0, 20), stream, action, chatStream, chatPost, chatClear, chatRecent, chatDelete, summary, where, kick, allPids, onlineNow, atRisk, REACTS, _test: { CR, BC, DC, dcMult, dcSettle, dcPlay, DC_MAIN, DC_SIDE, playHand, score, bustPoint, multAt, crBust, bcSettle, newShoe } };
+  return { collect, feed: () => feed.slice(0, 20), pushFeed: items => { feed.unshift(...items); feed.splice(30); if (onFeed) onFeed(items); }, stream, action, chatStream, chatPost, chatClear, chatRecent, chatDelete, summary, where, kick, allPids, onlineNow, atRisk, REACTS, _test: { CR, BC, DC, dcMult, dcSettle, dcPlay, DC_MAIN, DC_SIDE, playHand, score, bustPoint, multAt, crBust, bcSettle, newShoe } };
 };

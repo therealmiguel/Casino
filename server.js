@@ -133,7 +133,7 @@ function mergeMeta(m) {
   META.security = Array.isArray(m.security) ? m.security : [];
   META.audit = Array.isArray(m.audit) ? m.audit : [];
   for (const [g, h] of Object.entries(m.house || {})) Object.assign(A.houseFor(g), h);
-  for (const k of ['jackpot', 'events', 'season', 'hall', 'tour', 'tourHistory', 'tourPrizes', 'rig']) if (m[k] !== undefined && m[k] !== null) META[k] = m[k];
+  for (const k of ['jackpot', 'events', 'season', 'hall', 'tour', 'tourHistory', 'tourPrizes', 'rig', 'wheel']) if (m[k] !== undefined && m[k] !== null) META[k] = m[k];
 }
 let flushing = false, lastMeta = 0;
 async function flush(force) {
@@ -273,7 +273,44 @@ function meBody(id, ctx) {
   return Object.assign(A.me(id, ctx), { notice: noticeNow(), closed: !!META.settings.closed, craps: (A.get(id).games.craps || null), jackpot: Math.round(P.jackpot().pool) });
 }
 // achievements, level ups and gifts ride along with any answer to the player
-function withPop(id, body) { const p = A.takePop(id); if (p && body && typeof body === 'object') body.pop = p; return body; }
+function withPop(id, body) { const p = A.takePop(id); if (p && body && typeof body === 'object') body.pop = p; const w = wheelFor(id); if (w && body && typeof body === 'object') body.wheel = w; return body; }
+
+/* ---------------- the Casino Wheel: an admin starts it, every player gets one free spin ---------------- */
+// 16 segments; the top prize sits on one of them and its chance is set by the admin
+const WHEEL_SEGS = [10000000, 10000, 25000, 50000, 10000, 100000, 25000, 250000, 10000, 50000, 500000, 25000, 100000, 50000, 1000000, 10000];
+const WHEEL_W = { 10000: 0.35, 25000: 0.25, 50000: 0.18, 100000: 0.12, 250000: 0.06, 500000: 0.03, 1000000: 0.01 };
+const wheelLive = () => { const W = META.wheel; return W && W.until > Date.now() && !W.ended ? W : null; };
+function wheelFor(id) {
+  const W = wheelLive(); const r = A.get(id);
+  if (!W || !r || r.banned || !r.name || (W.spun && W.spun[id])) return null;
+  return { id: W.id, until: W.until, segs: WHEEL_SEGS, top: WHEEL_SEGS[0], chance: W.chance };
+}
+function wheelPrize(W) {
+  if (Math.random() < W.chance) return 0;            // index of the top prize
+  const counts = {}; WHEEL_SEGS.forEach(v => { counts[v] = (counts[v] || 0) + 1; });
+  let r = Math.random() * Object.values(WHEEL_W).reduce((a, b) => a + b, 0);
+  for (const [v, w] of Object.entries(WHEEL_W)) {
+    r -= w;
+    if (r < 0) { const idx = WHEEL_SEGS.map((x, i) => (x === +v ? i : -1)).filter(i => i > 0); return idx[Math.floor(Math.random() * idx.length)]; }
+  }
+  return 1;
+}
+function wheelSpin(id, ip) {
+  const W = wheelLive(); const r = A.get(id);
+  if (!W) return { code: 409, body: { error: 'The wheel has stopped.' } };
+  if (!r.name) return { code: 409, body: { error: 'Pick a name in the lobby first.' } };
+  W.spun = W.spun || {};
+  if (W.spun[id]) return { code: 409, body: { error: 'You already spun this wheel.', seg: W.spun[id].seg, prize: W.spun[id].prize } };
+  // secret luck from the admin room counts here too
+  const seg = LUCK.pick(id, () => wheelPrize(W), i => WHEEL_SEGS[i] - 50000);
+  const prize = WHEEL_SEGS[seg];
+  W.spun[id] = { seg, prize, t: Date.now(), name: r.name };
+  r.bal += prize; A.logTx(r, 'event', prize, 'Casino Wheel prize'); r.peak = Math.max(r.peak, A.cash(id)); A.touch(id);
+  saveMeta(); boardChanged();
+  if (prize >= 250000) live2.pushFeed([{ t: Date.now(), room: 'wh', game: 'Casino Wheel', name: r.name, net: prize, x: 0, staked: 0 }]);
+  if (seg === 0) announce(`🎡 ${r.name} just won ${A.usd(prize)} on the Casino Wheel!`);
+  return { code: 200, body: { ok: true, seg, prize, cents: A.get(id).bal } };
+}
 async function playerApi(req, res, p, ip) {
   if (!ready) return send(res, 503, { error: 'The casino is opening. Try again in a few seconds.' });
   if (p === '/api/players' && req.method === 'GET') return send(res, 200, A.publicList());
@@ -317,6 +354,10 @@ async function playerApi(req, res, p, ip) {
   if (p === '/api/daily') return reply(P.claimDaily(id));
   if (p === '/api/challenge') return reply(P.claimChallenge(id, b.i));
   if (p === '/api/tour') return reply(P.tourAction(id, b));
+  if (p === '/api/wheel') {
+    if (b.action === 'spin') { const r = wheelSpin(id, ip); return send(res, r.code, withPop(id, r.body)); }
+    return send(res, 200, withPop(id, { cents: A.get(id).bal }));
+  }
   if (p === '/api/tip') { const r = P.tip(id, b.to, b.cents, b.note); return reply(r); }
   let m;
   if ((m = p.match(/^\/api\/g\/(slots|slots2|roulette|blackjack|craps|plinko|mines|chicken)$/))) {
@@ -377,6 +418,7 @@ async function adminApi(req, res, sub, ip) {
       security: META.security.slice(-80).reverse(), audit: META.audit.slice(-40).reverse(), bigWins: bigWins.slice(0, 12),
       startedAt: STARTED, storage: USE_REDIS ? 'upstash' : 'file',
       chat: live2.chatRecent(), rig: META.rig || {},
+      wheel: META.wheel ? { live: !!wheelLive(), until: META.wheel.until, chance: META.wheel.chance, start: META.wheel.start, spins: Object.values(META.wheel.spun || {}).sort((a, b) => b.t - a.t).slice(0, 60), paid: Object.values(META.wheel.spun || {}).reduce((a, s) => a + s.prize, 0) } : null,
       jackpot: P.jackpot(), events: META.events, season: META.season, hall: META.hall.slice(0, 6), tour: { ...META.tour, prizes: META.tourPrizes, board: P.tourBoard().slice(0, 10), history: META.tourHistory.slice(0, 5) },
     });
   }
@@ -531,6 +573,17 @@ async function adminApi(req, res, sub, ip) {
     const pool = Math.round(Number(b.pool)), seed = Math.round(Number(b.seed));
     if (!(pool >= 0 && pool <= 1e10) || !(seed >= 0 && seed <= 1e10)) return send(res, 400, { error: 'Pick amounts.' });
     P.jackpot().pool = pool; P.jackpot().seed = seed; saveMeta(); audit('jackpot', `Pool ${A.usd(pool)}, restarts at ${A.usd(seed)}`, ip);
+    return send(res, 200, { ok: true });
+  }
+  if (sub === '/api/wheel') {
+    if (b.action === 'end') { if (META.wheel) META.wheel.ended = true; saveMeta(); audit('wheel', 'Casino Wheel stopped', ip); return send(res, 200, { ok: true }); }
+    const minutes = Math.min(120, Math.max(1, Math.round(Number(b.minutes) || 10)));
+    const chance = [0.001, 0.01, 0.02, 0.05, 0.1, 0.25, 1].includes(Number(b.chance)) ? Number(b.chance) : 0.01;
+    META.wheel = { id: 'w' + Date.now().toString(36), start: Date.now(), until: Date.now() + minutes * 60000, chance, spun: {} };
+    saveMeta();
+    announce(`🎡 The Casino Wheel is spinning! Everyone online gets one free spin with a shot at ${A.usd(WHEEL_SEGS[0])}.`);
+    const msg = `event: wheel\ndata: ${JSON.stringify({ id: META.wheel.id })}\n\n`; for (const res2 of streams) res2.write(msg);
+    audit('wheel', `Casino Wheel started for ${minutes} min, ${Math.round(chance * 1000) / 10}% chance at the top prize`, ip);
     return send(res, 200, { ok: true });
   }
   if (sub === '/api/rig') {

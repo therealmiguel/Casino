@@ -260,6 +260,7 @@ window.CasinoNet = (() => {
     }
     if (typeof j.cents === 'number') CasinoWallet._server(j.cents);
     if (Array.isArray(j.pop) && j.pop.length) CasinoUI.popups(j.pop);
+    if (j.wheel && window.CasinoWheel) CasinoWheel.offer(j.wheel);
     if (r.status === 403 && /suspended/i.test(j.error || '')) CasinoUI.suspended();
     return { ok: r.ok, status: r.status, body: j };
   }
@@ -345,6 +346,7 @@ window.CasinoBoard = (() => {
       es.addEventListener('players', e => { try { onRows(JSON.parse(e.data)); } catch (x) {} });
       es.addEventListener('notice', e => { try { CasinoUI.notice(JSON.parse(e.data)); } catch (x) {} });
       es.addEventListener('jackpot', e => { try { dispatchEvent(new CustomEvent('casino:jackpot', { detail: JSON.parse(e.data) })); } catch (x) {} });
+      es.addEventListener('wheel', () => { if (window.CasinoWheel) CasinoWheel.check(); });
       es.addEventListener('feed', e => { try { dispatchEvent(new CustomEvent('casino:feed', { detail: { items: JSON.parse(e.data), fresh: true } })); } catch (x) {} });
       es.addEventListener('feedall', e => { try { dispatchEvent(new CustomEvent('casino:feed', { detail: { items: JSON.parse(e.data), fresh: false } })); } catch (x) {} });
       es.onerror = () => { if (onError && es.readyState === 2) onError(); };
@@ -489,6 +491,137 @@ window.CasinoSound = (() => {
     } catch (e) {}
   }
   return { get: () => Object.assign({}, cfg), set, ding };
+})();
+
+
+/* The Casino Wheel: when the admin starts it, every player online gets one free spin.
+   The game underneath keeps running; the wheel can be tucked away for a moment but comes back until it's spun. */
+window.CasinoWheel = (() => {
+  let W = null, el = null, pill = null, busy = false, done = new Set(), hideT = null;
+  try { JSON.parse(localStorage.getItem('miguels-casino-wheels') || '[]').forEach(x => done.add(x)); } catch (e) {}
+  const remember = id => { done.add(id); try { localStorage.setItem('miguels-casino-wheels', JSON.stringify([...done].slice(-20))); } catch (e) {} };
+  const usd = c => '$' + (c / 100).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  const N = 16, A = 360 / N;
+  const COLS = ['#F5C542', '#7A2BE2', '#E8364F', '#1FA36A', '#2E6BE6', '#E8364F', '#7A2BE2', '#F07F2A', '#1FA36A', '#2E6BE6', '#D63384', '#7A2BE2', '#E8364F', '#1FA36A', '#F07F2A', '#2E6BE6'];
+  function css() {
+    if (document.getElementById('mcw-css')) return;
+    const st = document.createElement('style'); st.id = 'mcw-css';
+    st.textContent = `
+    .mcw{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;background:radial-gradient(60% 60% at 50% 45%,rgba(60,20,90,.75),rgba(5,3,10,.92));backdrop-filter:blur(4px);font-family:Manrope,system-ui,sans-serif;color:#fff;animation:mcwIn .4s ease}
+    @keyframes mcwIn{from{opacity:0}}
+    .mcw .box{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px;max-width:96vw}
+    .mcw h2{margin:0;font:900 clamp(22px,4.5vw,40px)/1.05 system-ui,sans-serif;letter-spacing:.02em;text-align:center;background:linear-gradient(180deg,#FFF6C8,#F5C542 55%,#C27A00);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 18px rgba(245,197,66,.5))}
+    .mcw p{margin:0;color:#D9CCF0;font-weight:700;text-align:center;font-size:14.5px}
+    .mcw .wb{position:relative;width:min(78vw,58vh,460px);aspect-ratio:1}
+    .mcw svg.wh{width:100%;height:100%;filter:drop-shadow(0 0 40px rgba(245,197,66,.45));transition:transform 6s cubic-bezier(.1,.7,.06,1)}
+    .mcw .ptr{position:absolute;left:50%;top:-5%;width:9%;transform:translateX(-50%);z-index:2;filter:drop-shadow(0 4px 6px rgba(0,0,0,.6))}
+    .mcw .hub{position:absolute;left:50%;top:50%;width:22%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;border:0;cursor:pointer;font:900 clamp(14px,2.6vw,22px) system-ui;color:#3A1E00;background:radial-gradient(circle at 35% 30%,#FFF6C8,#F5C542 55%,#B87200);box-shadow:0 0 0 5px #3A1E00,0 0 30px rgba(245,197,66,.8);animation:mcwPulse 1.1s ease-in-out infinite}
+    .mcw .hub:disabled{animation:none;cursor:default;filter:saturate(.7)}
+    @keyframes mcwPulse{50%{transform:translate(-50%,-50%) scale(1.08)}}
+    .mcw .res{min-height:56px;text-align:center}
+    .mcw .res b{display:block;font:900 clamp(28px,6vw,52px)/1 system-ui;color:#FFE59A;text-shadow:0 0 24px rgba(245,197,66,.8)}
+    .mcw .res span{color:#D9CCF0;font-weight:700}
+    .mcw .row{display:flex;gap:10px;align-items:center}
+    .mcw .later{height:38px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#fff;font-weight:700;cursor:pointer}
+    .mcw .go{height:46px;padding:0 22px;border-radius:999px;border:0;background:linear-gradient(180deg,#FFE27A,#F5A623);color:#2A1500;font-weight:900;cursor:pointer}
+    .mcw .tm{font:700 13px ui-monospace,Menlo,monospace;color:#BFB0DA}
+    .mcw-pill{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:10049;height:48px;padding:0 20px;border-radius:999px;border:0;cursor:pointer;font:900 15px system-ui;color:#2A1500;background:linear-gradient(180deg,#FFE27A,#F5A623);box-shadow:0 0 0 3px rgba(255,255,255,.35),0 10px 30px rgba(245,166,35,.55);animation:mcwPill 1s ease-in-out infinite alternate}
+    @keyframes mcwPill{to{box-shadow:0 0 0 6px rgba(255,255,255,.15),0 10px 40px rgba(245,166,35,.9)}}
+    .mcw-c{position:fixed;z-index:10051;width:9px;height:14px;pointer-events:none;animation:mcwC 2.2s cubic-bezier(.2,.7,.4,1) forwards}
+    @keyframes mcwC{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}`;
+    document.head.appendChild(st);
+  }
+  function wheelSVG(segs) {
+    const R = 100, c = 110, rad = a => a * Math.PI / 180;
+    let s = `<svg class="wh" viewBox="0 0 220 220" aria-hidden="true"><circle cx="110" cy="110" r="109" fill="#2A1238" stroke="#F5C542" stroke-width="3"/>`;
+    segs.forEach((v, i) => {
+      const a0 = (i - 0.5) * A - 90, a1 = (i + 0.5) * A - 90;
+      const x0 = c + R * Math.cos(rad(a0)), y0 = c + R * Math.sin(rad(a0)), x1 = c + R * Math.cos(rad(a1)), y1 = c + R * Math.sin(rad(a1));
+      s += `<path d="M${c} ${c}L${x0.toFixed(2)} ${y0.toFixed(2)}A${R} ${R} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}Z" fill="${COLS[i % COLS.length]}" stroke="#1A0A24" stroke-width="1.2"/>`;
+      const am = i * A - 90, tx = c + R * 0.66 * Math.cos(rad(am)), ty = c + R * 0.66 * Math.sin(rad(am));
+      const lab = v >= 10000000 ? '$100K' : v >= 100000 ? '$' + v / 100000 + 'K' : '$' + v / 100;
+      s += `<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" fill="${i === 0 ? '#3A1E00' : '#fff'}" font-family="system-ui" font-weight="900" font-size="${i === 0 ? 13 : 11}" text-anchor="middle" dominant-baseline="middle" transform="rotate(${am} ${tx.toFixed(2)} ${ty.toFixed(2)})">${lab}</text>`;
+    });
+    for (let i = 0; i < N; i++) { const a = rad((i + 0.5) * A - 90); s += `<circle cx="${(c + 104 * Math.cos(a)).toFixed(2)}" cy="${(c + 104 * Math.sin(a)).toFixed(2)}" r="2.8" fill="#FFF6C8"/>`; }
+    return s + '</svg>';
+  }
+  function confetti() {
+    const cols = ['#F5C542', '#FF5FA8', '#5BF0A0', '#7AE0FF', '#C7A6FF', '#fff'];
+    for (let i = 0; i < 90; i++) {
+      const c = document.createElement('i'); c.className = 'mcw-c';
+      c.style.left = (40 + Math.random() * 20) + 'vw'; c.style.top = '45vh'; c.style.background = cols[i % cols.length];
+      c.style.setProperty('--dx', (Math.random() - 0.5) * 900 + 'px'); c.style.setProperty('--dy', (Math.random() * 700 - 400) + 'px'); c.style.setProperty('--r', (Math.random() * 1200 - 600) + 'deg');
+      document.body.appendChild(c); setTimeout(() => c.remove(), 2300);
+    }
+  }
+  function tone(f, d, when = 0, v = 0.06) { try { const ac = tone.ac || (tone.ac = new (window.AudioContext || window.webkitAudioContext)()); const t = ac.currentTime + when, o = ac.createOscillator(), g = ac.createGain(); o.type = 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d + 0.02); } catch (e) {} }
+  function timer() {
+    if (!el || !W) return;
+    const left = Math.max(0, W.until - Date.now()), m = Math.floor(left / 60000), s = Math.floor(left / 1000) % 60;
+    const t = el.querySelector('.tm'); if (t) t.textContent = `ends in ${m}:${String(s).padStart(2, '0')}`;
+    if (left <= 0 && !busy) close(true);
+  }
+  setInterval(timer, 1000);
+  function show() {
+    if (!W || el || !document.body) return;
+    css(); if (pill) { pill.remove(); pill = null; }
+    el = document.createElement('div'); el.className = 'mcw'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Casino Wheel');
+    el.innerHTML = `<div class="box"><h2>🎡 The Casino Wheel</h2><p>Everyone online gets one free spin. Top prize: <b style="color:#FFE59A">${usd(W.top)}</b></p>
+      <div class="wb"><svg class="ptr" viewBox="0 0 40 50"><path d="M20 48 4 8a16 16 0 0 1 32 0z" fill="#FFF6C8" stroke="#3A1E00" stroke-width="2.5"/></svg>${wheelSVG(W.segs)}<button class="hub" id="mcwSpin">SPIN</button></div>
+      <div class="res" id="mcwRes"></div>
+      <div class="row"><span class="tm"></span><button class="later" id="mcwLater">Back to my game for a sec</button></div></div>`;
+    document.body.appendChild(el); timer();
+    el.querySelector('#mcwSpin').onclick = spin;
+    el.querySelector('#mcwLater').onclick = later;
+  }
+  // tuck it away; it comes back by itself
+  function later() {
+    if (busy || !el) return;
+    el.remove(); el = null;
+    pill = document.createElement('button'); pill.className = 'mcw-pill'; pill.textContent = '🎡 Spin the Casino Wheel!';
+    pill.onclick = show; document.body.appendChild(pill);
+    clearTimeout(hideT); hideT = setTimeout(() => { if (W && !el) show(); }, 25000);
+  }
+  function close(expired) {
+    clearTimeout(hideT);
+    if (el) { el.remove(); el = null; } if (pill) { pill.remove(); pill = null; }
+    if (expired && W) remember(W.id);
+    W = null;
+  }
+  async function spin() {
+    if (busy || !W) return;
+    busy = true;
+    const btn = el.querySelector('#mcwSpin'); btn.disabled = true;
+    el.querySelector('#mcwLater').hidden = true;
+    const r = await CasinoNet.api('api/wheel', { action: 'spin' });
+    if (!r.ok && r.body.seg === undefined) { busy = false; el.querySelector('#mcwRes').innerHTML = `<span>${r.body.error || 'Try again.'}</span>`; if (/stopped/i.test(r.body.error || '')) setTimeout(() => close(true), 2000); else btn.disabled = false; return; }
+    const seg = r.body.seg, prize = r.body.prize, id = W.id;
+    remember(id);
+    const wh = el.querySelector('svg.wh');
+    const target = 8 * 360 - seg * A + (Math.random() - 0.5) * A * 0.6;
+    wh.style.transform = `rotate(${target}deg)`;
+    let last = -1; const t0 = performance.now();
+    const tick = now => { const p = Math.min(1, (now - t0) / 6000); const ang = target * (1 - Math.pow(1 - p, 3.4)); const sgi = Math.floor(ang / A); if (sgi !== last) { last = sgi; tone(1500, 0.03, 0, 0.02); } if (p < 1) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    await new Promise(x => setTimeout(x, 6200));
+    el.querySelector('#mcwRes').innerHTML = `<b>${usd(prize)}</b><span>${seg === 0 ? 'THE TOP PRIZE! Unbelievable!' : 'added to your bankroll'}</span>`;
+    [0, 0.1, 0.2, 0.32].forEach((w, i) => tone([659, 784, 988, 1319][i], 0.35, w, 0.08));
+    confetti(); if (seg === 0) setTimeout(confetti, 700);
+    try { CasinoWallet.refresh(); } catch (e) {}
+    await new Promise(x => setTimeout(x, seg === 0 ? 5000 : 3200));
+    busy = false; close(false);
+  }
+  function offer(w) {
+    if (!w || done.has(w.id)) return;
+    if (W && W.id === w.id) return;
+    W = w;
+    if (document.body) show(); else addEventListener('DOMContentLoaded', show);
+  }
+  async function check() { if (!/^https?:$/.test(location.protocol)) return; try { await CasinoNet.api('api/wheel', {}); } catch (e) {} }
+  // a quiet look every 15 seconds, so pages that are just sitting there find out too
+  setInterval(() => { if (!document.hidden && !W) check(); }, 15000);
+  setTimeout(check, 2500);
+  return { offer, check };
 })();
 </script>
 

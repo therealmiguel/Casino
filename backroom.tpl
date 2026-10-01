@@ -188,6 +188,17 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
             <p class="help" id="evNow" style="margin-top:10px"></p>
           </div>
           <div class="card">
+            <h2>🎡 Casino Wheel</h2>
+            <p class="help">A big prize wheel pops up for everyone online, on whatever page they're on; their games keep running underneath. Everyone gets one free spin: $100 up to $10,000, plus one $100,000 segment. Players who come online while it runs get their spin too.</p>
+            <div class="row" style="flex-wrap:wrap">
+              <select id="whMin" style="max-width:150px" aria-label="How long"><option value="5">open 5 minutes</option><option value="10" selected>open 10 minutes</option><option value="30">open 30 minutes</option><option value="60">open 1 hour</option></select>
+              <select id="whChance" style="max-width:200px" aria-label="Chance of the top prize"><option value="0.001">$100K: 1 in 1,000</option><option value="0.01" selected>$100K: 1 in 100</option><option value="0.02">$100K: 1 in 50</option><option value="0.05">$100K: 1 in 20</option><option value="0.1">$100K: 1 in 10</option><option value="0.25">$100K: 1 in 4</option><option value="1">$100K: everyone wins it</option></select>
+              <button class="btn gold" id="whGo">Spin the wheel for everyone</button><button class="btn" id="whStop">Stop</button>
+            </div>
+            <p class="help" id="whNow" style="margin-top:10px"></p>
+            <ul class="log" id="whList" style="max-height:200px;overflow:auto"></ul>
+          </div>
+          <div class="card">
             <h2>Free spins</h2>
             <p class="help">Free spins on Dynamite Diggers. Players see a button on the slot and a popup.</p>
             <div class="row"><input type="number" id="fsN" min="1" max="100" value="10" style="max-width:90px" aria-label="Spins"><span class="muted">spins at</span>
@@ -488,6 +499,10 @@ function renderControls() {
   if (T.prizes && !$('tp1').value) { $('tp1').value = T.prizes[0] / 100; $('tp2').value = T.prizes[1] / 100; $('tp3').value = T.prizes[2] / 100; }
   const ROOMS = { bj: 'Blackjack', rl: 'Roulette', pk: 'Hold\u2019em', cr: 'Crash', bc: 'Baccarat', dc: 'Dice City' };
   $('chatList').innerHTML = (OV.chat || []).map(m => `<li><span class="dim">${ago(m.t)} · ${ROOMS[m.room] || m.room}</span> <b>${esc(m.name)}</b>: ${esc(m.text)} <button class="btn small" data-chatdel="${m.id}" style="float:right;height:24px;padding:0 8px">Remove</button></li>`).join('') || '<li class="dim">No messages yet.</li>';
+  const WH = OV.wheel;
+  $('whNow').innerHTML = !WH ? 'Not started yet.' : WH.live ? `<b>Spinning now</b>, open until ${when(WH.until)} · ${WH.spins.length} spun · ${usd(WH.paid)} paid out so far.` : `Last wheel: ${WH.spins.length} spins, ${usd(WH.paid)} paid out.`;
+  $('whStop').disabled = !(WH && WH.live);
+  $('whList').innerHTML = WH ? WH.spins.map(x => `<li><span class="dim">${ago(x.t)}</span> <b>${esc(x.name)}</b> won <b class="${x.prize >= 10000000 ? 'pos' : ''}">${usd(x.prize)}</b>${x.prize >= 10000000 ? ' 🎉' : ''}</li>`).join('') : '';
   const RG = OV.rig || {}, RGN = { cr: v => `Crash at ${v}×`, rl: v => `roulette ${v}`, dc: v => `Dice City ${v}`, bc: v => `baccarat ${v}` };
   const rigs = Object.entries(RG).filter(([k, v]) => v !== null && v !== undefined && RGN[k]);
   $('rigNow').innerHTML = rigs.length ? 'Waiting for the next round: ' + rigs.map(([k, v]) => `<b>${esc(RGN[k](v))}</b> <a href="#" data-unrig="${k}">cancel</a>`).join(' · ') : 'Nothing rigged. Every live table is random.';
@@ -513,6 +528,8 @@ $('gSend').onclick = async () => {
 const post = async (path, body, msg) => { try { await api(path, body); toast(msg); load(); } catch (x) { toast(x.message); } };
 document.querySelectorAll('[data-rig]').forEach(b => b.onclick = () => { const g = b.dataset.rig, v = { cr: $('rgCr').value, rl: $('rgRl').value, dc: $('rgDc').value, bc: $('rgBc').value }[g]; if (v === '') return toast('Type a result first'); post('rig', { game: g, value: g === 'bc' ? v : +v }, 'Rigged for the next round'); });
 $('rigNow').addEventListener('click', e => { const a = e.target.closest('[data-unrig]'); if (a) { e.preventDefault(); post('rig', { game: a.dataset.unrig, value: null }, 'Rig cancelled'); } });
+$('whGo').onclick = () => { if (confirm('Start the Casino Wheel for everyone online?')) post('wheel', { minutes: +$('whMin').value, chance: +$('whChance').value }, 'The wheel is spinning'); };
+$('whStop').onclick = () => post('wheel', { action: 'end' }, 'Wheel stopped');
 $('chatClear').onclick = () => { if (confirm('Clear the chat at every live table?')) post('chatclear', { room: 'all' }, 'Chat cleared'); };
 $('chatList').addEventListener('click', e => { const b = e.target.closest('[data-chatdel]'); if (b) post('chatdel', { msg: +b.dataset.chatdel }, 'Message removed'); });
 $('hhGo').onclick = () => post('event', { boost: { game: $('hhGame').value, mult: +$('hhMult').value, hours: +$('hhHours').value } }, 'Happy hour started');
