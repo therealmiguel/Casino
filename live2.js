@@ -6,7 +6,7 @@ const rnd = n => crypto.randomInt(n);
 const F = Number(process.env.LIVE_TIME_SCALE) || 1;   // for automated tests only
 const WF = require('./wordfilter');
 
-module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip, persist }) {
+module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip, persist, onFeed }) {
   const maxFor = pid => (vip && vip(pid) ? 500000 : 100000);
   const bal = pid => { const r = A.get(pid); return r ? r.bal : 0; };
   const nameOf = (pid, fallback) => cleanName(fallback) || (A.get(pid) || {}).name || 'Player';
@@ -78,6 +78,7 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
     CR.last = [...CR.bets].map(([pid, b]) => ({ pid, name: b.name, bet: b.bet, out: b.out || 0, paid: b.paid || 0 }));
     CR.bets.clear();
     changed('cr');
+    recapFlush('cr', { bust: CR.bust });
     crTimer(CR_AFTER_MS, () => { if (present('cr')) crBetting(); else { CR.phase = 'idle'; CR.deadline = 0; changed('cr'); } });
   }
   function crAction(pid, name, body) {
@@ -381,6 +382,38 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
     broadcast(room, 'msg', msg);
     return { code: 200, body: { ok: true } };
   }
+  /* =============== ROUND RECAPS: who won and who lost, on every live table =============== */
+  // every finished round on a live table lands here (see server.js); the results are gathered for a moment
+  // and then sent to everyone at that table, and the big ones go to the lobby's live feed
+  const GAME_ROOM = { 'live-bj': 'bj', 'live-rl': 'rl', poker: 'pk', crash: 'cr', 'live-bc': 'bc', 'live-dc': 'dc' };
+  const ROOM_NAME = { bj: 'Live blackjack', rl: 'Live roulette', pk: 'Hold\u2019em', cr: 'Rocket Crash', bc: 'Baccarat', dc: 'Dice City' };
+  const pending = {}, recapTimers = {};
+  const hashOf = pid => crypto.createHash('sha256').update(pid).digest('hex').slice(0, 8);
+  function collect(game, pid, e) {
+    const room = GAME_ROOM[game]; if (!room) return;
+    const rec = A.get(pid); if (!rec) return;
+    const list = pending[room] = pending[room] || [];
+    let row = list.find(r => r.pid === pid);
+    if (!row) { row = { pid, name: rec.name || 'Player', staked: 0, paid: 0 }; list.push(row); }
+    row.staked += e.staked || 0; row.paid += e.paid || 0;
+    // crash rounds end when the rocket blows up; everything else a moment after the last payout
+    if (room !== 'cr') { clearTimeout(recapTimers[room]); recapTimers[room] = setTimeout(() => recapFlush(room), 700); }
+  }
+  const feed = [];
+  function recapFlush(room, extra) {
+    clearTimeout(recapTimers[room]);
+    const list = pending[room] || []; pending[room] = [];
+    if (!list.length) return;
+    const rows = list.map(r => ({ name: r.name, p: hashOf(r.pid), staked: r.staked, paid: r.paid, net: r.paid - r.staked, x: r.staked ? Math.round(r.paid / r.staked * 100) / 100 : 0 }))
+      .sort((a, b) => b.net - a.net);
+    const recap = Object.assign({ room, game: ROOM_NAME[room], t: Date.now(), rows }, extra || {});
+    broadcast(room, 'recap', recap);
+    // the lobby feed: wins of $50 or 5× and more, losses of $100 and more
+    const notable = rows.filter(r => r.net >= 5000 || (r.net > 0 && r.x >= 5) || r.net <= -10000).slice(0, 4)
+      .map(r => ({ t: recap.t, room, game: recap.game, name: r.name, net: r.net, x: r.x, staked: r.staked }));
+    if (notable.length) { feed.unshift(...notable); feed.splice(30); if (onFeed) onFeed(notable); }
+  }
+
   // admin room
   function chatClear(room) { for (const r of room === 'all' ? ROOMS : [room]) if (chat[r]) { chat[r] = []; broadcast(r, 'clear', {}); } }
   function chatRecent() { return ROOMS.flatMap(r => chat[r].map(m => Object.assign({ room: r }, m))).sort((a, b) => b.t - a.t).slice(0, 40); }
@@ -451,5 +484,5 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
   }
   const allPids = () => new Set([...CR.bets.keys(), ...BC.bets.keys(), ...DC.bets.keys()]);
   function onlineNow(m) { for (const c of conns) { if (!m.has(c.pid)) m.set(c.pid, []); m.get(c.pid).push(c.game); } return m; }
-  return { stream, action, chatStream, chatPost, chatClear, chatRecent, chatDelete, summary, where, kick, allPids, onlineNow, atRisk, REACTS, _test: { CR, BC, DC, dcMult, dcSettle, dcPlay, DC_MAIN, DC_SIDE, playHand, score, bustPoint, multAt, crBust, bcSettle, newShoe } };
+  return { collect, feed: () => feed.slice(0, 20), stream, action, chatStream, chatPost, chatClear, chatRecent, chatDelete, summary, where, kick, allPids, onlineNow, atRisk, REACTS, _test: { CR, BC, DC, dcMult, dcSettle, dcPlay, DC_MAIN, DC_SIDE, playHand, score, bustPoint, multAt, crBust, bcSettle, newShoe } };
 };

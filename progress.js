@@ -59,6 +59,8 @@ const ACH = [
   ['crash-10', '🚀', 'To the moon', 'Cash out at 10× or more in Crash'],
   ['crash-50', '💎', 'Diamond hands', 'Cash out at 50× or more in Crash'],
   ['skyline', '🏙️', 'Skyline', 'Win 100× or more in Dice City'],
+  ['road-10', '🐔', 'Why did the chicken…', 'Cash out at 10× or more in Cluck Crossing'],
+  ['crossed', '🏁', 'The other side', 'Get the chicken all the way across the road'],
   ['mines-10', '💣', 'Minesweeper', 'Clear 10 safe tiles in one Mines game'],
   ['plinko-edge', '🔻', 'Edge of glory', 'Land in an outside Plinko bucket'],
   ['natural-9', '9️⃣', 'Natural nine', 'Win a baccarat bet with a natural 9'],
@@ -301,6 +303,7 @@ module.exports = function createProgress(A, opts) {
       const bj = rec.games.bj && rec.games.bj.round;
       if (bj && bj.phase !== 'done') return { error: 'Finish your blackjack hand first.' };
       if (rec.games.mines && rec.games.mines.live) return { error: 'Finish your Mines game first.' };
+      if (rec.games.chick && rec.games.chick.live) return { error: 'Finish your crossing first.' };
       rec.mode = want; A.touch(id);
       return { ok: true };
     }
@@ -346,7 +349,7 @@ module.exports = function createProgress(A, opts) {
     for (const [id, r] of A.players) {
       r.bal = A.START; r.peak = A.START; r.resets = 0;
       r.st = { hands: 0, spins: 0, rolls: 0, bigWin: 0, blackjacks: 0, bestMult: 0, pointsMade: 0, wagered: 0, paid: 0, rounds: 0 };
-      if (r.games) { delete r.games.craps; if (r.games.bj) r.games.bj.round = null; delete r.games.mines; }
+      if (r.games) { delete r.games.craps; if (r.games.bj) r.games.bj.round = null; delete r.games.mines; delete r.games.chick; }
       r.hist = [[Date.now(), A.START]];
       A.logTx(r, 'season', 0, `Season ${S.n + 1} begins: everyone starts fresh with $1,000`);
       pop(r, { type: 'season', icon: '🌅', title: `Season ${S.n + 1} has begun`, text: 'Everyone starts again with $1,000. Your level, badges and trophies stay.' });

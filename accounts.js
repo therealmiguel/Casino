@@ -21,7 +21,7 @@ module.exports = function createAccounts(hooks = {}) {
   let P = null;                       // progression (levels, achievements, tournament), plugged in by the server
   const setProgress = p => { P = p; };
   // which wallet a bet uses: tournament chips for the solo games while the player is in tournament mode
-  const TOUR_GAMES = new Set(['slots', 'slots2', 'roulette', 'blackjack', 'plinko', 'mines']);
+  const TOUR_GAMES = new Set(['slots', 'slots2', 'roulette', 'blackjack', 'plinko', 'mines', 'chicken']);
   const inTour = (rec, game) => !!(P && TOUR_GAMES.has(game) && P.tourActive(rec));
   const wal = (rec, game) => (inTour(rec, game) ? rec.tour : rec);
   const balOf = (id, game) => { const rec = players.get(id); return rec ? wal(rec, game).bal : 0; };
@@ -158,6 +158,7 @@ module.exports = function createAccounts(hooks = {}) {
     const have = cash(id);
     if (have >= 500) return { error: `You still have ${usd(have)}. A fresh $1,000 is only for when you're out of chips.`, code: 409 };
     if (rec.games && rec.games.mines && rec.games.mines.live && !rec.games.mines.tour) return { error: 'Finish your Mines game first.', code: 409 };
+    if (rec.games && rec.games.chick && rec.games.chick.live) return { error: 'Finish your crossing first.', code: 409 };
     rec.bal += START; rec.resets++;
     logTx(rec, 'reset', START, 'Fresh $1,000 stack');
     touch(id);

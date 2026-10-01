@@ -15,6 +15,28 @@ for (const rows of [8, 12, 16]) { PLINKO[rows] = {}; for (const risk of ['low', 
 const MINES_EDGE = 0.97, MINES_MAX_WIN = 25000000; // a Mines game pays at most $250,000
 function minesMult(m, k) { let x = MINES_EDGE; for (let i = 0; i < k; i++) x *= (25 - i) / (25 - m - i); return Math.floor(x * 100) / 100; }
 
+// Cluck Crossing: the chicken crosses lane after lane. The traffic gets heavier the further it goes:
+// each lane's chance of a car rises steadily from the first lane to the last, and every multiplier
+// pays back 97% of the risk taken to get there.
+const ROAD_EDGE = 0.97, ROAD_MAX_WIN = 25000000;
+const ROAD = {
+  easy: { lanes: 24, first: 1 / 25, top: 24 },
+  medium: { lanes: 22, first: 3 / 25, top: 2200 },
+  hard: { lanes: 20, first: 5 / 25, top: 50000 },
+  hardcore: { lanes: 15, first: 10 / 25, top: 3000000 },
+};
+for (const R of Object.values(ROAD)) {
+  // find the last lane's danger so that crossing every lane pays exactly R.top
+  const qs = last => Array.from({ length: R.lanes }, (_, i) => R.first + (last - R.first) * i / (R.lanes - 1));
+  const topFor = last => ROAD_EDGE / qs(last).reduce((a, q) => a * (1 - q), 1);
+  let lo = R.first, hi = 0.97;
+  for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (topFor(mid) < R.top) lo = mid; else hi = mid; }
+  R.q = qs((lo + hi) / 2);
+  R.mult = [1]; let surv = 1;
+  for (const q of R.q) { surv *= 1 - q; R.mult.push(Math.floor(ROAD_EDGE / surv * 100) / 100); }
+}
+function roadMult(diff, k) { return ROAD[diff].mult[k]; }
+
 module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLOT_BETS, VIP_SLOT_BETS }) {
   const betOk = (id, c, max) => Number.isInteger(c) && c >= 10 && c <= (vip(id) ? max * 5 : max);
 
@@ -98,7 +120,51 @@ module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLO
     return ok(id, { plan, payout, cost, jackpot, pool: P ? Math.round(P.jackpot().pool) : 0 }, 'slots2');
   }
 
-  return { plinko, mines, slots2, PLINKO, minesMult };
+  /* ---------- Cluck Crossing ---------- */
+  const roadView = (G) => ({ table: ROAD[G.diff].mult, live: !!G.live, bet: G.bet, diff: G.diff, step: G.step, lanes: ROAD[G.diff].lanes, mult: roadMult(G.diff, G.step), next: G.step < ROAD[G.diff].lanes ? roadMult(G.diff, G.step + 1) : null, dead: G.dead || false, paid: G.paid || 0 });
+  function roadEnd(id, G, paid) {
+    G.live = false; G.paid = paid;
+    if (paid > 0) A.credit(id, paid, 'chicken', `Cluck Crossing cash-out ${roadMult(G.diff, G.step)}×`);
+    const tags = []; const m = roadMult(G.diff, G.step);
+    if (paid > 0 && m >= 10) tags.push('road-10');
+    if (paid > 0 && G.step >= ROAD[G.diff].lanes) tags.push('crossed');
+    A.round(id, 'chicken', { staked: G.bet, paid, spins: 1, mult: paid > 0 && m >= 10 ? Math.floor(m) : 0, tags });
+  }
+  function chicken(id, b) {
+    const rec = A.get(id), act = String(b.action || '');
+    let G = rec.games.chick || null;
+    if (act === 'state') return ok(id, Object.assign(G ? roadView(G) : { live: false }, { tables: Object.fromEntries(Object.entries(ROAD).map(([k, R]) => [k, R.mult])), chance: Object.fromEntries(Object.entries(ROAD).map(([k, R]) => [k, R.q.map(q => Math.round(q * 1000) / 10)])) }), 'chicken');
+    if (act === 'start') {
+      if (G && G.live) return { code: 409, body: Object.assign({ error: 'Finish this crossing first.' }, roadView(G)) };
+      const diff = String(b.diff || ''), bet = Math.round(Number(b.bet));
+      if (!ROAD[diff]) return bad(id, `road difficulty ${diff.slice(0, 12)}`, 'Pick a difficulty.');
+      if (!betOk(id, bet, 10000)) return bad(id, `road bet ${String(b.bet).slice(0, 20)}`, `Bets go from $0.10 to $${vip(id) ? '500' : '100'}.`);
+      if (!A.debit(id, bet, 'chicken', 'Cluck Crossing bet')) return { code: 409, body: { error: 'Not enough in your bankroll.' } };
+      G = rec.games.chick = { live: true, bet, diff, step: 0, t: Date.now() };
+      A.touch(id);
+      return ok(id, roadView(G), 'chicken');
+    }
+    if (!G || !G.live) return { code: 409, body: { error: 'Start a crossing first.', live: false } };
+    if (act === 'go') {
+      // the server decides each lane at the moment the chicken steps into it
+      const hit = rnd(1000000) < ROAD[G.diff].q[G.step] * 1000000;
+      if (hit) { G.dead = true; G.step++; roadEnd(id, G, 0); A.touch(id); return ok(id, Object.assign(roadView(G), { hit: true }), 'chicken'); }
+      G.step++; A.touch(id);
+      const win = Math.round(G.bet * roadMult(G.diff, G.step));
+      if (G.step >= ROAD[G.diff].lanes || win >= ROAD_MAX_WIN) { roadEnd(id, G, Math.min(win, ROAD_MAX_WIN)); return ok(id, Object.assign(roadView(G), { auto: true }), 'chicken'); }
+      return ok(id, roadView(G), 'chicken');
+    }
+    if (act === 'cash') {
+      if (!G.step) return { code: 409, body: { error: 'Cross at least one lane first.' } };
+      roadEnd(id, G, Math.min(ROAD_MAX_WIN, Math.round(G.bet * roadMult(G.diff, G.step))));
+      return ok(id, roadView(G), 'chicken');
+    }
+    return bad(id, `road action ${act.slice(0, 20)}`, 'Unknown move.');
+  }
+
+  return { plinko, mines, slots2, chicken, PLINKO, minesMult, ROAD, roadMult };
 };
 module.exports.PLINKO = PLINKO;
 module.exports.minesMult = minesMult;
+module.exports.ROAD = ROAD;
+module.exports.roadMult = roadMult;

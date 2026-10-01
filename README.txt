@@ -5,7 +5,7 @@ What's in this folder
   server.js         the server: shows the casino, keeps every bankroll, runs the admin room
   accounts.js       player accounts: the only place money ever changes
   games.js          blackjack, roulette, craps and Dynamite Diggers, played on the server
-  games2.js         Plinko, Gem Mines and the Cosmic Cascade slot
+  games2.js         Plinko, Gem Mines, Cluck Crossing and the Cosmic Cascade slot
   progress.js       levels, VIP, daily bonus, challenges, badges, Mega Jackpot,
                     weekly tournament, seasons, tips and happy hours
   cascade_engine.js the rules and payouts of Cosmic Cascade

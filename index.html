@@ -204,7 +204,7 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
     <div class="bulbs" id="bulbs" aria-hidden="true"></div>
     <div class="eyebrow">Open all night · Tables live</div>
     <h1>Miguel's Casino</h1>
-    <p class="lede">Pick a table. Blackjack, lightning roulette, bubble craps, two slot machines, Plinko, Mines and Rocket Crash, all under one roof.</p>
+    <p class="lede">Pick a table. Blackjack, lightning roulette, bubble craps, two slot machines, Plinko, Mines, Cluck Crossing and Rocket Crash, all under one roof.</p>
     <div class="bank">
       <div class="meter"><span>Your bankroll</span><b id="bankroll">$1,000.00</b></div>
       <button class="topup" id="topup" hidden>Get $1,000 in chips</button>
@@ -407,6 +407,30 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
   }
 })();
 </script>
+    <a class="table" href="chicken.html">
+      <div class="art" style="background:linear-gradient(180deg,#2E2F33,#26272B)">
+        <svg viewBox="0 0 320 200" aria-hidden="true">
+          <rect x="0" y="0" width="44" height="200" fill="#9A9EA5"/><rect x="40" y="0" width="4" height="200" fill="#D8D9DC"/>
+          <g fill="#E9E6DA" opacity=".7"><rect x="110" y="0" width="3" height="200" stroke-dasharray="0"/><rect x="178" y="0" width="3" height="200"/><rect x="246" y="0" width="3" height="200"/></g>
+          <g fill="#2E2F33"><rect x="110" y="30" width="3" height="20"/><rect x="110" y="90" width="3" height="20"/><rect x="110" y="150" width="3" height="20"/><rect x="178" y="30" width="3" height="20"/><rect x="178" y="90" width="3" height="20"/><rect x="178" y="150" width="3" height="20"/><rect x="246" y="30" width="3" height="20"/><rect x="246" y="90" width="3" height="20"/><rect x="246" y="150" width="3" height="20"/></g>
+          <circle cx="78" cy="130" r="22" fill="#F5B627" stroke="#8A5A00" stroke-width="3"/><text x="78" y="135" text-anchor="middle" font-family="Impact,system-ui" font-size="14" fill="#4A2B00">1.21×</text>
+          <rect x="54" y="74" width="48" height="10" rx="3" fill="#E8392F"/><rect x="62" y="74" width="8" height="10" fill="#F4F2EC"/><rect x="78" y="74" width="8" height="10" fill="#F4F2EC"/>
+          <circle cx="145" cy="130" r="22" fill="#45474D" stroke="#FFC93C" stroke-width="3"/><text x="145" y="135" text-anchor="middle" font-family="Impact,system-ui" font-size="14" fill="#FFE59A">1.55×</text>
+          <circle cx="213" cy="130" r="22" fill="#45474D" stroke="#27282C" stroke-width="3"/><text x="213" y="135" text-anchor="middle" font-family="Impact,system-ui" font-size="14" fill="#fff">2.05×</text>
+          <g transform="translate(200 18)"><rect x="0" y="0" width="28" height="50" rx="9" fill="#2F6FE0"/><rect x="5" y="12" width="18" height="8" rx="2" fill="#1B2430"/><rect x="5" y="34" width="18" height="7" rx="2" fill="#1B2430"/></g>
+          <g transform="translate(112 74) scale(.55)"><path d="M50 92l-4 18M68 92l3 18" stroke="#F2A11F" stroke-width="5" stroke-linecap="round"/><path d="M30 60c0-20 16-34 36-34 9 0 17 3 22 9l6 26c2 20-14 34-34 34S30 82 30 60z" fill="#fff"/><path d="M22 62c-8-6-12-18-6-24 5 6 10 8 15 8-2-9 2-18 9-20 0 9 4 14 9 17l-2 24z" fill="#ECE8E1"/><path d="M78 10c3-6 10-6 11 0 4-4 10-2 9 4 5 0 6 6 2 9H80z" fill="#E53935"/><path d="M72 24c0-9 8-15 17-14 9 1 14 9 13 18l-2 16c-2 6-9 8-15 6l-12-6z" fill="#fff"/><path d="M100 30l14 5-13 5z" fill="#F7B21B"/><circle cx="91" cy="27" r="4.4" fill="#1B1B1F"/></g>
+        </svg>
+      </div>
+      <div class="info">
+        <span class="kind">Road game · new</span>
+        <h2>Cluck Crossing</h2>
+        <p>Hop the chicken across lane after lane of traffic. Every lane raises the multiplier, up to 3,000,000× on Hardcore. Cash out before you get squashed.</p>
+        <div class="foot">
+          <div class="chips"><span>Bet</span><b>$0.10 – $100</b></div>
+          <span class="play">Play <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </div>
+      </div>
+    </a>
     <a class="table" href="crash.html">
       <div class="art" style="background:radial-gradient(70% 60% at 70% 0%,#1A2A5A,transparent 70%),#060914">
         <svg viewBox="0 0 320 200" aria-hidden="true">
@@ -470,6 +494,74 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
       </a>
     </div>
   </section>
+
+  <section class="feed-sec" id="feedSec" hidden aria-labelledby="feedTitle">
+    <div class="feed-head"><span class="dot"></span><b id="feedTitle">Live wins &amp; losses</b><span class="sub">from every live table, as it happens</span></div>
+    <div class="feed-rail" id="feedRail"><div class="feed-track" id="feedTrack"></div></div>
+  </section>
+<style>
+.feed-sec{margin-top:22px;border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#1E0B14,#14070D);box-shadow:0 0 0 1px rgba(232,193,112,.25),0 14px 30px rgba(0,0,0,.4)}
+.feed-head{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid rgba(232,193,112,.15)}
+.feed-head .dot{width:9px;height:9px;border-radius:50%;background:#FF4F7A;box-shadow:0 0 10px #FF4F7A;animation:feedBlink 1.2s infinite}
+@keyframes feedBlink{50%{opacity:.3}}
+.feed-head b{font:800 12px var(--body,system-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--gold-2,#F8E2A6)}
+.feed-head .sub{color:var(--muted,#B7A6A0);font-size:12.5px}
+.feed-rail{position:relative;overflow:hidden;height:62px;mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.feed-track{position:absolute;left:0;top:0;height:100%;display:flex;align-items:center;gap:12px;padding:0 12px;white-space:nowrap;will-change:transform}
+.fi{display:inline-flex;align-items:center;gap:10px;padding:7px 14px 7px 8px;border-radius:999px;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);font-size:14px;flex:none}
+.fi .ic{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:16px;background:rgba(255,255,255,.07)}
+.fi.win .ic{background:rgba(91,240,160,.16)} .fi.lose .ic{background:rgba(255,111,140,.14)}
+.fi b{font-weight:800}
+.fi .amt{font:700 14px var(--mono,ui-monospace);}
+.fi.win .amt{color:#5BF0A0} .fi.lose .amt{color:#FF8FA8}
+.fi .x{font:700 11.5px var(--mono,ui-monospace);color:var(--gold-2,#F8E2A6);padding:2px 7px;border-radius:999px;background:rgba(248,226,166,.12)}
+.fi .g{color:var(--muted,#B7A6A0);font-size:12.5px}
+.fi.fresh{animation:fiNew 1.6s ease}
+@keyframes fiNew{0%{box-shadow:inset 0 0 0 2px #FFE6A0,0 0 26px rgba(255,211,78,.6)}100%{box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}}
+.feed-empty{color:var(--muted,#B7A6A0);font-size:13.5px;padding:0 6px}
+</style>
+<script>
+(() => {
+  const track = document.getElementById('feedTrack'), sec = document.getElementById('feedSec');
+  const ICON = { bj: '🂡', rl: '⚡', pk: '♣️', cr: '🚀', bc: '🎴', dc: '🏙️' };
+  const WIN = ['scooped', 'bagged', 'snatched', 'cashed', 'took home', 'grabbed'], LOSE = ['dropped', 'left', 'donated', 'lost'];
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const usd = c => '$' + (Math.abs(c) / 100).toLocaleString('en-US', { minimumFractionDigits: Math.abs(c) % 100 ? 2 : 0, maximumFractionDigits: 2 });
+  const ago = t => { const s = (Date.now() - t) / 1000; return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + 'm ago' : Math.round(s / 3600) + 'h ago'; };
+  let items = [];
+  function item(f, fresh) {
+    const win = f.net > 0, verb = (win ? WIN : LOSE)[(f.t + f.name.length) % (win ? WIN.length : LOSE.length)];
+    const emo = win ? (f.x >= 50 ? '🌋' : f.x >= 10 ? '🚀' : f.net >= 50000 ? '💰' : '🎉') : (f.net <= -50000 ? '🌊' : '💸');
+    return `<span class="fi ${win ? 'win' : 'lose'}${fresh ? ' fresh' : ''}"><span class="ic">${emo}</span><span><b>${esc(f.name)}</b> ${verb} <span class="amt">${usd(f.net)}</span> ${win && f.x >= 2 ? `<span class="x">${f.x.toFixed(2)}×</span>` : ''} <span class="g">${ICON[f.room] || ''} ${esc(f.game)} · ${ago(f.t)}</span></span></span>`;
+  }
+  let x = 0, w = 0, last = 0, paused = false;
+  function render(freshN) {
+    sec.hidden = false;
+    if (!items.length) { track.innerHTML = '<span class="feed-empty">Nothing yet. The first big win or loss on a live table shows up here.</span>'; w = 0; x = 0; track.style.transform = ''; return; }
+    const one = items.map((f, i) => item(f, i < freshN)).join('');
+    track.innerHTML = one;
+    // only when the strip is wider than the screen: show it twice so it can loop without a gap
+    if (track.scrollWidth > track.parentElement.clientWidth * 0.9) { track.innerHTML = one + one; w = track.scrollWidth / 2; }
+    else { w = 0; x = 0; track.style.transform = ''; }
+  }
+  function tick(t) {
+    requestAnimationFrame(tick);
+    const dt = Math.min(50, t - (last || t)); last = t;
+    if (!w || paused || document.hidden) return;
+    x -= dt * 0.045; if (-x >= w) x += w;
+    track.style.transform = `translateX(${x}px)`;
+  }
+  requestAnimationFrame(tick);
+  track.parentElement.addEventListener('mouseenter', () => { paused = true; });
+  track.parentElement.addEventListener('mouseleave', () => { paused = false; });
+  addEventListener('casino:feed', e => {
+    const d = e.detail || {};
+    if (d.fresh) { items = d.items.concat(items).slice(0, 24); x = 0; render(d.items.length); }
+    else { items = (d.items || []).slice(0, 24); render(0); }
+  });
+  setInterval(() => { if (items.length) render(0); }, 60000);
+})();
+</script>
 
   <section class="board" aria-labelledby="boardTitle">
     <div class="board-head">
@@ -656,6 +748,8 @@ window.CasinoBoard = (() => {
       es.addEventListener('players', e => { try { onRows(JSON.parse(e.data)); } catch (x) {} });
       es.addEventListener('notice', e => { try { CasinoUI.notice(JSON.parse(e.data)); } catch (x) {} });
       es.addEventListener('jackpot', e => { try { dispatchEvent(new CustomEvent('casino:jackpot', { detail: JSON.parse(e.data) })); } catch (x) {} });
+      es.addEventListener('feed', e => { try { dispatchEvent(new CustomEvent('casino:feed', { detail: { items: JSON.parse(e.data), fresh: true } })); } catch (x) {} });
+      es.addEventListener('feedall', e => { try { dispatchEvent(new CustomEvent('casino:feed', { detail: { items: JSON.parse(e.data), fresh: false } })); } catch (x) {} });
       es.onerror = () => { if (onError && es.readyState === 2) onError(); };
     } else { load(); poll = setInterval(load, 8000); }
     return () => { if (es) es.close(); if (poll) clearInterval(poll); };

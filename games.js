@@ -229,6 +229,7 @@ module.exports = function createGames(A, { flag, isClosed, P }) {
     if (game === 'plinko') return G2.plinko(id, body);
     if (game === 'mines') return G2.mines(id, body);
     if (game === 'slots2') return G2.slots2(id, body);
+    if (game === 'chicken') return G2.chicken(id, body);
     return { code: 404, body: { error: 'Unknown game.' } };
   }
   return { handle, planSpin, SLOT_BETS, checkLayout, rng, rnd };

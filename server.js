@@ -16,7 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
-const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'crash.html', 'baccarat-live.html', 'dicecity.html', 'profile.html'];
+const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'chicken.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'crash.html', 'baccarat-live.html', 'dicecity.html', 'profile.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
   const preferred = [path.join(__dirname, 'public'), __dirname];
@@ -192,7 +192,10 @@ live2 = require('./live2')({
   auth: (id, token, ip) => authPlayer(id, token, ip),
   isClosed: () => META.settings.closed,
   persist: () => live1.persist(),
+  onFeed: items => { const msg = `event: feed\ndata: ${JSON.stringify(items)}\n\n`; for (const res of streams) res.write(msg); },
 });
+// every finished round also goes to the live tables' round recaps
+{ const round = A.round; A.round = (id, game, e) => { const r = round(id, game, e); try { live2.collect(game, id, e || {}); } catch (x) {} return r; }; }
 // one face for every live table: blackjack, roulette and Hold'em (live.js); Crash, baccarat and chat (live2.js)
 const LIVE2_GAMES = ['cr', 'bc', 'dc'];
 const live = Object.assign({}, live1, {
@@ -309,7 +312,7 @@ async function playerApi(req, res, p, ip) {
   if (p === '/api/tour') return reply(P.tourAction(id, b));
   if (p === '/api/tip') { const r = P.tip(id, b.to, b.cents, b.note); return reply(r); }
   let m;
-  if ((m = p.match(/^\/api\/g\/(slots|slots2|roulette|blackjack|craps|plinko|mines)$/))) {
+  if ((m = p.match(/^\/api\/g\/(slots|slots2|roulette|blackjack|craps|plinko|mines|chicken)$/))) {
     const r = games.handle(m[1], id, b);
     return send(res, r.code, withPop(id, r.body));
   }
@@ -453,14 +456,14 @@ async function adminApi(req, res, sub, ip) {
     return send(res, 200, { ok: true, count: n });
   }
   if (sub === '/api/event') {
-    const games_ = ['all', 'slots', 'blackjack', 'roulette', 'craps', 'plinko', 'mines', 'crash', 'live-bc', 'live-dc'];
+    const games_ = ['all', 'slots', 'blackjack', 'roulette', 'craps', 'plinko', 'mines', 'chicken', 'crash', 'live-bc', 'live-dc'];
     if (b.boost !== undefined) {
       if (!b.boost) META.events.boost = null;
       else {
         const mult = Number(b.boost.mult), hours = Math.min(48, Math.max(0.25, Number(b.boost.hours) || 1));
         if (![1.5, 2, 3].includes(mult) || !games_.includes(b.boost.game)) return send(res, 400, { error: 'Pick a game and a boost.' });
         META.events.boost = { game: b.boost.game, mult, until: Date.now() + hours * 3600000, t: Date.now() };
-        announce(`🎉 Happy hour! Winnings ${b.boost.game === 'all' ? 'everywhere' : 'on ' + ({ slots: 'the slots', blackjack: 'blackjack', roulette: 'roulette', craps: 'craps', plinko: 'Plinko', mines: 'Mines', crash: 'Crash', 'live-bc': 'baccarat', 'live-dc': 'Dice City' })[b.boost.game]} are boosted ×${mult} for ${hours < 1 ? Math.round(hours * 60) + ' minutes' : hours + ' hour' + (hours === 1 ? '' : 's')}!`);
+        announce(`🎉 Happy hour! Winnings ${b.boost.game === 'all' ? 'everywhere' : 'on ' + ({ slots: 'the slots', blackjack: 'blackjack', roulette: 'roulette', craps: 'craps', plinko: 'Plinko', mines: 'Mines', chicken: 'Cluck Crossing', crash: 'Crash', 'live-bc': 'baccarat', 'live-dc': 'Dice City' })[b.boost.game]} are boosted ×${mult} for ${hours < 1 ? Math.round(hours * 60) + ' minutes' : hours + ' hour' + (hours === 1 ? '' : 's')}!`);
       }
       audit('event', META.events.boost ? `Happy hour ×${META.events.boost.mult} on ${META.events.boost.game}` : 'Happy hour ended', ip);
     }
@@ -539,7 +542,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/stream') {
       if (!ready) return send(res, 503, { error: 'Opening.' });
       res.writeHead(200, Object.assign({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' }, SECURITY_HEADERS));
-      res.write(`retry: 3000\nevent: players\ndata: ${JSON.stringify(A.publicList())}\n\nevent: notice\ndata: ${JSON.stringify(noticeNow())}\n\nevent: jackpot\ndata: ${JSON.stringify({ pool: Math.round(P.jackpot().pool), last: P.jackpot().last })}\n\n`);
+      res.write(`retry: 3000\nevent: players\ndata: ${JSON.stringify(A.publicList())}\n\nevent: notice\ndata: ${JSON.stringify(noticeNow())}\n\nevent: jackpot\ndata: ${JSON.stringify({ pool: Math.round(P.jackpot().pool), last: P.jackpot().last })}\n\nevent: feedall\ndata: ${JSON.stringify(live2.feed())}\n\n`);
       streams.add(res);
       req.on('close', () => streams.delete(res));
       return;
