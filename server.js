@@ -16,7 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
-const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'profile.html'];
+const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'profile.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
   const preferred = [path.join(__dirname, 'public'), __dirname];
@@ -289,7 +289,7 @@ async function playerApi(req, res, p, ip) {
   if (p === '/api/tour') return reply(P.tourAction(id, b));
   if (p === '/api/tip') { const r = P.tip(id, b.to, b.cents, b.note); return reply(r); }
   let m;
-  if ((m = p.match(/^\/api\/g\/(slots|roulette|blackjack|craps)$/))) {
+  if ((m = p.match(/^\/api\/g\/(slots|slots2|roulette|blackjack|craps|plinko|mines)$/))) {
     const r = games.handle(m[1], id, b);
     return send(res, r.code, withPop(id, r.body));
   }

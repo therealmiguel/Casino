@@ -6,6 +6,7 @@ const SlotEngine = require('./slot_engine');
 const RR = require('./roulette_rules');
 const CRAPS = require('./craps_rules');
 const BJ = require('./bj_solo');
+const createGames2 = require('./games2');
 
 // fast, strong randomness: crypto bytes in a pool
 let pool = Buffer.alloc(0), at = 0;
@@ -218,12 +219,16 @@ module.exports = function createGames(A, { flag, isClosed, P }) {
     return ok(id, { dice: [d1, d2], bets: T.bets, point: T.point, bank: r.bank, outcome: r.outcome, before }, 'craps');
   }
 
+  const G2 = createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLOT_BETS, VIP_SLOT_BETS });
   function handle(game, id, body) {
     if (isClosed()) return { code: 503, body: { error: 'The casino is closed for a moment. Try again soon.' } };
     if (game === 'slots') return slots(id, body);
     if (game === 'roulette') return roulette(id, body);
     if (game === 'blackjack') return blackjack(id, body);
     if (game === 'craps') return craps(id, body);
+    if (game === 'plinko') return G2.plinko(id, body);
+    if (game === 'mines') return G2.mines(id, body);
+    if (game === 'slots2') return G2.slots2(id, body);
     return { code: 404, body: { error: 'Unknown game.' } };
   }
   return { handle, planSpin, SLOT_BETS, checkLayout, rng, rnd };

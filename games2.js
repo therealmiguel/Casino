@@ -1,0 +1,104 @@
+// Plinko, Mines and Cosmic Cascade, played on the server like every other solo game.
+'use strict';
+const crypto = require('crypto');
+const CE = require('./cascade_engine');
+
+// Plinko pays, from the edge bucket to the middle one (the board is symmetric)
+const PLINKO_HALF = {
+  8: { low: [5.5, 2, 1.1, 1, 0.5], med: [12, 3, 1.3, 0.7, 0.4], high: [28, 4, 1.5, 0.3, 0.2] },
+  12: { low: [9, 3, 1.6, 1.3, 1.1, 1, 0.5], med: [30, 10, 4, 2, 1.1, 0.6, 0.3], high: [150, 24, 8, 2, 0.7, 0.2, 0.2] },
+  16: { low: [15, 9, 2, 1.4, 1.3, 1.2, 1.1, 1, 0.5], med: [100, 40, 10, 5, 3, 1.5, 1, 0.5, 0.25], high: [800, 120, 25, 9, 4, 2, 0.2, 0.2, 0.2] },
+};
+const PLINKO = {};
+for (const rows of [8, 12, 16]) { PLINKO[rows] = {}; for (const risk of ['low', 'med', 'high']) { const h = PLINKO_HALF[rows][risk]; PLINKO[rows][risk] = [...h, ...h.slice(0, -1).reverse()]; } }
+
+const MINES_EDGE = 0.97, MINES_MAX_WIN = 25000000; // a Mines game pays at most $250,000
+function minesMult(m, k) { let x = MINES_EDGE; for (let i = 0; i < k; i++) x *= (25 - i) / (25 - m - i); return Math.floor(x * 100) / 100; }
+
+module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLOT_BETS, VIP_SLOT_BETS }) {
+  const betOk = (id, c, max) => Number.isInteger(c) && c >= 10 && c <= (vip(id) ? max * 5 : max);
+
+  /* ---------- Plinko ---------- */
+  function plinko(id, b) {
+    const rows = Number(b.rows), risk = String(b.risk || ''), bet = Math.round(Number(b.bet));
+    if (!PLINKO[rows] || !PLINKO[rows][risk]) return bad(id, `plinko board ${String(b.rows).slice(0, 8)}/${risk.slice(0, 8)}`, 'Pick 8, 12 or 16 rows and a risk.');
+    if (!betOk(id, bet, 10000)) return bad(id, `plinko bet ${String(b.bet).slice(0, 20)}`, `Each ball takes $0.10 to $${vip(id) ? '500' : '100'}.`);
+    if (!A.debit(id, bet, 'plinko', 'Plinko ball')) return { code: 409, body: { error: 'Not enough in your bankroll.' } };
+    const path = []; let k = 0;
+    for (let i = 0; i < rows; i++) { const r = rnd(2); path.push(r); k += r; }
+    const mult = PLINKO[rows][risk][k];
+    const paid = Math.round(bet * mult);
+    if (paid > 0) A.credit(id, paid, 'plinko', `Plinko ${mult}×`);
+    const tags = (k === 0 || k === rows) ? ['plinko-edge'] : [];
+    A.round(id, 'plinko', { staked: bet, paid, spins: 1, mult: mult >= 10 ? Math.round(mult) : 0, tags });
+    return ok(id, { path, bucket: k, mult, paid }, 'plinko');
+  }
+
+  /* ---------- Mines ---------- */
+  const minesOf = id => { const r = A.get(id); return r.games.mines || null; };
+  const minesView = (G, reveal) => ({ live: !!G.live, bet: G.bet, m: G.m, open: G.open, mult: minesMult(G.m, G.open.length), next: G.open.length < 25 - G.m ? minesMult(G.m, G.open.length + 1) : null, mines: reveal ? G.mines : undefined, boom: G.boom, paid: G.paid || 0 });
+  function minesEnd(id, G, paid) {
+    G.live = false; G.paid = paid;
+    if (paid > 0) A.credit(id, paid, 'mines', `Mines cash-out ${minesMult(G.m, G.open.length)}×`);
+    const tags = []; if (G.open.length >= 5) tags.push('mines-5'); if (G.open.length >= 10) tags.push('mines-10');
+    A.round(id, 'mines', { staked: G.bet, paid, spins: 1, tags });
+  }
+  function mines(id, b) {
+    const rec = A.get(id), act = String(b.action || '');
+    let G = minesOf(id);
+    if (act === 'state') return ok(id, G ? minesView(G, !G.live) : { live: false }, 'mines');
+    if (act === 'start') {
+      if (G && G.live) return { code: 409, body: Object.assign({ error: 'Finish this game first.' }, minesView(G, false)) };
+      const m = Math.round(Number(b.mines)), bet = Math.round(Number(b.bet));
+      if (!(m >= 1 && m <= 24)) return bad(id, `mines count ${String(b.mines).slice(0, 8)}`, 'Pick 1 to 24 mines.');
+      if (!betOk(id, bet, 10000)) return bad(id, `mines bet ${String(b.bet).slice(0, 20)}`, `Bets go from $0.10 to $${vip(id) ? '500' : '100'}.`);
+      if (!A.debit(id, bet, 'mines', 'Mines bet')) return { code: 409, body: { error: 'Not enough in your bankroll.' } };
+      const cells = Array.from({ length: 25 }, (_, i) => i);
+      for (let i = 24; i > 0; i--) { const j = rnd(i + 1); [cells[i], cells[j]] = [cells[j], cells[i]]; }
+      G = rec.games.mines = { live: true, bet, m, mines: cells.slice(0, m).sort((x, y) => x - y), open: [], t: Date.now(), tour: A.inTour(rec, 'mines') };
+      A.touch(id);
+      return ok(id, minesView(G, false), 'mines');
+    }
+    if (!G || !G.live) return { code: 409, body: { error: 'Start a game first.', live: false } };
+    if (act === 'pick') {
+      const i = Math.round(Number(b.i));
+      if (!(i >= 0 && i < 25)) return bad(id, `mines tile ${String(b.i).slice(0, 8)}`, 'That tile is not on the board.');
+      if (G.open.includes(i)) return ok(id, minesView(G, false), 'mines');
+      if (G.mines.includes(i)) { G.boom = i; minesEnd(id, G, 0); A.touch(id); return ok(id, Object.assign(minesView(G, true), { hit: true }), 'mines'); }
+      G.open.push(i); A.touch(id);
+      const win = Math.round(G.bet * minesMult(G.m, G.open.length));
+      if (G.open.length === 25 - G.m || win >= MINES_MAX_WIN) { minesEnd(id, G, Math.min(win, MINES_MAX_WIN)); return ok(id, Object.assign(minesView(G, true), { auto: true }), 'mines'); }
+      return ok(id, minesView(G, false), 'mines');
+    }
+    if (act === 'cash') {
+      if (!G.open.length) return { code: 409, body: { error: 'Open at least one tile first.' } };
+      minesEnd(id, G, Math.min(MINES_MAX_WIN, Math.round(G.bet * minesMult(G.m, G.open.length))));
+      return ok(id, minesView(G, true), 'mines');
+    }
+    return bad(id, `mines action ${act.slice(0, 20)}`, 'Unknown move.');
+  }
+
+  /* ---------- Cosmic Cascade ---------- */
+  function slots2(id, b) {
+    const rec = A.get(id);
+    const bet = Math.round(Number(b.bet));
+    if (!SLOT_BETS.includes(bet) && !(VIP_SLOT_BETS.includes(bet) && vip(id))) return bad(id, `cascade bet ${String(b.bet).slice(0, 20)}`, 'That bet size is not on this machine.');
+    const buy = !!b.buy;
+    const cost = buy ? bet * CE.BUY_PRICE : bet;
+    if (!A.debit(id, cost, 'slots2', buy ? 'Cosmic Cascade bonus buy' : 'Cosmic Cascade spin')) return { code: 409, body: { error: 'Not enough in your bankroll.' } };
+    const plan = CE.play(rng, buy);
+    const payout = Math.round(plan.total * bet);
+    if (payout > 0) A.credit(id, payout, 'slots2', 'Cosmic Cascade win');
+    const jackpot = P && !A.inTour(rec, 'slots2') ? P.jackpotSpin(id, cost, 'slots2', rng) : 0;
+    const tags = [];
+    const maxCasc = Math.max(plan.base ? plan.base.cascades : 0, ...(plan.bonus && plan.bonus.fs ? plan.bonus.fs.list.map(f => f.s.cascades) : [0]));
+    if (maxCasc >= 5) tags.push('cascade-5');
+    if (plan.bonus) { tags.push('wheel', 'bonus'); if (plan.bonus.fs) tags.push('free-spins'); }
+    A.round(id, 'slots2', { staked: cost, paid: payout, spins: 1, mult: Math.round(plan.total), tags });
+    return ok(id, { plan, payout, cost, jackpot, pool: P ? Math.round(P.jackpot().pool) : 0 }, 'slots2');
+  }
+
+  return { plinko, mines, slots2, PLINKO, minesMult };
+};
+module.exports.PLINKO = PLINKO;
+module.exports.minesMult = minesMult;

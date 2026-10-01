@@ -201,7 +201,7 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
     <div class="bulbs" id="bulbs" aria-hidden="true"></div>
     <div class="eyebrow">Open all night · Tables live</div>
     <h1>Miguel's Casino</h1>
-    <p class="lede">Pick a table. Blackjack, lightning roulette, bubble craps and the Dynamite Diggers slot, all under one roof.</p>
+    <p class="lede">Pick a table. Blackjack, lightning roulette, bubble craps, two slot machines, Plinko and Mines, all under one roof.</p>
     <div class="bank">
       <div class="meter"><span>Your bankroll</span><b id="bankroll">$1,000.00</b></div>
       <button class="topup" id="topup" hidden>Get $1,000 in chips</button>
@@ -317,6 +317,93 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
         </div>
       </div>
     </a>
+    <a class="table" href="cascade.html">
+      <div class="art" style="background:radial-gradient(60% 70% at 25% 30%,rgba(120,60,255,.45),transparent 70%),radial-gradient(60% 60% at 85% 80%,rgba(255,60,160,.3),transparent 70%),#070516">
+        <svg viewBox="0 0 320 200" aria-hidden="true">
+          <defs>
+            <radialGradient id="cc0" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#FFF4C8"/><stop offset=".45" stop-color="#F6C84C"/><stop offset="1" stop-color="#8A4B00"/></radialGradient>
+            <radialGradient id="cc1" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#CFF6FF"/><stop offset=".5" stop-color="#2E8CFF"/><stop offset="1" stop-color="#0A1F66"/></radialGradient>
+            <radialGradient id="cco" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#7BEFFF"/><stop offset=".8" stop-color="#1C6DFF"/><stop offset="1" stop-color="#0A1A66"/></radialGradient>
+            <linearGradient id="cck" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F0E2FF"/><stop offset=".5" stop-color="#A66BFF"/><stop offset="1" stop-color="#4A1C9E"/></linearGradient>
+            <linearGradient id="ccg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E2FFEF"/><stop offset=".5" stop-color="#36D98A"/><stop offset="1" stop-color="#0B6B3D"/></linearGradient>
+          </defs>
+          <g fill="#fff"><circle cx="30" cy="30" r="1.2"/><circle cx="290" cy="40" r="1"/><circle cx="250" cy="170" r="1.3"/><circle cx="60" cy="160" r="1"/><circle cx="160" cy="18" r="1.1"/></g>
+          <rect x="62" y="34" width="196" height="132" rx="16" fill="rgba(20,14,44,.85)" stroke="#48E1FF" stroke-opacity=".5" stroke-width="2"/>
+          <g transform="rotate(-18 112 82)"><path d="M78 82a34 9 0 0 1 68 0" fill="none" stroke="#C98A1B" stroke-width="4"/></g>
+          <circle cx="112" cy="80" r="20" fill="url(#cc0)"/>
+          <g transform="rotate(-18 112 82)"><path d="M78 82a34 9 0 0 0 68 0" fill="none" stroke="#FFE6A0" stroke-width="4"/></g>
+          <circle cx="206" cy="78" r="22" fill="url(#cc1)"/><path d="M188 72c12 6 24-4 36 1M186 84c14 5 26-5 40 0" stroke="#9FE3FF" stroke-width="3" fill="none" opacity=".6"/>
+          <path d="M160 108l18 12v22l-18 12-18-12v-22z" fill="url(#cck)"/>
+          <path d="M100 118l16 18-16 18-16-18z" fill="url(#ccg)"/>
+          <circle cx="222" cy="134" r="18" fill="url(#cco)"/><text x="222" y="139" text-anchor="middle" font-family="monospace" font-weight="700" font-size="13" fill="#fff" stroke="#062048" stroke-width="3" paint-order="stroke">25×</text>
+          <path d="M160 40v14M154 46l6 8 6-8" stroke="#FFE6A0" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="info">
+        <span class="kind">Slot machine · new</span>
+        <h2>Cosmic Cascade</h2>
+        <p>Symbols pay anywhere and tumble into new wins, multiplier orbs up to 100×, and a prize wheel with free spins.</p>
+        <div class="foot">
+          <div class="chips"><span>Bet</span><b>$0.20 – $100</b></div>
+          <span class="play">Play <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </div>
+      </div>
+    </a>
+    <a class="table" href="plinko.html">
+      <div class="art" style="background:radial-gradient(70% 60% at 50% 0%,#2A1659,transparent 70%),#0A0716">
+        <svg viewBox="0 0 320 200" aria-hidden="true" id="plinkoArt"></svg>
+      </div>
+      <div class="info">
+        <span class="kind">Drop game · new</span>
+        <h2>Neon Plinko</h2>
+        <p>Drop balls through 8, 12 or 16 rows of pins. Pick your risk: steady wins in the middle or up to 800× on the edge.</p>
+        <div class="foot">
+          <div class="chips"><span>Per ball</span><b>$0.10 – $100</b></div>
+          <span class="play">Play <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </div>
+      </div>
+    </a>
+    <a class="table" href="mines.html">
+      <div class="art" style="background:radial-gradient(70% 60% at 50% 0%,#0F3A36,transparent 70%),#071212">
+        <svg viewBox="0 0 320 200" aria-hidden="true" id="minesArt"></svg>
+      </div>
+      <div class="info">
+        <span class="kind">Pick game · new</span>
+        <h2>Gem Mines</h2>
+        <p>25 tiles, as many mines as you dare. Every gem raises the multiplier. Cash out before you hit a mine.</p>
+        <div class="foot">
+          <div class="chips"><span>Bet</span><b>$0.10 – $100</b></div>
+          <span class="play">Play <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </div>
+      </div>
+    </a>
+<script>
+(() => {
+  const ns = 'http://www.w3.org/2000/svg';
+  const p = document.getElementById('plinkoArt');
+  if (p) {
+    let s = '';
+    for (let i = 0; i < 8; i++) for (let j = 0; j < i + 3; j++) s += `<circle cx="${160 + (j - (i + 2) / 2) * 20}" cy="${26 + i * 16}" r="2.6" fill="#D9D2F2"/>`;
+    const m = [12, 3, 1.3, 0.7, 0.4, 0.7, 1.3, 3, 12];
+    m.forEach((v, k) => { const d = Math.abs(k - 4) / 4; const c = [255, 214 - 153 * d, 92 + 35 * d].map(Math.round); s += `<rect x="${160 + (k - 4) * 20 - 9}" y="160" width="18" height="16" rx="4" fill="rgb(${c})"/><text x="${160 + (k - 4) * 20}" y="171.5" text-anchor="middle" font-family="monospace" font-weight="700" font-size="7.5" fill="#1A0A22">${v}</text>`; });
+    s += '<circle cx="150" cy="70" r="6" fill="#FF5C93"/><circle cx="150" cy="70" r="11" fill="#FF5C93" opacity=".25"/><circle cx="182" cy="118" r="6" fill="#FF5C93"/>';
+    p.innerHTML = s;
+  }
+  const q = document.getElementById('minesArt');
+  if (q) {
+    let s = '<defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#D9FFF1"/><stop offset=".5" stop-color="#3EF0B0"/><stop offset="1" stop-color="#0E8F68"/></linearGradient></defs>';
+    const gems = [1, 6, 12, 17], mine = 13;
+    for (let i = 0; i < 25; i++) {
+      const x = 95 + (i % 5) * 27, y = 32 + Math.floor(i / 5) * 27;
+      const g = gems.includes(i), b = i === mine;
+      s += `<rect x="${x}" y="${y}" width="23" height="23" rx="5" fill="${g ? '#0F2B27' : b ? '#3A1010' : '#22403F'}" stroke="${g ? '#3EF0B0' : b ? '#FF4D4D' : 'none'}" stroke-width="1.2"/>`;
+      if (g) s += `<path d="M${x + 7} ${y + 5}h9l4 5-8.5 9.5-8.5-9.5z" fill="url(#mg)"/>`;
+      if (b) s += `<circle cx="${x + 11.5}" cy="${y + 13}" r="6.5" fill="#25272C"/><circle cx="${x + 17}" cy="${y + 6}" r="2" fill="#FFD25A"/>`;
+    }
+    q.innerHTML = s;
+  }
+})();
+</script>
   </main>
 
 

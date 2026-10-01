@@ -156,6 +156,7 @@ module.exports = function createAccounts(hooks = {}) {
     if (!rec) return { error: 'Unknown player.' };
     const have = cash(id);
     if (have >= 500) return { error: `You still have ${usd(have)}. A fresh $1,000 is only for when you're out of chips.`, code: 409 };
+    if (rec.games && rec.games.mines && rec.games.mines.live && !rec.games.mines.tour) return { error: 'Finish your Mines game first.', code: 409 };
     rec.bal += START; rec.resets++;
     logTx(rec, 'reset', START, 'Fresh $1,000 stack');
     touch(id);

@@ -4,7 +4,11 @@ MIGUEL'S CASINO: PUTTING IT ON THE INTERNET
 What's in this folder
   server.js         the server: shows the casino, keeps every bankroll, runs the admin room
   accounts.js       player accounts: the only place money ever changes
-  games.js          blackjack, roulette, craps and the slot machine, played on the server
+  games.js          blackjack, roulette, craps and Dynamite Diggers, played on the server
+  games2.js         Plinko, Gem Mines and the Cosmic Cascade slot
+  progress.js       levels, VIP, daily bonus, challenges, badges, Mega Jackpot,
+                    weekly tournament, seasons, tips and happy hours
+  cascade_engine.js the rules and payouts of Cosmic Cascade
   bj_solo.js        the blackjack dealer for the solo table
   roulette_rules.js, craps_rules.js, slot_engine.js   the rules and payouts of each game
   live.js           the live tables: shared blackjack (5 seats), roulette and Hold'em
@@ -87,6 +91,10 @@ STEP 4: THE ADMIN ROOM (only for you)
     - see the house books: what each game took in and paid out
     - post an announcement banner, gift chips to everyone, close the casino
       for a moment, lock out new players, and download a backup
+    - start a happy hour (wins boosted x1.5, x2 or x3 on one game or all),
+      double XP, or give everyone free spins
+    - set the weekly tournament prizes, end the tournament or the season early,
+      and set the Mega Jackpot pot
 
 
 CHECK IT WORKS
