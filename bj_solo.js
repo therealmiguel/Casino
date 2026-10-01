@@ -56,7 +56,8 @@ function buildShoe(S, rnd) {
   S.shuffleDue = false;
 }
 
-function play(S, action, body, wallet, rnd) {
+function play(S, action, body, wallet, rnd, limits) {
+  const LIM = limits || { max: MAX, sideMax: SIDE_MAX };
   let R = S.round;
   const log = [];                                  // cards in the order they were drawn: { to: 'p'|'d', hand, card }
   const err = m => ({ error: m });
@@ -143,11 +144,11 @@ function play(S, action, body, wallet, rnd) {
     const sides = { pp: 0, t21: 0, ll: 0 };
     for (const k of Object.keys(sides)) {
       const v = Math.round(Number((body.sides || {})[k] || 0));
-      if (!(v >= 0 && v <= SIDE_MAX) || v % 100) return err('Side bets are $1 to $100.');
+      if (!(v >= 0 && v <= LIM.sideMax) || v % 100) return err(`Side bets are $1 to $${LIM.sideMax / 100}.`);
       if (v && !sidesOn) return err('Side bets are switched off.');
       sides[k] = v;
     }
-    if (!(bet >= MIN && bet <= MAX) || bet % 100) return err('The main bet is $5 to $1,000.');
+    if (!(bet >= MIN && bet <= LIM.max) || bet % 100) return err(`The main bet is $5 to $${(LIM.max / 100).toLocaleString('en-US')}.`);
     const decks = Math.round(Number(body.decks) || 6);
     if (!DECKS.includes(decks)) return err('Pick a shoe of 1, 2, 4, 6 or 8 decks.');
     const stake = bet + sides.pp + sides.t21 + sides.ll;

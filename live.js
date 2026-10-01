@@ -8,7 +8,8 @@ const F = Number(process.env.LIVE_TIME_SCALE) || 1;   // for automated tests onl
 const RR = require('./roulette_rules');
 const { createPoker } = require('./poker');
 
-module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, flag }) {
+module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, flag, vip }) {
+  const maxFor = pid => (vip && vip(pid) ? 500000 : 100000);
   /* ---------------- connections & notices ---------------- */
   const conns = new Set();                 // { res, game, pid, name }
   const notices = new Map();               // pid -> [{ id, game, payout, staked, net, ... }]  (for messages only; money is already paid)
@@ -193,7 +194,11 @@ module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, 
       if (s.ins > 0) { staked += s.ins; if (dBJ) { pay += s.ins * 3; insNet = s.ins * 2; } else insNet = -s.ins; }
       s.insResult = s.ins > 0 ? insNet : null;
       if (pay > 0) A.credit(s.pid, pay, 'live-bj', 'Live blackjack payout');
-      A.round(s.pid, 'live-bj', { staked, paid: pay, hands: s.hands.length, blackjacks: bjs });
+      const tags = [];
+      if (bjs) tags.push('natural');
+      if (s.hands.length > 1 && s.hands.some(h => h.result.net > 0)) tags.push('split-win');
+      if (s.ins > 0 && dBJ) tags.push('insured');
+      A.round(s.pid, 'live-bj', { staked, paid: pay, hands: s.hands.length, blackjacks: bjs, tags });
       owe(s.pid, { id: `bj-${BJ.roundId}`, game: 'bj', payout: pay, staked, net: pay - staked, hands: s.hands.length, insurance: s.insResult });
     }
     BJ.deadline = Date.now() + SETTLE_MS;
@@ -258,7 +263,7 @@ module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, 
       if (BJ.phase !== 'waiting' && BJ.phase !== 'betting' && BJ.phase !== 'settle') return err('Wait for the next round to bet.');
       const amount = Math.round(Number(body.amount));
       if (!(amount >= 100) || amount % 100) return err('Bets are in whole dollars, from $1.', 400);
-      if (s.bet + amount > MAX) return err('The table maximum is $1,000.');
+      if (s.bet + amount > maxFor(pid)) return err(`The table maximum is ${A.usd(maxFor(pid))}.`);
       if (!A.debit(pid, amount, 'live-bj', 'Live blackjack bet')) return err('Not enough in your bankroll.');
       s.bet += amount; s.ready = false;
       if (BJ.phase === 'waiting') startBetting();
@@ -338,7 +343,7 @@ module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, 
     const visibleDealer = BJ.hole && BJ.dealer.length ? [BJ.dealer[0], null] : BJ.dealer;
     return {
       game: 'bj', now: Date.now(), phase: BJ.phase, roundId: BJ.roundId, deadline: BJ.deadline, turn: BJ.turn, news: BJ.news, peek: BJ.peek,
-      minBet: MIN, maxBet: MAX, shoeLeft: BJ.shoe.length, insMs: INS_MS,
+      minBet: MIN, maxBet: maxFor(pid), shoeLeft: BJ.shoe.length, insMs: INS_MS,
       dealer: visibleDealer, dealerTotal: BJ.hole ? (BJ.dealer.length ? total([BJ.dealer[0]]).total : 0) : total(BJ.dealer).total,
       seats: BJ.seats.map(s => s && {
         name: s.name, bet: s.bet, ready: s.ready, leaving: s.leaving, me: s.pid === pid, online: online('bj', s.pid),
@@ -376,7 +381,7 @@ module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, 
     for (const [pid, b] of RL.bets) {
       const { total: payout, mult } = RR.payout(b.bets, RL.n, RL.strikes, true);
       if (payout > 0) A.credit(pid, payout, 'live-rl', `Live roulette: ${RL.n}`);
-      A.round(pid, 'live-rl', { staked: b.total, paid: payout, spins: 1, mult });
+      A.round(pid, 'live-rl', { staked: b.total, paid: payout, spins: 1, mult, tags: mult ? (mult === 500 ? ['lightning', 'lightning-500'] : ['lightning']) : [] });
       owe(pid, { id: `rl-${RL.roundId}`, game: 'rl', payout, staked: b.total, net: payout - b.total });
       RL.results[pid] = { name: RL.names.get(pid) || 'Player', net: payout - b.total, staked: b.total };
     }
@@ -436,7 +441,7 @@ module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, 
     persist: st => { pokerSeated = st.seated || {}; persist(); },
     take: (pid, c, why) => A.move(pid, -c, why || 'Poker buy-in'),
     give: (pid, c, why) => A.move(pid, c, why || 'Poker cash-out'),
-    handDone: (pid, staked, won) => { A.round(pid, 'poker', { staked, paid: won, hands: 1 }); watchHand(pid, staked, won); },
+    handDone: (pid, staked, won) => { A.round(pid, 'poker', { staked, paid: won, hands: 1, tags: won - staked >= 50000 ? ['pot-500'] : [] }); watchHand(pid, staked, won); },
   });
   // chip dumping: a player losing a big pot to someone on the same network (an alt account feeding a main one)
   let handBatch = [];
@@ -565,6 +570,7 @@ module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, 
     for (const c of [...conns]) if (c.pid === pid) { try { c.res.end(); } catch (e) {} conns.delete(c); }
     return n;
   }
+  function kickAll() { const ids = new Set(); BJ.seats.forEach(s => s && ids.add(s.pid)); RL.bets.forEach((v, k) => ids.add(k)); Object.keys(pokerSeated).forEach(k => ids.add(k)); ids.forEach(kick); }
   function onlineNow() { const m = new Map(); for (const c of conns) { if (!m.has(c.pid)) m.set(c.pid, []); m.get(c.pid).push(c.game); } return m; }
-  return { stream, action, claim, summary, restore, where, kick, onlineNow, persist, _test: { BJ, RL, total, PK, resolveInsurance, settle } };
+  return { stream, action, claim, summary, restore, where, kick, kickAll, onlineNow, persist, _test: { BJ, RL, total, PK, resolveInsurance, settle } };
 };

@@ -178,6 +178,23 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
             <p class="help" id="nNow" style="margin-top:10px"></p>
           </div>
           <div class="card">
+            <h2>Happy hour</h2>
+            <p class="help">Boost everyone's winnings on a game for a while. A banner tells the whole casino.</p>
+            <div class="row"><select id="hhGame" style="max-width:170px" aria-label="Game"><option value="all">Every game</option><option value="slots">Slots</option><option value="blackjack">Blackjack</option><option value="roulette">Roulette</option><option value="craps">Craps</option><option value="plinko">Plinko</option><option value="mines">Mines</option><option value="crash">Crash</option><option value="live-bc">Baccarat</option></select>
+              <select id="hhMult" style="max-width:110px" aria-label="Boost"><option value="1.5">×1.5</option><option value="2" selected>×2</option><option value="3">×3</option></select>
+              <select id="hhHours" style="max-width:130px" aria-label="How long"><option value="0.5">30 minutes</option><option value="1" selected>1 hour</option><option value="2">2 hours</option><option value="6">6 hours</option><option value="24">1 day</option></select>
+              <button class="btn gold" id="hhGo">Start</button><button class="btn" id="hhStop">Stop</button></div>
+            <div class="row" style="margin-top:12px"><b style="flex:1">Double XP</b><select id="xpHours" style="max-width:130px" aria-label="How long"><option value="1">1 hour</option><option value="3">3 hours</option><option value="24" selected>1 day</option><option value="72">3 days</option></select><button class="btn gold" id="xpGo">Start</button><button class="btn" id="xpStop">Stop</button></div>
+            <p class="help" id="evNow" style="margin-top:10px"></p>
+          </div>
+          <div class="card">
+            <h2>Free spins</h2>
+            <p class="help">Free spins on Dynamite Diggers. Players see a button on the slot and a popup.</p>
+            <div class="row"><input type="number" id="fsN" min="1" max="100" value="10" style="max-width:90px" aria-label="Spins"><span class="muted">spins at</span>
+              <select id="fsBet" style="max-width:110px" aria-label="Bet"><option value="20">$0.20</option><option value="100" selected>$1</option><option value="200">$2</option><option value="1000">$10</option></select>
+              <select id="fsTo" style="max-width:180px" aria-label="Who"><option value="all">Everyone</option><option value="online">Online now</option></select><button class="btn gold" id="fsGo">Give</button></div>
+          </div>
+          <div class="card">
             <h2>Gift chips</h2>
             <p class="help">Adds money to every named player's bankroll. It shows up in their history as a gift from the casino.</p>
             <div class="row"><input type="number" id="gAmt" min="1" step="1" placeholder="Amount in $" style="max-width:150px" aria-label="Amount in dollars">
@@ -191,6 +208,22 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
             <h2>Casino switches</h2>
             <div class="switch"><div><b>Close the casino</b><span>Every table stops taking bets (use it before updating the site).</span></div><button class="btn" id="swClosed"></button></div>
             <div class="switch"><div><b>Lock new players out</b><span>Only people who already have a seat can play.</span></div><button class="btn" id="swLocked"></button></div>
+          </div>
+          <div class="card">
+            <h2>Season</h2>
+            <p class="help" id="seasonNow"></p>
+            <div class="row"><button class="btn bad" id="seasonEnd">End the season now</button></div>
+          </div>
+          <div class="card">
+            <h2>Weekly tournament</h2>
+            <p class="help" id="tourNow"></p>
+            <div class="row"><input type="number" id="tp1" min="0" placeholder="1st $" style="max-width:110px" aria-label="First prize"><input type="number" id="tp2" min="0" placeholder="2nd $" style="max-width:110px" aria-label="Second prize"><input type="number" id="tp3" min="0" placeholder="3rd $" style="max-width:110px" aria-label="Third prize"><button class="btn" id="tpSave">Save prizes</button></div>
+            <div class="row" style="margin-top:10px"><button class="btn bad" id="tourEnd">End this week's tournament now</button></div>
+          </div>
+          <div class="card">
+            <h2>Mega jackpot</h2>
+            <p class="help" id="jpNow"></p>
+            <div class="row"><input type="number" id="jpPool" min="0" placeholder="Pot now $" style="max-width:140px" aria-label="Pot now"><input type="number" id="jpSeed" min="0" placeholder="Restart at $" style="max-width:140px" aria-label="Restart at"><button class="btn" id="jpSave">Save</button></div>
           </div>
           <div class="card">
             <h2>Backup</h2>
@@ -220,7 +253,7 @@ const ago = t => { if (!t) return '—'; const s = (Date.now() - t) / 1000; if (
 const when = t => new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const COLORS = ['#E8C170', '#E07A5F', '#81B29A', '#9C89B8', '#F2CC8F', '#6FB1D6', '#E5989B', '#B5E48C'];
 const tint = s => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
-const GAMES = { slots: 'Dynamite Diggers', roulette: 'Voltage Roulette', blackjack: 'Brass Table Blackjack', craps: 'Bubble Dome Craps', 'live-bj': 'Live blackjack', 'live-rl': 'Live roulette', poker: 'Hold’em (player vs player)', live: 'Live tables', admin: 'Casino', reset: 'Fresh $1,000', import: 'Upgrade', join: 'Joined', table: 'Poker chips' };
+const GAMES = { bonus: 'Bonuses & challenges', jackpot: 'Mega jackpot', tournament: 'Tournament prizes', event: 'Happy hour & free spins', tip: 'Tip', season: 'Season', slots2: 'Cosmic Cascade', plinko: 'Plinko', mines: 'Mines', crash: 'Crash', 'live-bc': 'Live baccarat', slots: 'Dynamite Diggers', roulette: 'Voltage Roulette', blackjack: 'Brass Table Blackjack', craps: 'Bubble Dome Craps', 'live-bj': 'Live blackjack', 'live-rl': 'Live roulette', poker: 'Hold’em (player vs player)', live: 'Live tables', admin: 'Casino', reset: 'Fresh $1,000', import: 'Upgrade', join: 'Joined', table: 'Poker chips' };
 let toastT;
 function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2600); }
 async function api(path, body) {
@@ -364,7 +397,9 @@ function drawPlayer() {
       <div><span>Total bet</span><b>${usd(s.wagered)}</b></div><div><span>Total paid</span><b>${usd(s.paid)}</b></div><div><span>Resets</span><b>${p.resets}</b></div></div>
     <h3>Play</h3>
     <div class="kv"><div><span>Rounds</span><b>${s.rounds.toLocaleString()}</b></div><div><span>Hands</span><b>${s.hands.toLocaleString()}</b></div><div><span>Spins</span><b>${s.spins.toLocaleString()}</b></div>
-      <div><span>Rolls</span><b>${s.rolls.toLocaleString()}</b></div><div><span>Blackjacks</span><b>${s.blackjacks.toLocaleString()}</b></div><div><span>Best win</span><b>${usd(s.bigWin)}</b></div></div>
+      <div><span>Rolls</span><b>${s.rolls.toLocaleString()}</b></div><div><span>Blackjacks</span><b>${s.blackjacks.toLocaleString()}</b></div><div><span>Best win</span><b>${usd(s.bigWin)}</b></div>
+      <div><span>Level</span><b>${p.level}</b></div><div><span>XP</span><b>${(p.xp || 0).toLocaleString()}</b></div><div><span>Badges</span><b>${p.badges || 0}</b></div></div>
+    <p class="help" style="margin-top:8px"><a href="/profile.html?id=${encodeURIComponent(p.id)}" target="_blank" rel="noopener">Open their public profile →</a></p>
     ${p.craps && p.craps.bets && Object.keys(p.craps.bets).length ? `<p class="help" style="margin-top:8px">${usd(Object.values(p.craps.bets).reduce((a, b) => a + b, 0))} riding on their craps table${p.craps.point ? ` (point ${p.craps.point})` : ''}.</p>` : ''}
     <h3>Manage</h3>
     <div class="acts">
@@ -406,6 +441,14 @@ $('drawer').addEventListener('click', async e => {
 /* ---------- controls ---------- */
 function renderControls() {
   const st = OV.settings;
+  const ev = OV.events || {}, live_ = e => e && e.until > Date.now();
+  $('evNow').textContent = [live_(ev.boost) ? `Happy hour ×${ev.boost.mult} on ${ev.boost.game} until ${when(ev.boost.until)}.` : 'No happy hour running.', live_(ev.xp) ? `Double XP until ${when(ev.xp.until)}.` : ''].join(' ');
+  $('seasonNow').textContent = `Season ${OV.season.n} started ${when(OV.season.start)} and ends ${when(OV.season.end)}. When it ends, the top 3 go into the hall of fame and everyone restarts with $1,000 (levels and badges stay).`;
+  const T = OV.tour || {};
+  $('tourNow').innerHTML = `Week ${esc(T.week || '')} ends ${T.end ? when(T.end) : ''}. ${T.board && T.board.length ? 'Leading: ' + T.board.slice(0, 3).map((r, i) => `${['🥇', '🥈', '🥉'][i]} ${esc(r.name)} ${usd(r.bal)}`).join(' · ') : 'Nobody has joined yet.'} Prizes now: ${(T.prizes || []).map(usd).join(' / ')}. Players need 10 rounds to win a prize.`;
+  if (T.prizes && !$('tp1').value) { $('tp1').value = T.prizes[0] / 100; $('tp2').value = T.prizes[1] / 100; $('tp3').value = T.prizes[2] / 100; }
+  const J = OV.jackpot || {};
+  $('jpNow').textContent = `The pot is ${usd(Math.round(J.pool || 0))} and restarts at ${usd(J.seed || 0)} after a win.${J.last ? ` Last won by ${J.last.name}: ${usd(J.last.amount)} (${ago(J.last.t)}).` : ''}`;
   $('swClosed').textContent = st.closed ? 'Open the casino' : 'Close the casino'; $('swClosed').className = 'btn ' + (st.closed ? 'gold' : 'bad');
   $('swLocked').textContent = st.locked ? 'Let new players in' : 'Lock them out'; $('swLocked').className = 'btn ' + (st.locked ? 'gold' : '');
   const n = st.notice;
@@ -423,6 +466,16 @@ $('gSend').onclick = async () => {
   if (!confirm(`Give ${usd(c)} to ${who}?`)) return;
   try { const r = await api('gift', { cents: c, to: $('gTo').value, note: $('gNote').value }); toast(`Sent to ${r.count} player${r.count === 1 ? '' : 's'}`); $('gAmt').value = ''; load(); } catch (x) { toast(x.message); }
 };
+const post = async (path, body, msg) => { try { await api(path, body); toast(msg); load(); } catch (x) { toast(x.message); } };
+$('hhGo').onclick = () => post('event', { boost: { game: $('hhGame').value, mult: +$('hhMult').value, hours: +$('hhHours').value } }, 'Happy hour started');
+$('hhStop').onclick = () => post('event', { boost: null }, 'Happy hour stopped');
+$('xpGo').onclick = () => post('event', { xp: { hours: +$('xpHours').value } }, 'Double XP started');
+$('xpStop').onclick = () => post('event', { xp: null }, 'Double XP stopped');
+$('fsGo').onclick = () => { if (confirm(`Give ${$('fsN').value} free spins to ${$('fsTo').value === 'all' ? 'everyone' : 'everyone online'}?`)) post('freespins', { n: +$('fsN').value, bet: +$('fsBet').value, to: $('fsTo').value }, 'Free spins sent'); };
+$('seasonEnd').onclick = () => { if (prompt('End the season now? Everyone goes back to $1,000. Type END to confirm.') === 'END') post('season', { action: 'end' }, 'New season started'); };
+$('tpSave').onclick = () => post('tournament', { action: 'prizes', prizes: [$('tp1').value, $('tp2').value, $('tp3').value].map(v => Math.round(parseFloat(v || 0) * 100)) }, 'Prizes saved');
+$('tourEnd').onclick = () => { if (confirm('End this week\u2019s tournament now and pay the prizes?')) post('tournament', { action: 'end' }, 'Tournament ended'); };
+$('jpSave').onclick = () => post('jackpot', { pool: Math.round(parseFloat($('jpPool').value) * 100), seed: Math.round(parseFloat($('jpSeed').value) * 100) }, 'Jackpot saved');
 $('export').onclick = async () => {
   const data = await api('export');
   const a = document.createElement('a');

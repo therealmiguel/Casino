@@ -31,6 +31,10 @@ body.fs .sky{filter:hue-rotate(-25deg) saturate(1.4) brightness(1.15)}
 body.hb .sky{filter:hue-rotate(15deg) saturate(1.6) brightness(.9)}
 
 .bar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:linear-gradient(180deg,rgba(20,14,10,.95),rgba(14,10,8,.85));border-bottom:1px solid var(--edge)}
+.mega{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:linear-gradient(180deg,#3A1A08,#1F0E05);box-shadow:0 0 0 1px var(--gold),0 0 16px rgba(255,190,60,.3);font:400 12px var(--display);letter-spacing:.08em;color:var(--gold-2);white-space:nowrap}
+.mega b{font:700 14px var(--mono);color:#fff;letter-spacing:0}
+.pill.free{background:linear-gradient(180deg,#5BD18F,#2E8C5A);border-color:#9FF2C4;color:#05200F}
+@media (max-width:760px){.mega{display:none}}
 .title{font:400 24px/1 var(--display);color:var(--gold-2);letter-spacing:.02em;text-shadow:0 2px 0 #7A3D0C,0 0 18px rgba(255,180,60,.35);white-space:nowrap}
 .bar .sp{flex:1}
 .ibtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--edge);background:var(--panel-2);display:grid;place-items:center;cursor:pointer;flex:none}
@@ -293,6 +297,7 @@ canvas#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-in
   <header class="bar">
     <a href="index.html" class="lobbylink" title="Back to Miguel's Casino" aria-label="Back to Miguel's Casino lobby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Lobby</span></a>
     <div class="title">Dynamite Diggers</div>
+    <div class="mega" id="mega" hidden title="Shared by every slot in the casino">MEGA <b id="megaAmt"></b></div>
     <div class="sp"></div>
     <button class="ibtn" id="infoBtn" aria-label="Paytable and rules" title="Paytable"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></button>
     <button class="ibtn" id="soundBtn" aria-label="Toggle sound" title="Sound"></button>
@@ -329,6 +334,7 @@ canvas#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-in
       <div class="side">
         <button class="pill" id="autoBtn"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>Auto</button>
         <button class="pill" id="turboBtn"><svg viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>Turbo</button>
+        <button class="pill free" id="freeBtn" hidden>Free spins</button>
         <button class="pill buy" id="buyBtn">Buy bonus</button>
       </div>
     </div>
@@ -338,6 +344,7 @@ canvas#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-in
 <div class="ov" id="ov" hidden></div>
 <div class="toast" id="toast" role="status"></div>
 
+<script>window.CASINO_CTX = 'solo';</script>
 <script>
 /* Miguel's Casino (online): the casino's server keeps every bankroll and decides every game.
    This page only shows a copy of your balance and sends your moves. */
@@ -371,6 +378,7 @@ window.CasinoNet = (() => {
       }
     }
     if (typeof j.cents === 'number') CasinoWallet._server(j.cents);
+    if (Array.isArray(j.pop) && j.pop.length) CasinoUI.popups(j.pop);
     if (r.status === 403 && /suspended/i.test(j.error || '')) CasinoUI.suspended();
     return { ok: r.ok, status: r.status, body: j };
   }
@@ -398,8 +406,8 @@ window.CasinoWallet = (() => {
   }
   async function refresh() {
     if (isBusy()) return null;
-    const r = await CasinoNet.api('api/me', { name: CasinoBoard.name() });
-    if (r.ok) { info_ = { peak: r.body.peak, resets: r.body.resets }; if (!isBusy()) apply(r.body.cents); CasinoUI.notice(r.body.notice); if (r.body.banned) CasinoUI.suspended(); }
+    const r = await CasinoNet.api('api/me', { name: CasinoBoard.name(), ctx: window.CASINO_CTX || 'lobby' });
+    if (r.ok) { info_ = { peak: r.body.peak, resets: r.body.resets }; if (!isBusy()) apply(r.body.cents); CasinoUI.notice(r.body.notice); CasinoUI.mode(r.body); if (r.body.banned) CasinoUI.suspended(); }
     return r.ok ? r.body : null;
   }
   // a fresh $1,000, only when you are out of chips everywhere
@@ -428,11 +436,12 @@ window.CasinoBoard = (() => {
     if (ready) return ready;
     ready = (async () => {
       if (!/^https?:$/.test(location.protocol)) return false;
-      const r = await CasinoNet.api('api/me', { name: name() });
+      const r = await CasinoNet.api('api/me', { name: name(), ctx: window.CASINO_CTX || 'lobby' });
       if (!r.ok) { if (r.status === 403) { denied = true; mode = 'server'; return true; } ready = null; return false; }
       meInfo = r.body; mode = 'server';
       CasinoWallet.apply(r.body.cents);
       CasinoUI.notice(r.body.notice);
+      CasinoUI.mode(r.body);
       if (r.body.banned) CasinoUI.suspended();
       if (r.body.name && !name()) { try { localStorage.setItem(NAME_KEY, r.body.name); } catch (e) {} }
       return true;
@@ -441,7 +450,7 @@ window.CasinoBoard = (() => {
   }
   async function push() {
     if (!(await connect())) return false;
-    const r = await CasinoNet.api('api/me', { name: name() });
+    const r = await CasinoNet.api('api/me', { name: name(), ctx: window.CASINO_CTX || 'lobby' });
     if (r.ok) meInfo = r.body;
     return r.ok;
   }
@@ -453,6 +462,7 @@ window.CasinoBoard = (() => {
       es = new EventSource('api/stream');
       es.addEventListener('players', e => { try { onRows(JSON.parse(e.data)); } catch (x) {} });
       es.addEventListener('notice', e => { try { CasinoUI.notice(JSON.parse(e.data)); } catch (x) {} });
+      es.addEventListener('jackpot', e => { try { dispatchEvent(new CustomEvent('casino:jackpot', { detail: JSON.parse(e.data) })); } catch (x) {} });
       es.onerror = () => { if (onError && es.readyState === 2) onError(); };
     } else { load(); poll = setInterval(load, 8000); }
     return () => { if (es) es.close(); if (poll) clearInterval(poll); };
@@ -470,6 +480,15 @@ window.CasinoUI = (() => {
     .mc-notice.party{background:linear-gradient(90deg,#FF9AD5,#FFD36E,#8EF0B4);} .mc-notice.warn{background:linear-gradient(180deg,#FFB4A8,#F2786D);}
     .mc-notice.ban{background:linear-gradient(180deg,#3A1414,#220A0A);color:#FFD9D2;box-shadow:0 12px 30px rgba(0,0,0,.5),0 0 0 1px #F2786D}
     .mc-notice b{font-weight:800}
+    .mc-pops{position:fixed;left:14px;bottom:14px;z-index:9998;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:min(340px,calc(100% - 28px))}
+    .mc-pop{display:flex;gap:11px;align-items:center;padding:11px 14px 11px 11px;border-radius:14px;background:linear-gradient(180deg,#2A1B10,#170E08);color:#FFF4DA;box-shadow:0 0 0 1px rgba(247,223,163,.5),0 14px 34px rgba(0,0,0,.55);font:14px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;animation:mcPop .45s cubic-bezier(.2,1.3,.4,1);pointer-events:auto}
+    .mc-pop i{font-style:normal;font-size:26px;width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:rgba(247,223,163,.12);flex:none}
+    .mc-pop b{display:block;font-weight:800;color:#F7DFA3}
+    .mc-pop small{display:block;color:#D8C8A8;font-size:12.5px}
+    .mc-pop.out{animation:mcOut .35s ease forwards}
+    @keyframes mcPop{from{opacity:0;transform:translateX(-30px) scale(.9)}to{opacity:1;transform:none}}
+    @keyframes mcOut{to{opacity:0;transform:translateX(-30px)}}
+    .mc-tour{position:fixed;left:12px;bottom:110px;pointer-events:none;white-space:nowrap;z-index:9997;padding:7px 12px;border-radius:999px;font:800 11.5px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#1B1206;background:linear-gradient(90deg,#8EF0B4,#F2C65A);box-shadow:0 8px 20px rgba(0,0,0,.4)}
     .mc-notice button{flex:none;border:0;background:rgba(0,0,0,.14);color:inherit;width:26px;height:26px;border-radius:50%;cursor:pointer;font:700 15px system-ui}
     @keyframes mcIn{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}`;
   function ensure() {
@@ -502,7 +521,90 @@ window.CasinoUI = (() => {
     if (!document.body) { addEventListener('DOMContentLoaded', suspended); return; }
     show('Your account has been suspended by the casino, so you can’t play right now. Ask Miguel if you think this is a mistake.', 'ban', false);
   }
-  return { notice, suspended };
+  // achievements, level ups, gifts: little cards in the corner, a moment after the result is on screen
+  let popBox = null, queue = [], showing = 0;
+  function popups(list) {
+    if (!document.body) { addEventListener('DOMContentLoaded', () => popups(list)); return; }
+    ensure();
+    if (!popBox) { popBox = document.createElement('div'); popBox.className = 'mc-pops'; popBox.setAttribute('aria-live', 'polite'); document.body.appendChild(popBox); }
+    const delay = window.CASINO_CTX === 'lobby' || !window.CASINO_CTX ? 300 : 2600;
+    list.forEach((p, i) => setTimeout(() => showPop(p), delay + i * 900));
+  }
+  function showPop(p) {
+    const el = document.createElement('div'); el.className = 'mc-pop';
+    const ic = document.createElement('i'); ic.textContent = p.icon || '⭐';
+    const tx = document.createElement('div'); const b = document.createElement('b'); b.textContent = (p.type === 'ach' ? 'Badge unlocked · ' : '') + p.title; const sm = document.createElement('small'); sm.textContent = p.text || '';
+    tx.append(b, sm); el.append(ic, tx); popBox.appendChild(el);
+    try { if (window.CasinoSound) CasinoSound.ding(); } catch (e) {}
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, 5200);
+  }
+  // playing with tournament chips: say so on every solo table
+  let ribbon = null;
+  function mode(me) {
+    if (!document.body) { addEventListener('DOMContentLoaded', () => mode(me)); return; }
+    const on = me && me.mode === 'tour' && window.CASINO_CTX === 'solo';
+    if (on && !ribbon) { ensure(); ribbon = document.createElement('div'); ribbon.className = 'mc-tour'; ribbon.textContent = '🏁 Tournament chips'; ribbon.title = 'You are playing with this week’s tournament chips. Switch back in the lobby.'; document.body.appendChild(ribbon); }
+    if (ribbon) ribbon.hidden = !on;
+  }
+  return { notice, suspended, popups, mode };
+})();
+
+// one volume for every game, and soft lounge music if you want it (set in the lobby)
+window.CasinoSound = (() => {
+  const KEY = 'miguels-casino-sound';
+  const load = () => { try { return Object.assign({ on: true, vol: 0.8, music: false, mvol: 0.4 }, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return { on: true, vol: 0.8, music: false, mvol: 0.4 }; } };
+  let cfg = load();
+  const masters = new Set();
+  const level = () => (cfg.on ? cfg.vol : 0);
+  const Base = window.AudioContext || window.webkitAudioContext;
+  const desc = Base && (Object.getOwnPropertyDescriptor(window.BaseAudioContext ? BaseAudioContext.prototype : Base.prototype, 'destination') || Object.getOwnPropertyDescriptor(Base.prototype, 'destination'));
+  if (Base && desc && desc.get) {
+    // every game's sounds go through one volume knob
+    class CasinoAudio extends Base {
+      constructor(...a) { super(...a); const g = Base.prototype.createGain.call(this); g.gain.value = level(); g.connect(desc.get.call(this)); this._mc = g; masters.add(g); }
+      get destination() { return this._mc || desc.get.call(this); }
+    }
+    try { window.AudioContext = CasinoAudio; if (window.webkitAudioContext) window.webkitAudioContext = CasinoAudio; } catch (e) {}
+  }
+  function apply() { masters.forEach(g => { try { g.gain.value = level(); } catch (e) {} }); music(); }
+  function set(k, v) { cfg[k] = v; try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} apply(); }
+  addEventListener('storage', e => { if (e.key === KEY) { cfg = load(); apply(); } });
+  // music: slow jazzy chords, made on the fly
+  let mctx = null, mgain = null, timer = null, step = 0;
+  const CHORDS = [[57, 60, 64, 67], [62, 65, 69, 72], [55, 59, 62, 65], [60, 64, 67, 71]];   // Am7, Dm7, G7, Cmaj7
+  const hz = n => 440 * Math.pow(2, (n - 69) / 12);
+  function note(f, t, d, type, v, dest) { const o = mctx.createOscillator(), g = mctx.createGain(); o.type = type; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g).connect(dest); o.start(t); o.stop(t + d + 0.05); }
+  function bar() {
+    const t = mctx.currentTime + 0.05, ch = CHORDS[step % 4], beat = 0.75;
+    const lp = mctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.connect(mgain);
+    ch.forEach(n => note(hz(n), t, beat * 4, 'triangle', 0.05, lp));
+    [0, 2].forEach(b => note(hz(ch[0] - 24), t + b * beat, beat * 1.6, 'sine', 0.12, mgain));
+    [1, 2.5, 3].forEach(b => note(hz(ch[(b * 2) % 4] + 12), t + b * beat, beat * 0.9, 'sine', 0.03, lp));
+    step++;
+  }
+  function music() {
+    const want = cfg.music && cfg.on;
+    if (!want) { if (timer) { clearInterval(timer); timer = null; } if (mgain) mgain.gain.value = 0; return; }
+    if (!Base) return;
+    if (!mctx) { try { mctx = new Base(); } catch (e) { return; } mgain = mctx.createGain(); mgain.connect(desc && desc.get ? desc.get.call(mctx) : mctx.destination); }
+    mgain.gain.value = cfg.mvol * 0.6;
+    if (mctx.state === 'suspended') mctx.resume().catch(() => {});
+    if (!timer && mctx.state === 'running') { bar(); timer = setInterval(bar, 3000); }
+  }
+  const unlock = () => { if (cfg.music) music(); };
+  document.addEventListener('pointerdown', unlock); document.addEventListener('keydown', unlock);
+  // a soft chime for badges and level ups
+  let dctx = null;
+  function ding() {
+    if (!cfg.on || !Base) return;
+    try {
+      if (!dctx) dctx = new window.AudioContext();
+      if (dctx.state !== 'running') return;
+      const t = dctx.currentTime;
+      [1047, 1319, 1568].forEach((f, i) => { const o = dctx.createOscillator(), g = dctx.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t + i * 0.08); g.gain.exponentialRampToValueAtTime(0.08, t + i * 0.08 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.08 + 0.5); o.connect(g).connect(dctx.destination); o.start(t + i * 0.08); o.stop(t + i * 0.08 + 0.55); });
+    } catch (e) {}
+  }
+  return { get: () => Object.assign({}, cfg), set, ding };
 })();
 </script>
 
@@ -647,7 +749,7 @@ const SlotEngine = (() => {
 const E = SlotEngine;
 const $ = id => document.getElementById(id);
 const KEY = 'dynamite-diggers-v1';
-const BETS = [20, 40, 60, 100, 200, 400, 600, 1000, 2000, 5000, 10000];
+const BETS = [20, 40, 60, 100, 200, 400, 600, 1000, 2000, 5000, 10000];   // VIPs online also get $200 and $500
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };
 const saved = load();
 const S = {
@@ -657,7 +759,7 @@ const S = {
   sound: saved.sound !== false, turbo: !!saved.turbo,
   busy: false, auto: 0, ledger: { cost: 0, paid: 0 }, hurry: false, fs: false, grid: null,
 };
-const bet = () => BETS[S.betIx];
+const bet = () => S.freeBet || BETS[S.betIx];
 function save(extra) { try { localStorage.setItem(KEY, JSON.stringify(Object.assign({ bet: bet(), stats: S.stats, sound: S.sound, turbo: S.turbo, pending: load().pending || null }, extra || {}))); } catch (e) {} }
 CasinoWallet.bind(() => S.bank, d => { S.bank = Math.max(0, S.bank + d); renderMeters(); }, () => S.busy);
 const rng = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; };
@@ -724,6 +826,7 @@ function renderMeters() {
   $('betDown').disabled = S.busy || S.betIx === 0; $('betUp').disabled = S.busy || S.betIx === BETS.length - 1;
   $('buyBtn').textContent = `Buy bonus ${money(cents(E.BUY_PRICE))}`;
   $('buyBtn').disabled = S.busy || S.auto > 0;
+  const fb = $('freeBtn'); fb.hidden = !(S.free && S.free.n > 0); if (!fb.hidden) { fb.textContent = `🎁 ${S.free.n} free spin${S.free.n === 1 ? '' : 's'} at ${money(S.free.bet)}`; fb.disabled = S.busy; }
   $('turboBtn').classList.toggle('on', S.turbo);
   $('autoBtn').classList.toggle('on', S.auto > 0);
   $('autoN').hidden = !S.auto; $('autoN').textContent = S.auto === Infinity ? '∞' : S.auto;
@@ -1030,23 +1133,26 @@ function plan(buy) {
   }
   return { s, hb, fs, total };
 }
-async function play(buy) {
+async function play(buy, free) {
   if (S.busy) { hurry(); return; }
-  const cost = buy ? cents(E.BUY_PRICE) : bet();
+  if (free && !(S.free && S.free.n > 0)) return;
+  S.freeBet = free ? S.free.bet : 0;
+  const cost = free ? 0 : buy ? cents(E.BUY_PRICE) : bet();
   if (S.bank < cost) { S.auto = 0; renderMeters(); toast(S.bank < bet() ? 'Not enough in your bankroll. Top up in the lobby.' : 'Lower your bet to keep playing.'); return; }
   S.busy = true; S.hurry = false;
   S.bank -= cost; S.ledger.cost += cost; CasinoWallet.sync();
-  let p, payout, serverCents = null;
+  let p, payout, serverCents = null, jackpotWon = 0;
   if (window.CASINO_ONLINE) {
     // online: the casino's server takes the bet, spins and pays; this page shows the spin it was sent
     renderMeters();
-    const R = await CasinoNet.api('api/g/slots', { bet: bet(), buy: !!buy });
+    const R = await CasinoNet.api('api/g/slots', { bet: bet(), buy: !!buy, free: !!free });
     if (!R.ok) {
-      S.bank += cost; S.ledger.cost -= cost; S.busy = false; S.auto = 0; renderMeters();
+      S.bank += cost; S.ledger.cost -= cost; S.busy = false; S.auto = 0; S.freeBet = 0; renderMeters();
       toast(R.body.error || 'The machine could not spin. Try again.');
       return;
     }
-    p = R.body.plan; payout = R.body.payout; serverCents = R.body.cents;
+    p = R.body.plan; payout = R.body.payout; serverCents = R.body.cents; jackpotWon = R.body.jackpot || 0;
+    S.free = R.body.free || null; if (R.body.pool) setMega(R.body.pool);
   } else {
     p = plan(buy);
     payout = cents(p.total);
@@ -1080,10 +1186,11 @@ async function play(buy) {
   save();
   S.hurry = false;
   try {
+    if (jackpotWon > 0) await megaJackpot(jackpotWon);
     if (payout >= bet() * 15) await bigWin(payout);
     else if (payout > 0 && !$('caption').innerHTML) $('caption').innerHTML = `You win <b>${money(payout)}</b>`;
   } catch (e) { console.error(e); $('ov').hidden = true; }
-  S.busy = false;
+  S.busy = false; S.freeBet = 0;
   renderMeters();
   if (S.auto) {
     if (S.auto !== Infinity) S.auto--;
@@ -1091,6 +1198,12 @@ async function play(buy) {
     renderMeters();
     if (S.auto) setTimeout(() => { if (S.auto && !S.busy) play(false); }, S.turbo ? 120 : 380);
   }
+}
+// the shared Mega Jackpot (online casino)
+function setMega(c) { const m = $('mega'); if (!m) return; m.hidden = false; $('megaAmt').textContent = money(Math.round(c)); }
+async function megaJackpot(c) {
+  sfx('big'); shower(320);
+  await overlay(`<h2 class="jp" style="color:#FFD36E">MEGA JACKPOT</h2><div class="amt">${money(c)}</div><p>You won the jackpot shared by every slot in the casino!</p>`, 7000);
 }
 async function freeSpins(list, run) {
   S.stats.features++;
@@ -1174,6 +1287,7 @@ $('betUp').onclick = () => { if (S.busy) return; S.betIx = Math.min(BETS.length 
 $('turboBtn').onclick = () => { S.turbo = !S.turbo; save(); renderMeters(); };
 $('autoBtn').onclick = () => { unlock(); autoMenu(); };
 $('buyBtn').onclick = () => { unlock(); buyMenu(); };
+$('freeBtn').onclick = () => { unlock(); play(false, true); };
 $('infoBtn').onclick = paytable;
 $('soundBtn').onclick = () => { S.sound = !S.sound; unlock(); save(); renderMeters(); };
 document.addEventListener('keydown', e => {
@@ -1190,7 +1304,14 @@ showGrid(first.grid);
 renderMeters();
 // a spin that was still animating when the page closed pays out now
 const pend = window.CASINO_ONLINE ? null : load().pending;
-if (window.CASINO_ONLINE) CasinoBoard.connect().then(ok => { if (!ok) toast('This machine needs the casino server to spin.'); });
+if (window.CASINO_ONLINE) CasinoBoard.connect().then(ok => {
+  if (!ok) { toast('This machine needs the casino server to spin.'); return; }
+  const me = CasinoBoard.me || {};
+  if (me.vip && !BETS.includes(20000)) { BETS.push(20000, 50000); }
+  if (me.free) S.free = me.free;
+  if (me.jackpot) setMega(me.jackpot);
+  renderMeters();
+});
 if (pend && pend.c > 0) { S.bank += pend.c; CasinoWallet.sync(); save({ pending: null }); renderMeters(); setTimeout(() => toast(`Your last spin finished: ${money(pend.c)} added`), 400); }
 if (document.fonts) document.fonts.ready.then(() => { if (!S.busy) showGrid(S.grid); });
 window.__slot = { S, E, play, plan };

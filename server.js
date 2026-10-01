@@ -16,7 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
-const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html'];
+const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'profile.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
   const preferred = [path.join(__dirname, 'public'), __dirname];
@@ -133,6 +133,7 @@ function mergeMeta(m) {
   META.security = Array.isArray(m.security) ? m.security : [];
   META.audit = Array.isArray(m.audit) ? m.audit : [];
   for (const [g, h] of Object.entries(m.house || {})) Object.assign(A.houseFor(g), h);
+  for (const k of ['jackpot', 'events', 'season', 'hall', 'tour', 'tourHistory', 'tourPrizes']) if (m[k] !== undefined && m[k] !== null) META[k] = m[k];
 }
 let flushing = false, lastMeta = 0;
 async function flush(force) {
@@ -166,12 +167,22 @@ function authPlayer(id, token, ip, opts = {}) {
   if (r.error && r.reason === 'wrong-token') flag(id, 'wrong-key', 'Someone tried to use this seat with the wrong key', ip);
   return r;
 }
-const games = require('./games')(A, { flag: (id, kind, detail) => flag(id, kind, detail), isClosed: () => META.settings.closed });
+// a casino-wide message (jackpot wins, season and tournament results); an announcement from the admin room takes priority
+function announce(text) {
+  const n = META.settings.notice;
+  if (n && n.text && !n.auto && (!n.until || n.until > Date.now())) return;
+  META.settings.notice = { text, kind: 'party', until: Date.now() + 3600000, t: Date.now(), auto: true };
+  saveMeta(); sendNotice();
+}
+const P = require('./progress')(A, { meta: META, save: saveMeta, announce, flag: (id, kind, detail, ip) => flag(id, kind, detail, ip), beforeSeasonReset: () => live.kickAll() });
+A.setProgress(P);
+const games = require('./games')(A, { flag: (id, kind, detail) => flag(id, kind, detail), isClosed: () => META.settings.closed, P });
 const live = require('./live')({
   A, cleanName: A.cleanName, flag,
   saveState: s => { liveState = s; liveDirty = true; },
   auth: (id, token, ip) => authPlayer(id, token, ip),
   isClosed: () => META.settings.closed,
+  vip: pid => { const r = A.get(pid); return !!(r && P.vipOf(r)); },
 });
 
 /* ---------------- leaderboard stream ---------------- */
@@ -188,6 +199,12 @@ function boardChanged() {
 function noticeNow() { const n = META.settings.notice; return n && n.text && (!n.until || n.until > Date.now()) ? n : null; }
 function sendNotice() { const msg = `event: notice\ndata: ${JSON.stringify(noticeNow())}\n\n`; for (const res of streams) res.write(msg); }
 setInterval(() => { for (const res of streams) res.write(': keep-alive\n\n'); }, 25000).unref();
+// the Mega Jackpot ticks up live in every lobby
+setInterval(() => {
+  if (!ready || !P.jpTake()) return;
+  const J = P.jackpot(), msg = `event: jackpot\ndata: ${JSON.stringify({ pool: Math.round(J.pool), last: J.last })}\n\n`;
+  for (const res of streams) res.write(msg);
+}, 3000).unref();
 
 /* ---------------- http helpers ---------------- */
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon' };
@@ -222,12 +239,18 @@ function serveFile(req, res, urlPath) {
 }
 
 /* ---------------- player API ---------------- */
-function meBody(id) {
-  return Object.assign(A.me(id), { notice: noticeNow(), closed: !!META.settings.closed, craps: (A.get(id).games.craps || null) });
+function meBody(id, ctx) {
+  return Object.assign(A.me(id, ctx), { notice: noticeNow(), closed: !!META.settings.closed, craps: (A.get(id).games.craps || null), jackpot: Math.round(P.jackpot().pool) });
 }
+// achievements, level ups and gifts ride along with any answer to the player
+function withPop(id, body) { const p = A.takePop(id); if (p && body && typeof body === 'object') body.pop = p; return body; }
 async function playerApi(req, res, p, ip) {
   if (!ready) return send(res, 503, { error: 'The casino is opening. Try again in a few seconds.' });
   if (p === '/api/players' && req.method === 'GET') return send(res, 200, A.publicList());
+  if (p === '/api/profile' && req.method === 'GET') {
+    const pr = P.profile(new URL(req.url, 'http://x').searchParams.get('id') || '');
+    return pr ? send(res, 200, pr) : send(res, 404, { error: 'No such player.' });
+  }
   if (req.method !== 'POST') return send(res, 405, { error: 'Use POST.' });
   const b = await jsonBody(req);
   if (!b) return send(res, 400, { error: 'Send JSON.' });
@@ -250,19 +273,25 @@ async function playerApi(req, res, p, ip) {
     const who = authPlayer(id, b.token, ip, { create: true, allowBanned: true });
     if (who.error) return send(res, who.code, { error: who.error });
     if (b.name) A.setName(id, b.name);
-    return send(res, 200, meBody(id));
+    return send(res, 200, withPop(id, meBody(id, b.ctx)));
   }
   const who = authPlayer(id, b.token, ip);
   if (who.error) return send(res, who.code, { error: who.error });
   if (p === '/api/wallet/reset') {
     const r = A.reset(id);
     if (r.error) return send(res, r.code || 409, { error: r.error, cents: who.rec.bal });
-    return send(res, 200, meBody(id));
+    return send(res, 200, meBody(id, b.ctx));
   }
+  const reply = r => (r.error ? send(res, r.code || 409, withPop(id, { error: r.error, cents: A.get(id).bal })) : send(res, 200, withPop(id, Object.assign(r, { hub: P.hub(id), cents: A.get(id).bal }))));
+  if (p === '/api/hub') return send(res, 200, withPop(id, Object.assign(P.hub(id), { cents: A.get(id).bal })));
+  if (p === '/api/daily') return reply(P.claimDaily(id));
+  if (p === '/api/challenge') return reply(P.claimChallenge(id, b.i));
+  if (p === '/api/tour') return reply(P.tourAction(id, b));
+  if (p === '/api/tip') { const r = P.tip(id, b.to, b.cents, b.note); return reply(r); }
   let m;
   if ((m = p.match(/^\/api\/g\/(slots|roulette|blackjack|craps)$/))) {
     const r = games.handle(m[1], id, b);
-    return send(res, r.code, r.body);
+    return send(res, r.code, withPop(id, r.body));
   }
   return send(res, 404, { error: 'Unknown address.' });
 }
@@ -317,6 +346,7 @@ async function adminApi(req, res, sub, ip) {
       players: A.players.size, named, banned, online, money, house: A.house, live: live.summary(), settings: META.settings,
       security: META.security.slice(-80).reverse(), audit: META.audit.slice(-40).reverse(), bigWins: bigWins.slice(0, 12),
       startedAt: STARTED, storage: USE_REDIS ? 'upstash' : 'file',
+      jackpot: P.jackpot(), events: META.events, season: META.season, hall: META.hall.slice(0, 6), tour: { ...META.tour, prizes: META.tourPrizes, board: P.tourBoard().slice(0, 10), history: META.tourHistory.slice(0, 5) },
     });
   }
   if (sub === '/api/players') {
@@ -334,6 +364,7 @@ async function adminApi(req, res, sub, ip) {
     if (!r) return send(res, 404, { error: 'No such player.' });
     const o = Object.assign({}, r); delete o.tokenHash; delete o.games;
     o.id = id; o.cash = A.cash(id); o.craps = r.games.craps || null; o.where = live.where(id);
+    o.level = P.levelOf((r.life || {}).xp || 0); o.xp = Math.floor((r.life || {}).xp || 0); o.badges = Object.keys((r.life || {}).ach || {}).length; delete o.life; delete o.hist; delete o.pop;
     o.security = META.security.filter(e => e.id === id).slice(-40).reverse();
     o.sameIp = r.ip ? [...A.players].filter(([pid, x]) => pid !== id && x.ip === r.ip).map(([pid, x]) => ({ id: pid, name: x.name || '(no name)' })).slice(0, 20) : [];
     return send(res, 200, o);
@@ -398,6 +429,62 @@ async function adminApi(req, res, sub, ip) {
     boardChanged();
     return send(res, 200, { ok: true, count: n });
   }
+  if (sub === '/api/event') {
+    const games_ = ['all', 'slots', 'blackjack', 'roulette', 'craps', 'plinko', 'mines', 'crash', 'live-bc'];
+    if (b.boost !== undefined) {
+      if (!b.boost) META.events.boost = null;
+      else {
+        const mult = Number(b.boost.mult), hours = Math.min(48, Math.max(0.25, Number(b.boost.hours) || 1));
+        if (![1.5, 2, 3].includes(mult) || !games_.includes(b.boost.game)) return send(res, 400, { error: 'Pick a game and a boost.' });
+        META.events.boost = { game: b.boost.game, mult, until: Date.now() + hours * 3600000, t: Date.now() };
+        announce(`🎉 Happy hour! Winnings ${b.boost.game === 'all' ? 'everywhere' : 'on ' + ({ slots: 'the slots', blackjack: 'blackjack', roulette: 'roulette', craps: 'craps', plinko: 'Plinko', mines: 'Mines', crash: 'Crash', 'live-bc': 'baccarat' })[b.boost.game]} are boosted ×${mult} for ${hours < 1 ? Math.round(hours * 60) + ' minutes' : hours + ' hour' + (hours === 1 ? '' : 's')}!`);
+      }
+      audit('event', META.events.boost ? `Happy hour ×${META.events.boost.mult} on ${META.events.boost.game}` : 'Happy hour ended', ip);
+    }
+    if (b.xp !== undefined) {
+      if (!b.xp) META.events.xp = null;
+      else { const hours = Math.min(72, Math.max(0.25, Number(b.xp.hours) || 1)); META.events.xp = { mult: 2, until: Date.now() + hours * 3600000, t: Date.now() }; announce(`⭐ Double XP for ${hours} hour${hours === 1 ? '' : 's'}! Level up faster.`); }
+      audit('event', META.events.xp ? 'Double XP on' : 'Double XP off', ip);
+    }
+    saveMeta();
+    return send(res, 200, { ok: true, events: META.events });
+  }
+  if (sub === '/api/freespins') {
+    const n = Math.round(Number(b.n)), bet = Math.round(Number(b.bet) || 100);
+    if (!(n >= 1 && n <= 100) || ![20, 40, 60, 100, 200, 400, 600, 1000].includes(bet)) return send(res, 400, { error: 'Give 1 to 100 spins at up to $10.' });
+    let count = 0;
+    for (const [id, r] of A.players) {
+      if (r.banned || !r.name) continue;
+      if (b.to === 'online' && !(recent(r) || onlineMap.has(id))) continue;
+      r.free = { n: Math.min(200, ((r.free && r.free.bet === bet && r.free.n) || 0) + n), bet };
+      P.pop(r, { type: 'gift', icon: '🎰', title: `${n} free spins!`, text: `On Dynamite Diggers at ${A.usd(bet)} each. Open the slot to play them.` });
+      A.touch(id); count++;
+    }
+    announce(`🎰 Free spins for everyone! Open Dynamite Diggers to play your ${n} free spins.`);
+    audit('free spins', `${n} × ${A.usd(bet)} to ${count} players`, ip);
+    return send(res, 200, { ok: true, count });
+  }
+  if (sub === '/api/season') {
+    if (b.action !== 'end') return send(res, 400, { error: 'Unknown action.' });
+    P.endSeason(true); audit('season', `Season ended early; season ${META.season.n} started`, ip); boardChanged();
+    return send(res, 200, { ok: true, season: META.season });
+  }
+  if (sub === '/api/tournament') {
+    if (b.action === 'prizes') {
+      const pr = (Array.isArray(b.prizes) ? b.prizes : []).slice(0, 3).map(x => Math.round(Number(x)));
+      if (pr.length !== 3 || pr.some(x => !(x >= 0 && x <= 1e9))) return send(res, 400, { error: 'Three prizes, $0 to $10,000,000.' });
+      META.tourPrizes = pr; saveMeta(); audit('tournament', `Prizes set to ${pr.map(A.usd).join(' / ')}`, ip);
+      return send(res, 200, { ok: true });
+    }
+    if (b.action === 'end') { P.endTournament(); audit('tournament', 'Tournament ended early', ip); boardChanged(); return send(res, 200, { ok: true }); }
+    return send(res, 400, { error: 'Unknown action.' });
+  }
+  if (sub === '/api/jackpot') {
+    const pool = Math.round(Number(b.pool)), seed = Math.round(Number(b.seed));
+    if (!(pool >= 0 && pool <= 1e10) || !(seed >= 0 && seed <= 1e10)) return send(res, 400, { error: 'Pick amounts.' });
+    P.jackpot().pool = pool; P.jackpot().seed = seed; saveMeta(); audit('jackpot', `Pool ${A.usd(pool)}, restarts at ${A.usd(seed)}`, ip);
+    return send(res, 200, { ok: true });
+  }
   if (sub === '/api/clearlog') { META.security = []; saveMeta(); audit('log', 'Security log cleared', ip); return send(res, 200, { ok: true }); }
   if (sub === '/api/export') {
     const all = {}; for (const [id, r] of A.players) { const o = Object.assign({}, r); delete o.tokenHash; all[id] = o; }
@@ -427,7 +514,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/stream') {
       if (!ready) return send(res, 503, { error: 'Opening.' });
       res.writeHead(200, Object.assign({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' }, SECURITY_HEADERS));
-      res.write(`retry: 3000\nevent: players\ndata: ${JSON.stringify(A.publicList())}\n\nevent: notice\ndata: ${JSON.stringify(noticeNow())}\n\n`);
+      res.write(`retry: 3000\nevent: players\ndata: ${JSON.stringify(A.publicList())}\n\nevent: notice\ndata: ${JSON.stringify(noticeNow())}\n\nevent: jackpot\ndata: ${JSON.stringify({ pool: Math.round(P.jackpot().pool), last: P.jackpot().last })}\n\n`);
       streams.add(res);
       req.on('close', () => streams.delete(res));
       return;
@@ -441,7 +528,7 @@ const server = http.createServer(async (req, res) => {
       if (!allow('ip:' + ip, 40, 80) || !allow('p:' + String(b.id || ''), 14, 30)) return send(res, 429, { error: 'Slow down a little.' });
       const r = p === '/api/live/claim' ? live.claim(b, ip) : live.action(p.endsWith('bj') ? 'bj' : p.endsWith('pk') ? 'pk' : 'rl', b, ip);
       if (r.flag) flag(String(b.id || ''), 'invalid', r.flag, ip);
-      return send(res, r.code, r.body);
+      return send(res, r.code, A.get(String(b.id || '')) ? withPop(String(b.id), r.body) : r.body);
     }
     if (p.startsWith('/api/')) return playerApi(req, res, p, ip);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed', 'text/plain; charset=utf-8');

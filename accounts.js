@@ -17,6 +17,13 @@ module.exports = function createAccounts(hooks = {}) {
   const extras = [];                  // functions (id) -> cents held elsewhere (live tables)
   const onChange = hooks.onChange || (() => {});
   const house = {};                   // game -> { wagered, paid, rounds }
+  let P = null;                       // progression (levels, achievements, tournament), plugged in by the server
+  const setProgress = p => { P = p; };
+  // which wallet a bet uses: tournament chips for the solo games while the player is in tournament mode
+  const TOUR_GAMES = new Set(['slots', 'slots2', 'roulette', 'blackjack', 'plinko', 'mines']);
+  const inTour = (rec, game) => !!(P && TOUR_GAMES.has(game) && P.tourActive(rec));
+  const wal = (rec, game) => (inTour(rec, game) ? rec.tour : rec);
+  const balOf = (id, game) => { const rec = players.get(id); return rec ? wal(rec, game).bal : 0; };
 
   function touch(id) { dirty.add(id); onChange(id); }
   function blank(id, token, ip) {
@@ -79,12 +86,13 @@ module.exports = function createAccounts(hooks = {}) {
   function debit(id, cents, game, note) {
     const rec = players.get(id);
     cents = Math.round(cents);
-    if (!rec || !(cents >= 0) || rec.bal < cents) return false;
+    if (!rec || !(cents >= 0)) return false;
+    const w = wal(rec, game);
+    if (w.bal < cents) return false;
     if (!cents) return true;
-    rec.bal -= cents;
-    houseFor(game).wagered += cents;
-    rec.st.wagered += cents;
-    logTx(rec, game, -cents, note);
+    w.bal -= cents;
+    if (w === rec) { houseFor(game).wagered += cents; rec.st.wagered += cents; logTx(rec, game, -cents, note); }
+    else rec.tour.wagered = (rec.tour.wagered || 0) + cents;
     touch(id);
     return true;
   }
@@ -92,11 +100,9 @@ module.exports = function createAccounts(hooks = {}) {
     const rec = players.get(id);
     cents = Math.round(cents);
     if (!rec || !(cents > 0)) return;
-    rec.bal += cents;
-    houseFor(game).paid += cents;
-    rec.st.paid += cents;
-    rec.peak = Math.max(rec.peak, cash(id));
-    logTx(rec, game, cents, note);
+    const w = wal(rec, game);
+    w.bal += cents;
+    if (w === rec) { houseFor(game).paid += cents; rec.st.paid += cents; rec.peak = Math.max(rec.peak, cash(id)); logTx(rec, game, cents, note); }
     touch(id);
   }
   // a bet that was never played comes back (it doesn't count as the house paying out)
@@ -104,10 +110,13 @@ module.exports = function createAccounts(hooks = {}) {
     const rec = players.get(id);
     cents = Math.round(cents);
     if (!rec || !(cents > 0)) return;
-    rec.bal += cents;
-    const h = houseFor(game); h.wagered = Math.max(0, h.wagered - cents);
-    rec.st.wagered = Math.max(0, rec.st.wagered - cents);
-    logTx(rec, game, cents, note || 'Bet returned');
+    const w = wal(rec, game);
+    w.bal += cents;
+    if (w === rec) {
+      const h = houseFor(game); h.wagered = Math.max(0, h.wagered - cents);
+      rec.st.wagered = Math.max(0, rec.st.wagered - cents);
+      logTx(rec, game, cents, note || 'Bet returned');
+    }
     touch(id);
   }
   // money that leaves the bankroll but not as a bet (moving chips onto a live table), and comes back later
@@ -123,9 +132,12 @@ module.exports = function createAccounts(hooks = {}) {
     return true;
   }
   // a finished round, for the leaderboard and the house books
-  function round(id, game, { staked = 0, paid = 0, hands = 0, spins = 0, rolls = 0, blackjacks = 0, mult = 0, points = 0 } = {}) {
+  function round(id, game, { staked = 0, paid = 0, hands = 0, spins = 0, rolls = 0, blackjacks = 0, mult = 0, points = 0, tags = [] } = {}) {
     const rec = players.get(id);
     if (!rec) return;
+    const tour = inTour(rec, game);
+    if (P) { try { P.onRound(id, game, { staked, paid, tags, tour }); } catch (e) { console.error('progress', e); } }
+    if (tour) { rec.tour.rounds = (rec.tour.rounds || 0) + 1; rec.lastGame = game; rec.lastPlay = Date.now(); touch(id); return; }
     const st = rec.st;
     st.rounds++; st.hands += hands; st.spins += spins; st.rolls += rolls; st.blackjacks += blackjacks; st.pointsMade += points;
     if (mult) st.bestMult = Math.max(st.bestMult, mult);
@@ -155,16 +167,22 @@ module.exports = function createAccounts(hooks = {}) {
     if (!rec || n.length < 2 || n === rec.name || rec.nameLocked) return;
     rec.name = n; touch(id);
   }
-  function me(id) {
+  function me(id, ctx) {
     const rec = players.get(id);
-    return { id, name: rec.name, cents: rec.bal, cash: cash(id), peak: rec.peak, resets: rec.resets, stats: rec.st, banned: !!rec.banned };
+    const tour = !!(P && P.tourActive(rec));
+    const lvl = P ? P.levelOf((rec.life || {}).xp || 0) : 0;
+    return { id, name: rec.name, cents: ctx === 'solo' && tour ? rec.tour.bal : rec.bal, bank: rec.bal, cash: cash(id), peak: rec.peak, resets: rec.resets, stats: rec.st, banned: !!rec.banned,
+      level: lvl, vip: !!(P && P.vipOf(rec)), mode: tour ? 'tour' : 'main', tourBal: tour ? rec.tour.bal : null, free: rec.free && rec.free.n > 0 ? rec.free : null };
   }
+  // popups waiting for this player (achievements, level ups, gifts)
+  function takePop(id) { const rec = players.get(id); if (!rec || !rec.pop || !rec.pop.length) return null; const p = rec.pop; rec.pop = []; touch(id); return p; }
   function publicList() {
     const out = [];
     for (const [id, r] of players) {
       if (!r.name || r.banned || r.hidden) continue;
       out.push({ id, name: r.name, cash: cash(id), peak: r.peak, resets: r.resets, hands: r.st.hands, spins: r.st.spins, rolls: r.st.rolls,
-        bigWin: r.st.bigWin, blackjacks: r.st.blackjacks, bestMult: r.st.bestMult, pointsMade: r.st.pointsMade, joined: r.joined, updatedAt: r.lastPlay || r.seen });
+        bigWin: r.st.bigWin, blackjacks: r.st.blackjacks, bestMult: r.st.bestMult, pointsMade: r.st.pointsMade, joined: r.joined, updatedAt: r.lastPlay || r.seen,
+        ...(P ? P.boardExtras(id, r) : {}) });
     }
     return out.sort((a, b) => b.cash - a.cash);
   }
@@ -184,7 +202,7 @@ module.exports = function createAccounts(hooks = {}) {
     return o;
   }
   return {
-    START, players, load, get, auth, debit, credit, refund, move, round, reset, setName, me, publicList, remove, takeDirty, putBack,
+    START, players, load, get, auth, debit, credit, refund, move, round, reset, setName, me, takePop, publicList, remove, takeDirty, putBack, setProgress, balOf, inTour, TOUR_GAMES,
     cash, tableMoney, logTx, touch, house, houseFor, extras, hash, cleanName, usd, all: () => players,
   };
 };

@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Player profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Limelight&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=DM+Mono:wght@500&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --velvet:#16080E; --velvet-2:#240C16; --velvet-3:#34111F; --card:#200A13;
+  --gold:#E8C170; --gold-2:#F7DFA3; --gold-dim:rgba(232,193,112,.35);
+  --ivory:#F5EBDD; --muted:#B69C9F; --grid:rgba(245,235,221,.09); --win:#7FD6A0; --lose:#F2786D;
+  --display:"Limelight","Didot","Georgia",serif; --body:"DM Sans","Segoe UI",system-ui,sans-serif; --mono:"DM Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;min-height:100vh;color:var(--ivory);font-family:var(--body);background:radial-gradient(90% 60% at 50% 0%,var(--velvet-3) 0%,var(--velvet-2) 40%,var(--velvet) 100%) fixed}
+a{color:var(--gold-2)}
+:focus-visible{outline:2px solid var(--gold-2);outline-offset:3px}
+.bar{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(232,193,112,.15);background:rgba(16,5,9,.8)}
+.bar .t{font:400 20px var(--display);color:var(--gold-2)}
+main{max-width:1040px;margin:0 auto;padding:24px 18px 50px}
+.head{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.av{width:78px;height:78px;border-radius:50%;display:grid;place-items:center;font:500 34px var(--body);color:#1A0B0F;flex:none;box-shadow:0 0 0 3px rgba(232,193,112,.4)}
+.who h1{margin:0;font:400 clamp(32px,6vw,52px)/1 var(--display);color:var(--gold-2);overflow-wrap:anywhere}
+.who p{margin:6px 0 0;color:var(--muted);font-size:14px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font:500 12.5px var(--body);box-shadow:inset 0 0 0 1px var(--gold-dim);color:var(--gold-2)}
+.chip.vip{background:linear-gradient(180deg,var(--gold-2),var(--gold));color:#1A0B0F;box-shadow:none}
+.sp{flex:1}
+.gbtn{border:0;cursor:pointer;font:700 13px var(--body);letter-spacing:.06em;text-transform:uppercase;color:#1A0B0F;background:linear-gradient(180deg,var(--gold-2),var(--gold));padding:11px 18px;border-radius:999px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:24px 0}
+.tile{background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:0 0 0 1px rgba(232,193,112,.14)}
+.tile span{display:block;font-size:12.5px;color:var(--muted)}
+.tile b{display:block;font:500 24px var(--body);margin-top:4px;color:var(--ivory)}
+.card{background:var(--card);border-radius:18px;padding:18px 20px;box-shadow:0 0 0 1px rgba(232,193,112,.14);margin-bottom:16px;min-width:0}
+.card h2{margin:0 0 4px;font:500 16px var(--body)}
+.card .sub{margin:0 0 14px;color:var(--muted);font-size:13px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.tip{position:absolute;pointer-events:none;background:#0B0407;border-radius:10px;padding:7px 10px;font-size:12.5px;box-shadow:0 0 0 1px var(--gold-dim),0 8px 20px rgba(0,0,0,.5);white-space:nowrap;transform:translate(-50%,-115%)}
+.tip b{display:block;font:500 14px var(--mono);color:var(--ivory)}
+.tip span{color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--grid);text-align:left}
+th{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pos{color:var(--win)} .neg{color:var(--lose)}
+.alist{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.ai{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:12px;background:rgba(0,0,0,.25)}
+.ai i{font-style:normal;font-size:22px;width:34px;text-align:center}
+.ai b{display:block;font-weight:500;font-size:14px}
+.ai small{display:block;color:var(--muted);font-size:12px}
+.ai.off{opacity:.38} .ai.off i{filter:grayscale(1)}
+.tro{display:flex;gap:10px;flex-wrap:wrap}
+.tro div{padding:10px 14px;border-radius:12px;background:rgba(232,193,112,.1);font-size:14px}
+details{margin-top:10px;color:var(--muted);font-size:13px}
+.empty{color:var(--muted);padding:12px 0}
+.modal{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(10,3,6,.78);backdrop-filter:blur(6px)}
+.mc{width:min(420px,100%);padding:24px 22px;border-radius:20px;background:linear-gradient(180deg,#2A0D18,#1B0810);box-shadow:0 0 0 2px #5a3a1c,0 30px 80px rgba(0,0,0,.6)}
+.mc h2{margin:0 0 6px;font:400 28px var(--display);color:var(--gold-2)}
+.mc p{color:var(--muted);font-size:14px;margin:0 0 14px}
+.mc input{width:100%;font:500 18px var(--body);color:var(--ivory);background:#0B0407;border:0;border-radius:12px;padding:12px 14px;box-shadow:inset 0 0 0 1px var(--gold-dim);margin-bottom:10px}
+.mc .row{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+.mc .err{color:#FFB4AB;min-height:18px;font-size:13px}
+.ghost{background:transparent;color:var(--gold-2);box-shadow:inset 0 0 0 1px var(--gold-dim)}
+.lobbylink{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:999px;border:1px solid rgba(232,193,112,.45);color:#F7DFA3;text-decoration:none;font:600 13px system-ui,-apple-system,"Segoe UI",sans-serif;white-space:nowrap;flex:none;background:rgba(0,0,0,.2)}
+.lobbylink:hover{background:rgba(232,193,112,.14)}
+.lobbylink svg{width:15px;height:15px}
+@media (max-width:640px){.lobbylink span{display:none}.lobbylink{padding:0 9px}}
+</style>
+</head>
+<body>
+<header class="bar">
+    <a href="index.html" class="lobbylink" title="Back to Miguel's Casino" aria-label="Back to Miguel's Casino lobby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Lobby</span></a><span class="t">Player profile</span></header>
+<main id="main"><p class="empty">Loading…</p></main>
+<div class="modal" id="tipModal" hidden><form class="mc" id="tipForm"><h2>Send chips</h2><p id="tipTxt"></p><input id="tipAmt" type="number" min="1" max="500" step="1" placeholder="Amount in $" aria-label="Amount in dollars"><input id="tipNote" maxlength="60" placeholder="Message (optional)" aria-label="Message"><div class="err" id="tipErr" role="alert"></div><div class="row"><button type="button" class="gbtn ghost" id="tipCancel">Cancel</button><button class="gbtn" type="submit">Send</button></div></form></div>
+
+<script>window.CASINO_CTX = 'lobby';</script>
+<script>
+/* Miguel's Casino (online): the casino's server keeps every bankroll and decides every game.
+   This page only shows a copy of your balance and sends your moves. */
+window.CASINO_ONLINE = true;
+window.CasinoNet = (() => {
+  const SEAT_KEY = 'miguels-casino-seat';
+  function seat() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(SEAT_KEY)); } catch (e) {}
+    if (!s || !s.id || !s.token) {
+      const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
+      s = { id: 'p-' + hex(12), token: hex(24) };
+      try { localStorage.setItem(SEAT_KEY, JSON.stringify(s)); } catch (e) {}
+    }
+    return s;
+  }
+  // POST to the casino with this browser's seat; returns { ok, status, body }
+  async function api(path, body = {}) {
+    const s = seat();
+    let r, j = {};
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id: s.id, token: s.token }, body)) });
+        j = await r.json().catch(() => ({}));
+        if (r.status === 429 && attempt < 2) { await new Promise(res => setTimeout(res, 700 * (attempt + 1))); continue; }
+        if (r.status === 503 && /opening/i.test(j.error || '') && attempt < 2) { await new Promise(res => setTimeout(res, 2500)); continue; }
+        break;
+      } catch (e) {
+        if (attempt === 2) return { ok: false, status: 0, body: { error: 'No connection to the casino. Check your internet and try again.' } };
+        await new Promise(res => setTimeout(res, 800));
+      }
+    }
+    if (typeof j.cents === 'number') CasinoWallet._server(j.cents);
+    if (Array.isArray(j.pop) && j.pop.length) CasinoUI.popups(j.pop);
+    if (r.status === 403 && /suspended/i.test(j.error || '')) CasinoUI.suspended();
+    return { ok: r.ok, status: r.status, body: j };
+  }
+  return { seat, api };
+})();
+
+window.CasinoWallet = (() => {
+  const START = 100000, CACHE = 'miguels-casino-cache';
+  let cache = null;
+  try { cache = JSON.parse(localStorage.getItem(CACHE)); } catch (e) {}
+  const mine = cache && cache.id === CasinoNet.seat().id;
+  let bal = mine && Number.isFinite(cache.cents) ? cache.cents : 0;
+  let info_ = { peak: mine ? cache.peak || 0 : 0, resets: mine ? cache.resets || 0 : 0 };
+  let view = null, onExternal = null, isBusy = () => false;
+  const listeners = [];
+  const cents = () => bal;
+  function bind(v, ext, busy) { view = v; onExternal = ext; if (busy) isBusy = busy; }
+  function remember() { try { localStorage.setItem(CACHE, JSON.stringify({ id: CasinoNet.seat().id, cents: bal, peak: info_.peak, resets: info_.resets })); } catch (e) {} }
+  // the server just told us the balance
+  function _server(c) { bal = c; remember(); listeners.forEach(f => { try { f(c); } catch (e) {} }); }
+  // move this page's own balance to match the server (only while nothing is in play)
+  function apply(c) {
+    if (view && onExternal) { const d = c - view(); if (d) onExternal(d); }
+    _server(c);
+  }
+  async function refresh() {
+    if (isBusy()) return null;
+    const r = await CasinoNet.api('api/me', { name: CasinoBoard.name(), ctx: window.CASINO_CTX || 'lobby' });
+    if (r.ok) { info_ = { peak: r.body.peak, resets: r.body.resets }; if (!isBusy()) apply(r.body.cents); CasinoUI.notice(r.body.notice); CasinoUI.mode(r.body); if (r.body.banned) CasinoUI.suspended(); }
+    return r.ok ? r.body : null;
+  }
+  // a fresh $1,000, only when you are out of chips everywhere
+  async function reset() {
+    const r = await CasinoNet.api('api/wallet/reset');
+    if (r.ok) { info_.resets = r.body.resets; apply(r.body.cents); }
+    return r;
+  }
+  const info = () => ({ cents: bal, peak: Math.max(info_.peak || 0, bal), resets: info_.resets || 0 });
+  const onChange = f => listeners.push(f);
+  let last = 0;
+  const maybeRefresh = () => { if (Date.now() - last > 4000) { last = Date.now(); refresh(); } };
+  addEventListener('focus', maybeRefresh);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeRefresh(); });
+  // money only moves on the server now, so these do nothing
+  const sync = () => {}, pull = () => {}, add = () => {}, noteReset = () => {};
+  return { cents, bind, sync, pull, add, noteReset, info, refresh, reset, apply, onChange, _server, START };
+})();
+
+window.CasinoBoard = (() => {
+  const NAME_KEY = 'miguels-casino-name';
+  let ready = null, mode = null, denied = false, meInfo = null, timer = null;
+  function name() { try { return (localStorage.getItem(NAME_KEY) || '').trim(); } catch (e) { return ''; } }
+  function setName(n) { try { localStorage.setItem(NAME_KEY, n); } catch (e) {} push(); }
+  function connect() {
+    if (ready) return ready;
+    ready = (async () => {
+      if (!/^https?:$/.test(location.protocol)) return false;
+      const r = await CasinoNet.api('api/me', { name: name(), ctx: window.CASINO_CTX || 'lobby' });
+      if (!r.ok) { if (r.status === 403) { denied = true; mode = 'server'; return true; } ready = null; return false; }
+      meInfo = r.body; mode = 'server';
+      CasinoWallet.apply(r.body.cents);
+      CasinoUI.notice(r.body.notice);
+      CasinoUI.mode(r.body);
+      if (r.body.banned) CasinoUI.suspended();
+      if (r.body.name && !name()) { try { localStorage.setItem(NAME_KEY, r.body.name); } catch (e) {} }
+      return true;
+    })().catch(() => { ready = null; return false; });
+    return ready;
+  }
+  async function push() {
+    if (!(await connect())) return false;
+    const r = await CasinoNet.api('api/me', { name: name(), ctx: window.CASINO_CTX || 'lobby' });
+    if (r.ok) meInfo = r.body;
+    return r.ok;
+  }
+  function schedule(ms = 2500) { clearTimeout(timer); timer = setTimeout(push, ms); }
+  function subscribe(onRows, onError) {
+    let es = null, poll = null;
+    const load = () => fetch('api/players', { cache: 'no-store' }).then(r => r.json()).then(onRows).catch(() => {});
+    if (window.EventSource) {
+      es = new EventSource('api/stream');
+      es.addEventListener('players', e => { try { onRows(JSON.parse(e.data)); } catch (x) {} });
+      es.addEventListener('notice', e => { try { CasinoUI.notice(JSON.parse(e.data)); } catch (x) {} });
+      es.addEventListener('jackpot', e => { try { dispatchEvent(new CustomEvent('casino:jackpot', { detail: JSON.parse(e.data) })); } catch (x) {} });
+      es.onerror = () => { if (onError && es.readyState === 2) onError(); };
+    } else { load(); poll = setInterval(load, 8000); }
+    return () => { if (es) es.close(); if (poll) clearInterval(poll); };
+  }
+  const identity = () => CasinoNet.seat();
+  const snapshot = () => null;
+  return { name, setName, connect, push, schedule, snapshot, subscribe, identity, get uid() { return CasinoNet.seat().id; }, get mode() { return mode; }, get denied() { return denied; }, get me() { return meInfo; } };
+})();
+
+// announcements from the casino, and the notice for a suspended account
+window.CasinoUI = (() => {
+  let bar = null, shownKey = '';
+  const css = `.mc-notice{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:9999;max-width:min(680px,calc(100% - 24px));display:flex;gap:10px;align-items:center;padding:10px 12px 10px 16px;border-radius:14px;
+    font:600 14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1B1206;background:linear-gradient(180deg,#FFE9A8,#F2C65A);box-shadow:0 12px 30px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.2);animation:mcIn .35s ease}
+    .mc-notice.party{background:linear-gradient(90deg,#FF9AD5,#FFD36E,#8EF0B4);} .mc-notice.warn{background:linear-gradient(180deg,#FFB4A8,#F2786D);}
+    .mc-notice.ban{background:linear-gradient(180deg,#3A1414,#220A0A);color:#FFD9D2;box-shadow:0 12px 30px rgba(0,0,0,.5),0 0 0 1px #F2786D}
+    .mc-notice b{font-weight:800}
+    .mc-pops{position:fixed;left:14px;bottom:14px;z-index:9998;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:min(340px,calc(100% - 28px))}
+    .mc-pop{display:flex;gap:11px;align-items:center;padding:11px 14px 11px 11px;border-radius:14px;background:linear-gradient(180deg,#2A1B10,#170E08);color:#FFF4DA;box-shadow:0 0 0 1px rgba(247,223,163,.5),0 14px 34px rgba(0,0,0,.55);font:14px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;animation:mcPop .45s cubic-bezier(.2,1.3,.4,1);pointer-events:auto}
+    .mc-pop i{font-style:normal;font-size:26px;width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:rgba(247,223,163,.12);flex:none}
+    .mc-pop b{display:block;font-weight:800;color:#F7DFA3}
+    .mc-pop small{display:block;color:#D8C8A8;font-size:12.5px}
+    .mc-pop.out{animation:mcOut .35s ease forwards}
+    @keyframes mcPop{from{opacity:0;transform:translateX(-30px) scale(.9)}to{opacity:1;transform:none}}
+    @keyframes mcOut{to{opacity:0;transform:translateX(-30px)}}
+    .mc-tour{position:fixed;left:12px;bottom:110px;pointer-events:none;white-space:nowrap;z-index:9997;padding:7px 12px;border-radius:999px;font:800 11.5px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#1B1206;background:linear-gradient(90deg,#8EF0B4,#F2C65A);box-shadow:0 8px 20px rgba(0,0,0,.4)}
+    .mc-notice button{flex:none;border:0;background:rgba(0,0,0,.14);color:inherit;width:26px;height:26px;border-radius:50%;cursor:pointer;font:700 15px system-ui}
+    @keyframes mcIn{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}`;
+  function ensure() {
+    if (bar) return bar;
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    bar = document.createElement('div'); bar.className = 'mc-notice'; bar.hidden = true; bar.setAttribute('role', 'status');
+    document.body.appendChild(bar);
+    return bar;
+  }
+  function show(text, kind, closable) {
+    const b = ensure();
+    b.className = 'mc-notice ' + (kind || '');
+    b.textContent = '';
+    const s = document.createElement('span'); s.textContent = text; b.appendChild(s);
+    if (closable) { const x = document.createElement('button'); x.type = 'button'; x.setAttribute('aria-label', 'Close'); x.textContent = '×'; x.onclick = () => { b.hidden = true; try { sessionStorage.setItem('mc-notice-closed', shownKey); } catch (e) {} }; b.appendChild(x); }
+    b.hidden = false;
+  }
+  let banned = false;
+  function notice(n) {
+    if (banned) return;
+    if (!document.body) { addEventListener('DOMContentLoaded', () => notice(n)); return; }
+    if (!n || !n.text) { if (bar && !banned) bar.hidden = true; return; }
+    shownKey = String(n.t || n.text);
+    let closed = ''; try { closed = sessionStorage.getItem('mc-notice-closed') || ''; } catch (e) {}
+    if (closed === shownKey) return;
+    show('📣 ' + n.text, n.kind === 'party' ? 'party' : n.kind === 'warn' ? 'warn' : '', true);
+  }
+  function suspended() {
+    banned = true;
+    if (!document.body) { addEventListener('DOMContentLoaded', suspended); return; }
+    show('Your account has been suspended by the casino, so you can’t play right now. Ask Miguel if you think this is a mistake.', 'ban', false);
+  }
+  // achievements, level ups, gifts: little cards in the corner, a moment after the result is on screen
+  let popBox = null, queue = [], showing = 0;
+  function popups(list) {
+    if (!document.body) { addEventListener('DOMContentLoaded', () => popups(list)); return; }
+    ensure();
+    if (!popBox) { popBox = document.createElement('div'); popBox.className = 'mc-pops'; popBox.setAttribute('aria-live', 'polite'); document.body.appendChild(popBox); }
+    const delay = window.CASINO_CTX === 'lobby' || !window.CASINO_CTX ? 300 : 2600;
+    list.forEach((p, i) => setTimeout(() => showPop(p), delay + i * 900));
+  }
+  function showPop(p) {
+    const el = document.createElement('div'); el.className = 'mc-pop';
+    const ic = document.createElement('i'); ic.textContent = p.icon || '⭐';
+    const tx = document.createElement('div'); const b = document.createElement('b'); b.textContent = (p.type === 'ach' ? 'Badge unlocked · ' : '') + p.title; const sm = document.createElement('small'); sm.textContent = p.text || '';
+    tx.append(b, sm); el.append(ic, tx); popBox.appendChild(el);
+    try { if (window.CasinoSound) CasinoSound.ding(); } catch (e) {}
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, 5200);
+  }
+  // playing with tournament chips: say so on every solo table
+  let ribbon = null;
+  function mode(me) {
+    if (!document.body) { addEventListener('DOMContentLoaded', () => mode(me)); return; }
+    const on = me && me.mode === 'tour' && window.CASINO_CTX === 'solo';
+    if (on && !ribbon) { ensure(); ribbon = document.createElement('div'); ribbon.className = 'mc-tour'; ribbon.textContent = '🏁 Tournament chips'; ribbon.title = 'You are playing with this week’s tournament chips. Switch back in the lobby.'; document.body.appendChild(ribbon); }
+    if (ribbon) ribbon.hidden = !on;
+  }
+  return { notice, suspended, popups, mode };
+})();
+
+// one volume for every game, and soft lounge music if you want it (set in the lobby)
+window.CasinoSound = (() => {
+  const KEY = 'miguels-casino-sound';
+  const load = () => { try { return Object.assign({ on: true, vol: 0.8, music: false, mvol: 0.4 }, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return { on: true, vol: 0.8, music: false, mvol: 0.4 }; } };
+  let cfg = load();
+  const masters = new Set();
+  const level = () => (cfg.on ? cfg.vol : 0);
+  const Base = window.AudioContext || window.webkitAudioContext;
+  const desc = Base && (Object.getOwnPropertyDescriptor(window.BaseAudioContext ? BaseAudioContext.prototype : Base.prototype, 'destination') || Object.getOwnPropertyDescriptor(Base.prototype, 'destination'));
+  if (Base && desc && desc.get) {
+    // every game's sounds go through one volume knob
+    class CasinoAudio extends Base {
+      constructor(...a) { super(...a); const g = Base.prototype.createGain.call(this); g.gain.value = level(); g.connect(desc.get.call(this)); this._mc = g; masters.add(g); }
+      get destination() { return this._mc || desc.get.call(this); }
+    }
+    try { window.AudioContext = CasinoAudio; if (window.webkitAudioContext) window.webkitAudioContext = CasinoAudio; } catch (e) {}
+  }
+  function apply() { masters.forEach(g => { try { g.gain.value = level(); } catch (e) {} }); music(); }
+  function set(k, v) { cfg[k] = v; try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} apply(); }
+  addEventListener('storage', e => { if (e.key === KEY) { cfg = load(); apply(); } });
+  // music: slow jazzy chords, made on the fly
+  let mctx = null, mgain = null, timer = null, step = 0;
+  const CHORDS = [[57, 60, 64, 67], [62, 65, 69, 72], [55, 59, 62, 65], [60, 64, 67, 71]];   // Am7, Dm7, G7, Cmaj7
+  const hz = n => 440 * Math.pow(2, (n - 69) / 12);
+  function note(f, t, d, type, v, dest) { const o = mctx.createOscillator(), g = mctx.createGain(); o.type = type; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g).connect(dest); o.start(t); o.stop(t + d + 0.05); }
+  function bar() {
+    const t = mctx.currentTime + 0.05, ch = CHORDS[step % 4], beat = 0.75;
+    const lp = mctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.connect(mgain);
+    ch.forEach(n => note(hz(n), t, beat * 4, 'triangle', 0.05, lp));
+    [0, 2].forEach(b => note(hz(ch[0] - 24), t + b * beat, beat * 1.6, 'sine', 0.12, mgain));
+    [1, 2.5, 3].forEach(b => note(hz(ch[(b * 2) % 4] + 12), t + b * beat, beat * 0.9, 'sine', 0.03, lp));
+    step++;
+  }
+  function music() {
+    const want = cfg.music && cfg.on;
+    if (!want) { if (timer) { clearInterval(timer); timer = null; } if (mgain) mgain.gain.value = 0; return; }
+    if (!Base) return;
+    if (!mctx) { try { mctx = new Base(); } catch (e) { return; } mgain = mctx.createGain(); mgain.connect(desc && desc.get ? desc.get.call(mctx) : mctx.destination); }
+    mgain.gain.value = cfg.mvol * 0.6;
+    if (mctx.state === 'suspended') mctx.resume().catch(() => {});
+    if (!timer && mctx.state === 'running') { bar(); timer = setInterval(bar, 3000); }
+  }
+  const unlock = () => { if (cfg.music) music(); };
+  document.addEventListener('pointerdown', unlock); document.addEventListener('keydown', unlock);
+  // a soft chime for badges and level ups
+  let dctx = null;
+  function ding() {
+    if (!cfg.on || !Base) return;
+    try {
+      if (!dctx) dctx = new window.AudioContext();
+      if (dctx.state !== 'running') return;
+      const t = dctx.currentTime;
+      [1047, 1319, 1568].forEach((f, i) => { const o = dctx.createOscillator(), g = dctx.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t + i * 0.08); g.gain.exponentialRampToValueAtTime(0.08, t + i * 0.08 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.08 + 0.5); o.connect(g).connect(dctx.destination); o.start(t + i * 0.08); o.stop(t + i * 0.08 + 0.55); });
+    } catch (e) {}
+  }
+  return { get: () => Object.assign({}, cfg), set, ding };
+})();
+</script>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const usd = c => (c < 0 ? '−' : '') + '$' + (Math.abs(c) / 100).toLocaleString('en-US', { minimumFractionDigits: Math.abs(c) % 100 ? 2 : 0, maximumFractionDigits: 2 });
+const compact = c => { const d = c / 100; const a = Math.abs(d); return (d < 0 ? '−' : '') + '$' + (a >= 1e6 ? (a / 1e6).toFixed(a >= 1e7 ? 0 : 1) + 'M' : a >= 1e4 ? Math.round(a / 1000) + 'K' : a >= 1000 ? (a / 1000).toFixed(1) + 'K' : Math.round(a)); };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const COLORS = ['#E8C170', '#E07A5F', '#81B29A', '#9C89B8', '#F2CC8F', '#6FB1D6', '#E5989B', '#B5E48C'];
+const tint = s => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
+const GAMES = { slots: 'Dynamite Diggers', slots2: 'Cosmic Cascade', roulette: 'Voltage Roulette', blackjack: 'Brass Table Blackjack', craps: 'Bubble Dome Craps', plinko: 'Plinko', mines: 'Mines', 'live-bj': 'Live blackjack', 'live-rl': 'Live roulette', 'live-bc': 'Live baccarat', crash: 'Crash', poker: 'Hold’em' };
+const id = new URLSearchParams(location.search).get('id') || CasinoNet.seat().id;
+let P = null;
+async function load() {
+  await CasinoBoard.connect();
+  const r = await fetch('api/profile?id=' + encodeURIComponent(id), { cache: 'no-store' });
+  if (!r.ok) { $('main').innerHTML = '<p class="empty">This player isn’t on the board. <a href="index.html">Back to the lobby</a></p>'; return; }
+  P = await r.json();
+  document.title = P.name + ' · Miguel’s Casino';
+  render();
+}
+function render() {
+  const p = P, mine = p.id === CasinoNet.seat().id;
+  const net = p.stats.paid - p.stats.wagered;
+  const ago = t => { const s = (Date.now() - t) / 1000; if (s < 180) return 'playing now'; if (s < 3600) return 'seen ' + Math.round(s / 60) + 'm ago'; if (s < 86400) return 'seen ' + Math.round(s / 3600) + 'h ago'; return 'seen ' + Math.round(s / 86400) + 'd ago'; };
+  $('main').innerHTML = `
+    <section class="head">
+      <div class="av" style="background:${tint(p.name)}">${esc(p.name.slice(0, 1).toUpperCase())}</div>
+      <div class="who"><h1>${esc(p.name)}</h1><p>#${p.rank} of ${p.players} this season · joined ${new Date(p.joined).toLocaleDateString()} · ${ago(p.seen)}</p>
+        <div class="chips"><span class="chip ${p.vip ? 'vip' : ''}">Level ${p.level}${p.vip ? ' · VIP' : ''}</span>${p.streak ? `<span class="chip">🔥 ${p.streak}-day streak</span>` : ''}<span class="chip">${p.achievements.filter(a => a.got).length} badges</span>${p.trophies.length ? `<span class="chip">🏆 ${p.trophies.length} trophies</span>` : ''}</div></div>
+      <div class="sp"></div>
+      ${mine ? '' : '<button class="gbtn" id="tipBtn">Send chips</button>'}
+    </section>
+    <div class="tiles">
+      <div class="tile"><span>Cash</span><b>${usd(p.cash)}</b></div>
+      <div class="tile"><span>Peak this season</span><b>${usd(p.peak)}</b></div>
+      <div class="tile"><span>Biggest win</span><b>${usd(Math.max(0, p.best))}</b></div>
+      <div class="tile"><span>Rounds this season</span><b>${p.stats.rounds.toLocaleString('en-US')}</b></div>
+      <div class="tile"><span>Resets</span><b>${p.resets}</b></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h2>Balance over time</h2><p class="sub">Cash across all tables, this season.</p><div class="chart" id="chart"></div>
+        <details><summary>Show as a table</summary><table><thead><tr><th>When</th><th class="n">Cash</th></tr></thead><tbody>${p.hist.slice().reverse().slice(0, 40).map(h => `<tr><td>${new Date(h[0]).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td><td class="n">${usd(h[1])}</td></tr>`).join('')}</tbody></table></details></div>
+      <div class="card"><h2>Favourite games</h2><p class="sub">All-time, most played first.</p>
+        ${p.favs.length ? `<table><thead><tr><th>Game</th><th class="n">Rounds</th><th class="n">Result</th></tr></thead><tbody>${p.favs.slice(0, 8).map(g => `<tr><td>${esc(GAMES[g.game] || g.game)}</td><td class="n">${g.rounds.toLocaleString('en-US')}</td><td class="n ${g.paid - g.wagered >= 0 ? 'pos' : 'neg'}">${g.game === 'poker' ? '' : (g.paid - g.wagered >= 0 ? '+' : '') + usd(g.paid - g.wagered)}</td></tr>`).join('')}</tbody></table>` : '<p class="empty">No games played yet.</p>'}
+      </div>
+    </div>
+    ${p.trophies.length ? `<div class="card"><h2>Trophies</h2><div class="tro">${p.trophies.slice().reverse().map(t => `<div>${['🥇', '🥈', '🥉'][t.place - 1] || '🏆'} ${t.type === 'season' ? `Season ${t.n}` : `Tournament ${esc(t.week)}`} · place ${t.place}</div>`).join('')}</div></div>` : ''}
+    <div class="card"><h2>Badges</h2><p class="sub">${p.achievements.filter(a => a.got).length} of ${p.achievements.length}</p><div class="alist">${p.achievements.slice().sort((a, b) => (b.got ? 1 : 0) - (a.got ? 1 : 0)).map(a => `<div class="ai ${a.got ? '' : 'off'}"><i>${a.icon}</i><div><b>${esc(a.name)}</b><small>${esc(a.desc)}</small></div></div>`).join('')}</div></div>`;
+  chart();
+  const tb = $('tipBtn'); if (tb) tb.onclick = openTip;
+}
+// balance line: one series, gold line, a light wash under it, hover to read any point
+function chart() {
+  const box = $('chart'), pts = P.hist.length ? P.hist.slice() : [];
+  if (pts.length < 2) { box.innerHTML = '<p class="empty">Not enough play yet to draw a chart.</p>'; return; }
+  const W = 640, H = 260, L = 54, R = 16, T = 14, B = 28;
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const x0 = xs[0], x1 = xs[xs.length - 1] || x0 + 1;
+  let lo = Math.min(...ys), hi = Math.max(...ys);
+  const nice = v => { const p = Math.pow(10, Math.floor(Math.log10(Math.max(1, v)))); const n = v / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; };
+  const step = nice((hi - lo || hi || 100000) / 4);
+  lo = Math.max(0, Math.floor(lo / step) * step); hi = Math.ceil(hi / step) * step; if (hi === lo) hi = lo + step;
+  const X = t => L + (t - x0) / Math.max(1, x1 - x0) * (W - L - R), Y = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  let grid = '';
+  for (let v = lo; v <= hi + 1; v += step) grid += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="DM Mono,monospace">${compact(v)}</text>`;
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('');
+  const area = d + `L${X(x1).toFixed(1)},${Y(lo)}L${X(x0).toFixed(1)},${Y(lo)}Z`;
+  const fmtD = t => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  const last = pts[pts.length - 1];
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Balance over time, from ${usd(ys[0])} to ${usd(last[1])}">
+    ${grid}
+    <text x="${L}" y="${H - 6}" font-size="11" fill="var(--muted)">${fmtD(x0)}</text><text x="${W - R}" y="${H - 6}" font-size="11" fill="var(--muted)" text-anchor="end">${fmtD(x1)}</text>
+    <path d="${area}" fill="var(--gold)" opacity=".1"/>
+    <path d="${d}" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${X(last[0])}" cy="${Y(last[1])}" r="5" fill="var(--gold)" stroke="var(--card)" stroke-width="2"/>
+    <line id="cx" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-width="1" opacity="0"/>
+    <circle id="cd" r="5" fill="var(--gold)" stroke="var(--card)" stroke-width="2" opacity="0"/>
+    <rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/>
+  </svg><div class="tip" id="tip" hidden></div>`;
+  const svg = box.querySelector('svg'), tip = $('tip'), cx = $('cx'), cd = $('cd');
+  const move = e => {
+    const r = svg.getBoundingClientRect(), mx = (e.clientX - r.left) / r.width * W;
+    let best = 0; pts.forEach((p, i) => { if (Math.abs(X(p[0]) - mx) < Math.abs(X(pts[best][0]) - mx)) best = i; });
+    const p = pts[best], px = X(p[0]), py = Y(p[1]);
+    cx.setAttribute('x1', px); cx.setAttribute('x2', px); cx.setAttribute('opacity', 1);
+    cd.setAttribute('cx', px); cd.setAttribute('cy', py); cd.setAttribute('opacity', 1);
+    tip.hidden = false; tip.style.left = px / W * r.width + 'px'; tip.style.top = py / H * r.height + 'px';
+    tip.innerHTML = `<b>${usd(p[1])}</b><span>${new Date(p[0]).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>`;
+  };
+  const out = () => { tip.hidden = true; cx.setAttribute('opacity', 0); cd.setAttribute('opacity', 0); };
+  $('hit').addEventListener('pointermove', move); $('hit').addEventListener('pointerleave', out);
+}
+function openTip() {
+  $('tipTxt').textContent = `Send ${P.name} up to $500 a day from your bankroll. You can send chips from level 3.`;
+  $('tipErr').textContent = ''; $('tipAmt').value = ''; $('tipNote').value = '';
+  $('tipModal').hidden = false; setTimeout(() => $('tipAmt').focus(), 30);
+}
+$('tipCancel').onclick = () => { $('tipModal').hidden = true; };
+$('tipForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const cents = Math.round(parseFloat($('tipAmt').value) * 100);
+  if (!(cents >= 100)) { $('tipErr').textContent = 'Type an amount from $1 to $500.'; return; }
+  const r = await CasinoNet.api('api/tip', { to: P.id, cents, note: $('tipNote').value });
+  if (!r.ok) { $('tipErr').textContent = r.body.error || 'Not sent.'; return; }
+  $('tipModal').hidden = true;
+  CasinoUI.popups([{ icon: '🎁', title: `Sent ${usd(cents)} to ${P.name}`, text: `${usd(r.body.left)} left to send today` }]);
+});
+load();
+})();
+</script>
+</body>
+</html>
