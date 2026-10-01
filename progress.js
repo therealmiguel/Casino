@@ -58,6 +58,7 @@ const ACH = [
   ['wheel', '🎡', 'Spin the wheel', 'Reach the prize wheel in Cosmic Cascade'],
   ['crash-10', '🚀', 'To the moon', 'Cash out at 10× or more in Crash'],
   ['crash-50', '💎', 'Diamond hands', 'Cash out at 50× or more in Crash'],
+  ['skyline', '🏙️', 'Skyline', 'Win 100× or more in Dice City'],
   ['mines-10', '💣', 'Minesweeper', 'Clear 10 safe tiles in one Mines game'],
   ['plinko-edge', '🔻', 'Edge of glory', 'Land in an outside Plinko bucket'],
   ['natural-9', '9️⃣', 'Natural nine', 'Win a baccarat bet with a natural 9'],

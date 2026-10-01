@@ -16,7 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
-const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'crash.html', 'baccarat-live.html', 'profile.html'];
+const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'crash.html', 'baccarat-live.html', 'dicecity.html', 'profile.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
   const preferred = [path.join(__dirname, 'public'), __dirname];
@@ -194,7 +194,7 @@ live2 = require('./live2')({
   persist: () => live1.persist(),
 });
 // one face for every live table: blackjack, roulette and Hold'em (live.js); Crash, baccarat and chat (live2.js)
-const LIVE2_GAMES = ['cr', 'bc'];
+const LIVE2_GAMES = ['cr', 'bc', 'dc'];
 const live = Object.assign({}, live1, {
   summary: () => Object.assign(live1.summary(), live2.summary()),
   where: pid => live1.where(pid).concat(live2.where(pid)),
@@ -453,14 +453,14 @@ async function adminApi(req, res, sub, ip) {
     return send(res, 200, { ok: true, count: n });
   }
   if (sub === '/api/event') {
-    const games_ = ['all', 'slots', 'blackjack', 'roulette', 'craps', 'plinko', 'mines', 'crash', 'live-bc'];
+    const games_ = ['all', 'slots', 'blackjack', 'roulette', 'craps', 'plinko', 'mines', 'crash', 'live-bc', 'live-dc'];
     if (b.boost !== undefined) {
       if (!b.boost) META.events.boost = null;
       else {
         const mult = Number(b.boost.mult), hours = Math.min(48, Math.max(0.25, Number(b.boost.hours) || 1));
         if (![1.5, 2, 3].includes(mult) || !games_.includes(b.boost.game)) return send(res, 400, { error: 'Pick a game and a boost.' });
         META.events.boost = { game: b.boost.game, mult, until: Date.now() + hours * 3600000, t: Date.now() };
-        announce(`🎉 Happy hour! Winnings ${b.boost.game === 'all' ? 'everywhere' : 'on ' + ({ slots: 'the slots', blackjack: 'blackjack', roulette: 'roulette', craps: 'craps', plinko: 'Plinko', mines: 'Mines', crash: 'Crash', 'live-bc': 'baccarat' })[b.boost.game]} are boosted ×${mult} for ${hours < 1 ? Math.round(hours * 60) + ' minutes' : hours + ' hour' + (hours === 1 ? '' : 's')}!`);
+        announce(`🎉 Happy hour! Winnings ${b.boost.game === 'all' ? 'everywhere' : 'on ' + ({ slots: 'the slots', blackjack: 'blackjack', roulette: 'roulette', craps: 'craps', plinko: 'Plinko', mines: 'Mines', crash: 'Crash', 'live-bc': 'baccarat', 'live-dc': 'Dice City' })[b.boost.game]} are boosted ×${mult} for ${hours < 1 ? Math.round(hours * 60) + ' minutes' : hours + ' hour' + (hours === 1 ? '' : 's')}!`);
       }
       audit('event', META.events.boost ? `Happy hour ×${META.events.boost.mult} on ${META.events.boost.game}` : 'Happy hour ended', ip);
     }
@@ -555,7 +555,7 @@ const server = http.createServer(async (req, res) => {
       const r = live2.chatPost(b, ip);
       return send(res, r.code, r.body);
     }
-    const lm = p.match(/^\/api\/live\/(bj|rl|pk|cr|bc|claim)$/);
+    const lm = p.match(/^\/api\/live\/(bj|rl|pk|cr|bc|dc|claim)$/);
     if (lm && req.method === 'POST') {
       if (!ready) return send(res, 503, { error: 'The casino is opening. Try again in a few seconds.' });
       const b = await jsonBody(req);

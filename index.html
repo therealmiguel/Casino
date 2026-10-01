@@ -83,6 +83,7 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
 .lt .ic.pk{background:radial-gradient(circle at 40% 30%,#1C6B45,#0A2E1D);color:#F7F2E7}
 .lt .ic.cr{background:radial-gradient(circle at 40% 30%,#1A2A5A,#060914);color:#FF8A3D}
 .lt .ic.bc{background:radial-gradient(circle at 40% 30%,#14603F,#0A3624)}
+.lt .ic.dc{background:radial-gradient(circle at 40% 30%,#3A1A7A,#08061A)}
 .lt .ic.rl{background:radial-gradient(circle at 40% 30%,#1D2230,#08090E);color:#FFD447}
 .lt .tx{flex:1;min-width:0}
 .lt h3{margin:0;font:400 22px/1.15 var(--display);color:var(--ivory)}
@@ -433,7 +434,7 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
 
   <section class="live-sec" id="liveSec" hidden aria-labelledby="liveTitle">
     <div class="head">
-      <div><div class="eyebrow">Play together</div><h2 id="liveTitle">Live tables</h2><p>Sit down with everyone online right now. Blackjack, roulette, Hold’em, baccarat and Crash: one dealer, same cards for everyone, with table chat.</p></div>
+      <div><div class="eyebrow">Play together</div><h2 id="liveTitle">Live tables</h2><p>Sit down with everyone online right now. Blackjack, roulette, Hold’em, baccarat, Crash and Dice City: one dealer, same cards for everyone, with table chat.</p></div>
       <div class="live" id="liveNow"><i></i><span>Open</span></div>
     </div>
     <div class="lives">
@@ -460,6 +461,11 @@ h1{margin:10px 0 6px;font:400 clamp(44px,9vw,88px)/1 var(--display);letter-spaci
       <a class="lt" href="baccarat-live.html">
         <div class="ic bc"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><rect x="3" y="5" width="10" height="14" rx="2" fill="#F3EEDF" transform="rotate(-10 8 12)"/><rect x="10" y="5" width="10" height="14" rx="2" fill="#F3EEDF" transform="rotate(8 15 12)"/><text x="15.5" y="15" text-anchor="middle" font-size="7" font-weight="800" fill="#C21F2E" font-family="system-ui" transform="rotate(8 15 12)">9</text></svg></div>
         <div class="tx"><h3>Baccarat Live</h3><div class="now" id="ltBc">Player, Banker or Tie</div></div>
+        <span class="play">Join</span>
+      </a>
+      <a class="lt" href="dicecity.html">
+        <div class="ic dc"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><rect x="3" y="10" width="5" height="11" fill="#3FE6FF"/><rect x="9" y="4" width="6" height="17" fill="#FF3FA4"/><rect x="16" y="8" width="5" height="13" fill="#9C6BFF"/><rect x="10.5" y="7" width="1.4" height="1.4" fill="#FFE9A6"/><rect x="12.5" y="7" width="1.4" height="1.4" fill="#FFE9A6"/><rect x="10.5" y="10" width="1.4" height="1.4" fill="#FFE9A6"/><rect x="12.5" y="13" width="1.4" height="1.4" fill="#FFE9A6"/></svg></div>
+        <div class="tx"><h3>Dice City</h3><div class="now" id="ltDc">Two dice, towers up to 300×</div></div>
         <span class="play">Join</span>
       </a>
     </div>
@@ -1020,6 +1026,7 @@ window.CasinoSound = (() => {
           $('ltRl').innerHTML = s.rl.players ? `<b>${s.rl.players} at the wheel</b> · ${PH[s.rl.phase] || ''}` : 'Shared wheel · nobody yet';
           if (s.cr) $('ltCr').innerHTML = s.cr.players ? `<b>${s.cr.players} on board</b> · ${s.cr.phase === 'running' ? 'rocket flying' : s.cr.phase === 'betting' ? 'taking bets' : 'between rounds'}` : `Everyone rides the same rocket${s.cr.last ? ` · last ${s.cr.last.toFixed(2)}×` : ''}`;
           if (s.bc) $('ltBc').innerHTML = s.bc.players ? `<b>${s.bc.players} at the table</b> · ${s.bc.phase === 'dealing' ? 'dealing' : PH[s.bc.phase] || ''}` : 'Player, Banker or Tie · nobody yet';
+          if (s.dc) $('ltDc').innerHTML = s.dc.players ? `<b>${s.dc.players} in the city</b> · ${s.dc.phase === 'playing' ? 'rolling' : PH[s.dc.phase] || ''}` : `Two dice, towers up to 300×${s.dc.last ? ` · last roll ${s.dc.last}` : ''}`;
         } catch (e) {}
       };
       poll(); setInterval(poll, 5000);

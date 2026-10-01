@@ -390,7 +390,7 @@ const compact = c => { const d = c / 100; const a = Math.abs(d); return (d < 0 ?
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const COLORS = ['#E8C170', '#E07A5F', '#81B29A', '#9C89B8', '#F2CC8F', '#6FB1D6', '#E5989B', '#B5E48C'];
 const tint = s => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
-const GAMES = { slots: 'Dynamite Diggers', slots2: 'Cosmic Cascade', roulette: 'Voltage Roulette', blackjack: 'Brass Table Blackjack', craps: 'Bubble Dome Craps', plinko: 'Plinko', mines: 'Mines', 'live-bj': 'Live blackjack', 'live-rl': 'Live roulette', 'live-bc': 'Live baccarat', crash: 'Crash', poker: 'Hold’em' };
+const GAMES = { slots: 'Dynamite Diggers', slots2: 'Cosmic Cascade', roulette: 'Voltage Roulette', blackjack: 'Brass Table Blackjack', craps: 'Bubble Dome Craps', plinko: 'Plinko', mines: 'Mines', 'live-bj': 'Live blackjack', 'live-rl': 'Live roulette', 'live-bc': 'Live baccarat', crash: 'Crash', 'live-dc': 'Dice City', poker: 'Hold’em' };
 const id = new URLSearchParams(location.search).get('id') || CasinoNet.seat().id;
 let P = null;
 async function load() {

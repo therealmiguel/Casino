@@ -22,7 +22,7 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
       persist();
     }, 40);
   }
-  function push(c) { try { c.res.write(`event: state\ndata: ${JSON.stringify(c.game === 'cr' ? crView(c.pid) : bcView(c.pid))}\n\n`); } catch (e) {} }
+  function push(c) { try { c.res.write(`event: state\ndata: ${JSON.stringify(c.game === 'cr' ? crView(c.pid) : c.game === 'dc' ? dcView(c.pid) : bcView(c.pid))}\n\n`); } catch (e) {} }
   const present = game => { for (const c of conns) if (c.game === game) return true; return false; };
   setInterval(() => { for (const c of conns) { try { c.res.write(': keep-alive\n\n'); } catch (e) {} } }, 15000).unref();
 
@@ -243,8 +243,94 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
     };
   }
 
+
+  /* =============== DICE CITY (two dice, eleven lots, buildings that boost the multipliers) =============== */
+  const DC_NUMS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const DC_MAIN = { 2: 4, 3: 2.8, 4: 1.9, 5: 1.4, 6: 1.1, 7: 4.4, 8: 1.1, 9: 1.4, 10: 1.9, 11: 2.8, 12: 4 };   // Low / Seven / High
+  const DC_SIDE = { 2: 28, 3: 14, 4: 9.2, 5: 6.9, 6: 5.5, 7: 4.6, 8: 5.5, 9: 6.9, 10: 9.2, 11: 14, 12: 28 };  // one exact total
+  const DC_CAP = 300;
+  const DC_NB = [[1, 30], [2, 35], [3, 22], [4, 10], [5, 3]];
+  const DC_MB = [[1.5, 40], [2, 35], [3, 15], [5, 7], [10, 2.5], [25, 0.5]];
+  const DC_SB = [[1.5, 45], [2, 35], [3, 14], [5, 5], [10, 1]];
+  const DC_BET_MS = 15000 * F, DC_BUILD_MS = 900 * F, DC_ROLL_MS = 2600 * F, DC_DRIVE_MS = 2200 * F, DC_RESULT_MS = 6000 * F;
+  const DC_SPOTS = ['low', 'seven', 'high', ...DC_NUMS.map(n => 'n' + n)];
+  const DC = { phase: 'idle', round: 0, deadline: 0, bets: new Map(), R: null, history: [], timer: null, results: {} };
+  const wpick = t => { let r = rnd(1e6) / 1e6 * t.reduce((a, x) => a + x[1], 0); for (const [v, w] of t) { r -= w; if (r < 0) return v; } return t[t.length - 1][0]; };
+  const dcTimer = (ms, fn) => { clearTimeout(DC.timer); DC.timer = setTimeout(fn, ms); };
+  function dcBetting() { DC.phase = 'betting'; DC.deadline = Date.now() + DC_BET_MS; DC.R = null; dcTimer(DC_BET_MS, dcPlay); changed('dc'); }
+  // the multiplier a bet on a lot pays right now (main bets and number bets are boosted separately)
+  const dcMult = (R, n, side) => Math.min(DC_CAP, Math.round((side ? DC_SIDE[n] * R.sb[n] : DC_MAIN[n] * R.mb[n]) * 100) / 100);
+  function dcPlay() {
+    if (![...DC.bets.values()].some(b => b.total > 0)) { if (present('dc')) dcBetting(); else { DC.phase = 'idle'; DC.deadline = 0; changed('dc'); } return; }
+    DC.round++;
+    const builds = [], mb = {}, sb = {};
+    DC_NUMS.forEach(n => { mb[n] = 1; sb[n] = 1; });
+    const k = wpick(DC_NB);
+    for (let i = 0; i < k; i++) { const n = DC_NUMS[rnd(11)], m = wpick(DC_MB), x = wpick(DC_SB); mb[n] *= m; sb[n] *= x; builds.push({ n, m, s: x }); }
+    const d = [1 + rnd(6), 1 + rnd(6)];
+    const start = Date.now();
+    const rollAt = start + k * DC_BUILD_MS + 500 * F, landAt = rollAt + DC_ROLL_MS, doneAt = landAt + DC_DRIVE_MS;
+    DC.R = { builds, mb, sb, dice: d, sum: d[0] + d[1], start, rollAt, landAt, doneAt };
+    DC.phase = 'playing'; DC.deadline = doneAt;
+    dcTimer(doneAt - Date.now(), dcSettle); changed('dc');
+  }
+  function dcSettle() {
+    const R = DC.R, n = R.sum; DC.results = {};
+    for (const [pid, b] of DC.bets) {
+      const s = b.spots; let paid = 0, best = 0;
+      const main = n <= 6 ? 'low' : n === 7 ? 'seven' : 'high';
+      if (s[main]) { const m = dcMult(R, n, false); paid += Math.floor(s[main] * m); best = Math.max(best, m); }
+      if (s['n' + n]) { const m = dcMult(R, n, true); paid += Math.floor(s['n' + n] * m); best = Math.max(best, m); }
+      if (paid > 0) A.credit(pid, paid, 'live-dc', `Dice City: rolled ${n}`);
+      A.round(pid, 'live-dc', { staked: b.total, paid, spins: 1, mult: best >= 10 ? Math.floor(best) : 0, tags: best >= 100 ? ['skyline'] : [] });
+      DC.results[pid] = { name: b.name, staked: b.total, net: paid - b.total, best };
+    }
+    DC.history.push({ sum: n, d: R.dice, m: Math.max(dcMult(R, n, false), 1) }); if (DC.history.length > 30) DC.history.shift();
+    DC.bets.clear();
+    DC.phase = 'result'; DC.deadline = Date.now() + DC_RESULT_MS;
+    changed('dc');
+    dcTimer(DC_RESULT_MS, () => { if (present('dc')) dcBetting(); else { DC.phase = 'idle'; DC.deadline = 0; changed('dc'); } });
+  }
+  function dcAction(pid, name, body) {
+    if (body.action !== 'bets') return { code: 400, body: { error: 'Unknown action.' } };
+    if (DC.phase !== 'betting' && DC.phase !== 'idle') return { code: 409, body: { error: 'Bets are closed for this roll.', cents: bal(pid) } };
+    const raw = body.bets && typeof body.bets === 'object' ? body.bets : {};
+    const spots = {}; let sum = 0;
+    const mainMax = maxFor(pid), sideMax = Math.round(mainMax / 5);
+    for (const [k, v] of Object.entries(raw)) {
+      const amt = Math.round(Number(v));
+      if (!DC_SPOTS.includes(k) || !(amt >= 0) || amt % 100) return { code: 400, body: { error: 'That bet is not on the board.' }, flag: `dice city bet ${String(k).slice(0, 20)}=${String(v).slice(0, 12)}` };
+      if (!amt) continue;
+      const lim = k[0] === 'n' ? sideMax : mainMax;
+      if (amt > lim) return { code: 400, body: { error: `${k[0] === 'n' ? 'Number bets' : 'Low, Seven and High'} take up to $${(lim / 100).toLocaleString('en-US')}.` } };
+      spots[k] = amt; sum += amt;
+    }
+    const before = (DC.bets.get(pid) || { total: 0 }).total, delta = sum - before;
+    if (delta > 0 && !A.debit(pid, delta, 'live-dc', 'Dice City bets')) return { code: 409, body: { error: 'Not enough in your bankroll.', cents: bal(pid), total: before } };
+    if (delta < 0) A.refund(pid, -delta, 'live-dc', 'Dice City bets taken back');
+    if (sum) DC.bets.set(pid, { spots, total: sum, name }); else DC.bets.delete(pid);
+    if (DC.phase === 'idle') dcBetting(); else changed('dc');
+    return { code: 200, body: { ok: true, total: sum, cents: bal(pid) } };
+  }
+  function dcView(pid) {
+    const seen = new Map();
+    for (const c of conns) if (c.game === 'dc') seen.set(c.pid, c.name);
+    for (const [p, b] of DC.bets) seen.set(p, b.name);
+    if (DC.phase === 'result') for (const [p, r] of Object.entries(DC.results)) seen.set(p, r.name);
+    const players = [...seen].map(([p, n]) => { const b = DC.bets.get(p), r = DC.phase === 'result' ? DC.results[p] : null; return { name: n, me: p === pid, bet: r ? r.staked : b ? b.total : 0, net: r ? r.net : null }; });
+    const mine = DC.bets.get(pid);
+    const R = DC.R;
+    return {
+      game: 'dc', now: Date.now(), phase: DC.phase, round: DC.round, deadline: DC.deadline,
+      main: DC_MAIN, side: DC_SIDE, cap: DC_CAP, buildMs: DC_BUILD_MS, rollMs: DC_ROLL_MS, driveMs: DC_DRIVE_MS,
+      R: R && (DC.phase === 'playing' || DC.phase === 'result') ? R : null,
+      history: DC.history.slice(-20), players,
+      me: { spots: mine ? mine.spots : {}, total: mine ? mine.total : 0, cents: bal(pid), max: maxFor(pid), sideMax: Math.round(maxFor(pid) / 5), result: DC.phase === 'result' && DC.results[pid] ? DC.results[pid] : null },
+    };
+  }
+
   /* =============== CHAT =============== */
-  const ROOMS = ['bj', 'rl', 'pk', 'cr', 'bc'];
+  const ROOMS = ['bj', 'rl', 'pk', 'cr', 'bc', 'dc'];
   const REACTS = ['👍', '😂', '🔥', '😮', '😭', '🎉', '💰', '🍀'];
   const chat = Object.fromEntries(ROOMS.map(r => [r, []]));
   const chatConns = new Set();
@@ -303,7 +389,7 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
   /* =============== shared =============== */
   function stream(req, res, url, ip) {
     const game = url.searchParams.get('game'), pid = url.searchParams.get('id') || '', token = url.searchParams.get('token') || '';
-    if (game !== 'cr' && game !== 'bc') { res.writeHead(400); return res.end(); }
+    if (game !== 'cr' && game !== 'bc' && game !== 'dc') { res.writeHead(400); return res.end(); }
     const who = auth(pid, token, ip);
     if (who.error) { res.writeHead(who.code || 403); return res.end(); }
     const c = { res, game, pid, name: nameOf(pid, url.searchParams.get('name')) };
@@ -312,6 +398,7 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
     conns.add(c);
     if (game === 'cr' && CR.phase === 'idle') crBetting();
     if (game === 'bc' && BC.phase === 'idle') bcBetting();
+    if (game === 'dc' && DC.phase === 'idle') dcBetting();
     push(c); changed(game);
     req.on('close', () => { conns.delete(c); changed(game); });
   }
@@ -321,13 +408,14 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
     if (who.error) return { code: who.code || 403, body: { error: who.error } };
     if (isClosed()) return { code: 503, body: { error: 'The casino is closed for a moment. Try again soon.' } };
     const name = nameOf(pid, body.name);
-    return game === 'cr' ? crAction(pid, name, body) : bcAction(pid, name, body);
+    return game === 'cr' ? crAction(pid, name, body) : game === 'dc' ? dcAction(pid, name, body) : bcAction(pid, name, body);
   }
   // money on these tables right now
   function onTables(pid) {
     let c = 0;
     const b = CR.bets.get(pid); if (b && !b.out && CR.phase !== 'crashed') c += b.bet;
     const k = BC.bets.get(pid); if (k && BC.phase !== 'result') c += k.total;
+    const q = DC.bets.get(pid); if (q && DC.phase !== 'result') c += q.total;
     return c;
   }
   A.extras.push(onTables);
@@ -335,16 +423,18 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
     const out = {};
     for (const [pid, b] of CR.bets) if (!b.out && CR.phase !== 'crashed') out[pid] = (out[pid] || 0) + b.bet;
     if (BC.phase !== 'result') for (const [pid, b] of BC.bets) out[pid] = (out[pid] || 0) + b.total;
+    if (DC.phase !== 'result') for (const [pid, b] of DC.bets) out[pid] = (out[pid] || 0) + b.total;
     return out;
   }
   function summary() {
     const n = g => { const s = new Set(); for (const c of conns) if (c.game === g) s.add(c.pid); return s.size; };
-    return { cr: { players: n('cr'), phase: CR.phase, last: CR.history.slice(-1)[0] || null }, bc: { players: n('bc'), phase: BC.phase } };
+    return { cr: { players: n('cr'), phase: CR.phase, last: CR.history.slice(-1)[0] || null }, bc: { players: n('bc'), phase: BC.phase }, dc: { players: n('dc'), phase: DC.phase, last: DC.history.length ? DC.history[DC.history.length - 1].sum : null } };
   }
   function where(pid) {
     const out = [];
     if (CR.bets.has(pid) || [...conns].some(c => c.game === 'cr' && c.pid === pid)) out.push('Crash');
     if (BC.bets.has(pid) || [...conns].some(c => c.game === 'bc' && c.pid === pid)) out.push('Live baccarat');
+    if (DC.bets.has(pid) || [...conns].some(c => c.game === 'dc' && c.pid === pid)) out.push('Dice City');
     return out;
   }
   function kick(pid) {
@@ -353,11 +443,13 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
     if (b && CR.phase === 'betting') { A.refund(pid, b.bet, 'crash', 'Crash bet returned'); CR.bets.delete(pid); n++; changed('cr'); }
     const k = BC.bets.get(pid);
     if (k && BC.phase === 'betting') { A.refund(pid, k.total, 'live-bc', 'Baccarat bets returned'); BC.bets.delete(pid); n++; changed('bc'); }
+    const q = DC.bets.get(pid);
+    if (q && DC.phase === 'betting') { A.refund(pid, q.total, 'live-dc', 'Dice City bets returned'); DC.bets.delete(pid); n++; changed('dc'); }
     for (const c of [...conns]) if (c.pid === pid) { try { c.res.end(); } catch (e) {} conns.delete(c); }
     for (const c of [...chatConns]) if (c.pid === pid) { try { c.res.end(); } catch (e) {} chatConns.delete(c); }
     return n;
   }
-  const allPids = () => new Set([...CR.bets.keys(), ...BC.bets.keys()]);
+  const allPids = () => new Set([...CR.bets.keys(), ...BC.bets.keys(), ...DC.bets.keys()]);
   function onlineNow(m) { for (const c of conns) { if (!m.has(c.pid)) m.set(c.pid, []); m.get(c.pid).push(c.game); } return m; }
-  return { stream, action, chatStream, chatPost, chatClear, chatRecent, chatDelete, summary, where, kick, allPids, onlineNow, atRisk, REACTS, _test: { CR, BC, playHand, score, bustPoint, multAt, crBust, bcSettle, newShoe } };
+  return { stream, action, chatStream, chatPost, chatClear, chatRecent, chatDelete, summary, where, kick, allPids, onlineNow, atRisk, REACTS, _test: { CR, BC, DC, dcMult, dcSettle, dcPlay, DC_MAIN, DC_SIDE, playHand, score, bustPoint, multAt, crBust, bcSettle, newShoe } };
 };

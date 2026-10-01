@@ -180,7 +180,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
           <div class="card">
             <h2>Happy hour</h2>
             <p class="help">Boost everyone's winnings on a game for a while. A banner tells the whole casino.</p>
-            <div class="row"><select id="hhGame" style="max-width:170px" aria-label="Game"><option value="all">Every game</option><option value="slots">Slots</option><option value="blackjack">Blackjack</option><option value="roulette">Roulette</option><option value="craps">Craps</option><option value="plinko">Plinko</option><option value="mines">Mines</option><option value="crash">Crash</option><option value="live-bc">Baccarat</option></select>
+            <div class="row"><select id="hhGame" style="max-width:170px" aria-label="Game"><option value="all">Every game</option><option value="slots">Slots</option><option value="blackjack">Blackjack</option><option value="roulette">Roulette</option><option value="craps">Craps</option><option value="plinko">Plinko</option><option value="mines">Mines</option><option value="crash">Crash</option><option value="live-bc">Baccarat</option><option value="live-dc">Dice City</option></select>
               <select id="hhMult" style="max-width:110px" aria-label="Boost"><option value="1.5">×1.5</option><option value="2" selected>×2</option><option value="3">×3</option></select>
               <select id="hhHours" style="max-width:130px" aria-label="How long"><option value="0.5">30 minutes</option><option value="1" selected>1 hour</option><option value="2">2 hours</option><option value="6">6 hours</option><option value="24">1 day</option></select>
               <button class="btn gold" id="hhGo">Start</button><button class="btn" id="hhStop">Stop</button></div>
@@ -259,7 +259,7 @@ const ago = t => { if (!t) return '—'; const s = (Date.now() - t) / 1000; if (
 const when = t => new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const COLORS = ['#E8C170', '#E07A5F', '#81B29A', '#9C89B8', '#F2CC8F', '#6FB1D6', '#E5989B', '#B5E48C'];
 const tint = s => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
-const GAMES = { crash: 'Crash', bonus: 'Bonuses & challenges', jackpot: 'Mega jackpot', tournament: 'Tournament prizes', event: 'Happy hour & free spins', tip: 'Tip', season: 'Season', slots2: 'Cosmic Cascade', plinko: 'Plinko', mines: 'Mines', crash: 'Crash', 'live-bc': 'Live baccarat', slots: 'Dynamite Diggers', roulette: 'Voltage Roulette', blackjack: 'Brass Table Blackjack', craps: 'Bubble Dome Craps', 'live-bj': 'Live blackjack', 'live-rl': 'Live roulette', poker: 'Hold’em (player vs player)', live: 'Live tables', admin: 'Casino', reset: 'Fresh $1,000', import: 'Upgrade', join: 'Joined', table: 'Poker chips' };
+const GAMES = { crash: 'Crash', 'live-dc': 'Dice City', bonus: 'Bonuses & challenges', jackpot: 'Mega jackpot', tournament: 'Tournament prizes', event: 'Happy hour & free spins', tip: 'Tip', season: 'Season', slots2: 'Cosmic Cascade', plinko: 'Plinko', mines: 'Mines', crash: 'Crash', 'live-bc': 'Live baccarat', slots: 'Dynamite Diggers', roulette: 'Voltage Roulette', blackjack: 'Brass Table Blackjack', craps: 'Bubble Dome Craps', 'live-bj': 'Live blackjack', 'live-rl': 'Live roulette', poker: 'Hold’em (player vs player)', live: 'Live tables', admin: 'Casino', reset: 'Fresh $1,000', import: 'Upgrade', join: 'Joined', table: 'Poker chips' };
 let toastT;
 function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2600); }
 async function api(path, body) {
@@ -455,7 +455,7 @@ function renderControls() {
   const T = OV.tour || {};
   $('tourNow').innerHTML = `Week ${esc(T.week || '')} ends ${T.end ? when(T.end) : ''}. ${T.board && T.board.length ? 'Leading: ' + T.board.slice(0, 3).map((r, i) => `${['🥇', '🥈', '🥉'][i]} ${esc(r.name)} ${usd(r.bal)}`).join(' · ') : 'Nobody has joined yet.'} Prizes now: ${(T.prizes || []).map(usd).join(' / ')}. Players need 10 rounds to win a prize.`;
   if (T.prizes && !$('tp1').value) { $('tp1').value = T.prizes[0] / 100; $('tp2').value = T.prizes[1] / 100; $('tp3').value = T.prizes[2] / 100; }
-  const ROOMS = { bj: 'Blackjack', rl: 'Roulette', pk: 'Hold\u2019em', cr: 'Crash', bc: 'Baccarat' };
+  const ROOMS = { bj: 'Blackjack', rl: 'Roulette', pk: 'Hold\u2019em', cr: 'Crash', bc: 'Baccarat', dc: 'Dice City' };
   $('chatList').innerHTML = (OV.chat || []).map(m => `<li><span class="dim">${ago(m.t)} · ${ROOMS[m.room] || m.room}</span> <b>${esc(m.name)}</b>: ${esc(m.text)} <button class="btn small" data-chatdel="${m.id}" style="float:right;height:24px;padding:0 8px">Remove</button></li>`).join('') || '<li class="dim">No messages yet.</li>';
   const J = OV.jackpot || {};
   $('jpNow').textContent = `The pot is ${usd(Math.round(J.pool || 0))} and restarts at ${usd(J.seed || 0)} after a win.${J.last ? ` Last won by ${J.last.name}: ${usd(J.last.amount)} (${ago(J.last.t)}).` : ''}`;
