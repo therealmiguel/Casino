@@ -84,6 +84,8 @@ button{font:inherit;color:inherit}
 .seat{--lift:0px;transform:translateY(var(--lift));display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
 .seat:nth-child(1),.seat:nth-child(5){--lift:-34px} .seat:nth-child(2),.seat:nth-child(4){--lift:-10px}
 .hands{display:flex;flex-direction:column;align-items:center;gap:6px;min-height:calc(var(--cw) * 1.4 + 30px);justify-content:flex-end;width:100%}
+.hands.many{flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:flex-end;--cw:clamp(30px,3.4vw,44px);gap:4px}
+.hands.many .hand{padding:4px}
 .hand{display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 6px 7px;border-radius:12px;border:1px solid transparent;max-width:100%}
 .hand.active{border-color:var(--brass-dim);background:rgba(216,170,82,.08);box-shadow:0 0 22px rgba(216,170,82,.18)}
 .meta{display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:center}
@@ -793,7 +795,7 @@ function render() {
     const el = document.createElement('div');
     const isTurn = st.phase === 'playing' && st.turn && st.turn.seat === i;
     el.className = 'seat' + (s && s.me ? ' me' : '') + (isTurn ? ' turn' : '');
-    const hands = document.createElement('div'); hands.className = 'hands';
+    const hands = document.createElement('div'); hands.className = 'hands' + (s && s.hands.length > 2 ? ' many' : '');
     if (s && s.hands.length) {
       s.hands.forEach((h, hi) => {
         const hd = document.createElement('div');
@@ -907,7 +909,7 @@ function renderControls() {
     const h = s.hands[t.hand];
     const two = h.cards.length === 2 && !h.splitAces;
     const pv = c => c.r === 'A' ? 1 : Math.min(10, c.r === 'J' || c.r === 'Q' || c.r === 'K' ? 10 : +c.r);
-    const canSplit = two && pv(h.cards[0]) === pv(h.cards[1]) && s.hands.length < 4 && h.bet <= bank;
+    const canSplit = two && pv(h.cards[0]) === pv(h.cards[1]) && !h.splitAces && h.bet <= bank;
     status.innerHTML = `Your turn: <b>${h.soft && h.total < 21 ? 'soft ' : ''}${h.total}</b> against the dealer's <b>${st.dealerTotal}</b>`;
     row.appendChild(btn('Hit', 'H', () => act('hit')));
     row.appendChild(btn('Stand', 'S', () => act('stand')));

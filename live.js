@@ -319,7 +319,6 @@ module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, 
     }
     if (a === 'split') {
       if (hand.cards.length !== 2 || splitVal(hand.cards[0].r) !== splitVal(hand.cards[1].r)) return err('You can only split a pair.');
-      if (s.hands.length >= 4) return err('Four hands is the limit.');
       if (hand.splitAces) return err('Split aces get one card each.');
       if (!A.debit(pid, hand.bet, 'live-bj', 'Live blackjack split')) return err('Not enough in your bankroll to split.');
       const charge = hand.bet;

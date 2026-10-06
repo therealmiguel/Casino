@@ -105,6 +105,8 @@ button{font:inherit;color:inherit}
 /* ---------- hands ---------- */
 .hands{display:flex;flex-wrap:wrap;justify-content:center;gap:14px 20px}
 .hands.many{--cw:clamp(50px, 8vw, 82px)}
+.hands.lots{--cw:clamp(38px, 5.6vw, 62px);gap:10px 12px}
+.hands.lots .hand{padding:7px 8px 8px}
 .hand{display:flex;flex-direction:column;align-items:center;gap:9px;padding:10px 12px 11px;border-radius:16px;border:1px solid transparent;transition:border-color .25s,background .25s,box-shadow .25s,opacity .3s}
 .hand.active{border-color:var(--brass-dim);background:rgba(216,170,82,.07);box-shadow:0 0 28px rgba(216,170,82,.14)}
 .hand.waiting{opacity:.72}
@@ -963,7 +965,7 @@ const newHand = bet => ({ cards: [], bet, done: false, bust: false, doubled: fal
 const canAct = () => S.phase === 'play' && !S.busy && !!cur();
 const canDouble = () => { const h = cur(); return canAct() && h.cards.length === 2 && !h.splitAces && S.bankroll >= h.bet; };
 const canSplit = () => {
-  const h = cur(); if (!canAct() || h.cards.length !== 2 || S.hands.length >= 4 || S.bankroll < h.bet) return false;
+  const h = cur(); if (!canAct() || h.cards.length !== 2 || S.bankroll < h.bet) return false;
   if (h.splitAces) return false;
   return splitVal(h.cards[0].r) === splitVal(h.cards[1].r);
 };
@@ -1212,6 +1214,7 @@ function renderDealer() {
 function renderHands() {
   const wrap = $('#hands');
   wrap.classList.toggle('many', S.hands.length > 2);
+  wrap.classList.toggle('lots', S.hands.length > 4);
   while (wrap.children.length < S.hands.length) {
     const el = document.createElement('div');
     el.className = 'hand';
@@ -1836,7 +1839,7 @@ function renderSheet() {
         <li>Dealer ${set.h17 ? '<b>hits soft 17</b>' : '<b>stands on all 17s</b>'} and peeks for blackjack when showing an Ace or a ten.</li>
         <li><b>Insurance</b> is offered against an Ace and pays 2 to 1. With your own blackjack it becomes <b>even money</b>.</li>
         <li><b>Double</b> on any first two cards, including after a split.</li>
-        <li><b>Split</b> any pair (tens of different ranks too) up to four hands. Split Aces get one card each.</li>
+        <li><b>Split</b> any pair (tens of different ranks too), as many times as you like. Split Aces get one card each.</li>
         <li><b>Surrender</b> gives up half your bet on your first two cards${set.surrender ? '' : ' (currently turned off)'}.</li>
         <li>${set.decks}-deck shoe, reshuffled when the cut card comes out. Table limits ${fmt(MIN)} to ${fmt(MAX)}.</li>
         <li>Tap the bet circle to take back your last chip.</li>

@@ -228,7 +228,8 @@ function play(S, action, body, wallet, rnd, limits) {
     return view(S, log);
   }
   if (action === 'split') {
-    if (h.cards.length !== 2 || R.hands.length >= 4 || h.splitAces || splitVal(h.cards[0].r) !== splitVal(h.cards[1].r)) return err('You can only split a pair, up to four hands.');
+    // unlimited splits: any pair can be split again, as long as there's money for the extra bet
+    if (h.cards.length !== 2 || h.splitAces || splitVal(h.cards[0].r) !== splitVal(h.cards[1].r)) return err('You can only split a pair.');
     if (!wallet.debit(h.bet)) return err('Not enough in your bankroll to split.');
     R.staked += h.bet;
     const moved = h.cards.pop();
