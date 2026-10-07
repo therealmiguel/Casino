@@ -11,6 +11,7 @@ What's in this folder
                     weekly tournament, seasons, tips and happy hours
   cascade_engine.js the rules and payouts of Cosmic Cascade
   live2.js          the live Rocket Crash, Baccarat and Dice City tables, and the table chat
+  wizard.js         Wizard, the trick-taking card game for 3 to 6 players (with bots), played for points
   wordfilter.js     keeps swear words and slurs out of chat and player names
   bj_solo.js        the blackjack dealer for the solo table
   roulette_rules.js, craps_rules.js, slot_engine.js   the rules and payouts of each game

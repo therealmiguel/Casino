@@ -348,7 +348,7 @@ module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip,
   }
 
   /* =============== CHAT =============== */
-  const ROOMS = ['bj', 'rl', 'pk', 'cr', 'bc', 'dc'];
+  const ROOMS = ['bj', 'rl', 'pk', 'cr', 'bc', 'dc', 'wz'];
   const REACTS = ['👍', '😂', '🔥', '😮', '😭', '🎉', '💰', '🍀'];
   const chat = Object.fromEntries(ROOMS.map(r => [r, []]));
   const chatConns = new Set();

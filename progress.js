@@ -59,6 +59,7 @@ const ACH = [
   ['crash-10', '🚀', 'To the moon', 'Cash out at 10× or more in Crash'],
   ['crash-50', '💎', 'Diamond hands', 'Cash out at 50× or more in Crash'],
   ['skyline', '🏙️', 'Skyline', 'Win 100× or more in Dice City'],
+  ['wizard-win', '🧙', 'Archmage', 'Win a game of Wizard'],
   ['book', '📜', 'Book worm', 'Open the book and start free spins in Tomb of Amun-Ra'],
   ['road-10', '🐔', 'Why did the chicken…', 'Cash out at 10× or more in Cluck Crossing'],
   ['crossed', '🏁', 'The other side', 'Get the chicken all the way across the road'],

@@ -936,7 +936,7 @@ window.__crash = { S };
   let myHash = '';
   (async () => { try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(CasinoNet.seat().id)); myHash = [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('').slice(0, 8); } catch (e) {} })();
   const money = c => (c < 0 ? '−' : '+') + '$' + (Math.abs(c) / 100).toLocaleString('en-US', { minimumFractionDigits: Math.abs(c) % 100 ? 2 : 0, maximumFractionDigits: 2 });
-  const ICON = { bj: '🂡', rl: '⚡', pk: '♣️', cr: '🚀', bc: '🎴', dc: '🏙️' };
+  const ICON = { bj: '🂡', rl: '⚡', pk: '♣️', cr: '🚀', bc: '🎴', dc: '🏙️', wz: '🧙' };
   // a nickname for every result, picked from how the round went
   function title(r, i, rows) {
     const worst = rows[rows.length - 1];

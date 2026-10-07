@@ -16,7 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
-const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'chicken.html', 'book.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'crash.html', 'baccarat-live.html', 'dicecity.html', 'profile.html'];
+const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'chicken.html', 'book.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'crash.html', 'baccarat-live.html', 'dicecity.html', 'wizard.html', 'profile.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
   const preferred = [path.join(__dirname, 'public'), __dirname];
@@ -203,6 +203,13 @@ live2 = require('./live2')({
 });
 // every finished round also goes to the live tables' round recaps
 { const round = A.round; A.round = (id, game, e) => { const r = round(id, game, e); try { live2.collect(game, id, e || {}); } catch (x) {} try { if (SOLO_GAMES.has(game)) LUCK.after(id); } catch (x) {} return r; }; }
+// Wizard, the card game: played for points, not chips
+const wizard = require('./wizard')({
+  A, cleanName: A.cleanName,
+  auth: (id, token, ip) => authPlayer(id, token, ip),
+  isClosed: () => META.settings.closed,
+  onWin: pid => { try { A.round(pid, 'wizard', { staked: 0, paid: 0, hands: 1, tags: ['wizard-win'] }); } catch (e) {} },
+});
 // one face for every live table: blackjack, roulette and Hold'em (live.js); Crash, baccarat and chat (live2.js)
 const LIVE2_GAMES = ['cr', 'bc', 'dc'];
 const live = Object.assign({}, live1, {
@@ -637,6 +644,15 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/live/stream') { if (!ready) return send(res, 503, { error: 'Opening.' }); return live.stream(req, res, url, ip); }
     if (p === '/api/live/summary') return send(res, 200, live.summary());
+    if (p === '/api/wz/stream') { if (!ready) return send(res, 503, { error: 'Opening.' }); return wizard.stream(req, res, url, ip); }
+    if (p === '/api/wz' && req.method === 'POST') {
+      if (!ready) return send(res, 503, { error: 'The casino is opening. Try again in a few seconds.' });
+      const b = await jsonBody(req);
+      if (!b) return send(res, 400, { error: 'Send JSON.' });
+      if (!allow('ip:' + ip, 40, 80) || !allow('p:' + String(b.id || ''), 14, 30)) return send(res, 429, { error: 'Slow down a little.' });
+      const r = wizard.action(b, ip);
+      return send(res, r.code, A.get(String(b.id || '')) ? withPop(String(b.id), r.body) : r.body);
+    }
     if (p === '/api/chat/stream') { if (!ready) return send(res, 503, { error: 'Opening.' }); return live2.chatStream(req, res, url, ip); }
     if (p === '/api/chat' && req.method === 'POST') {
       if (!ready) return send(res, 503, { error: 'The casino is opening. Try again in a few seconds.' });
