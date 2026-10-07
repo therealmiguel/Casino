@@ -2,6 +2,7 @@
 'use strict';
 const crypto = require('crypto');
 const CE = require('./cascade_engine');
+const BE = require('./book_engine');
 
 // Plinko pays, from the edge bucket to the middle one (the board is symmetric)
 const PLINKO_HALF = {
@@ -169,7 +170,48 @@ module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLO
     return bad(id, `road action ${act.slice(0, 20)}`, 'Unknown move.');
   }
 
-  return { plinko, mines, slots2, chicken, PLINKO, minesMult, ROAD, roadMult };
+  /* ---------- Tomb of Amun-Ra (book slot) ---------- */
+  function book(id, b) {
+    const rec = A.get(id), act = String(b.action || 'spin');
+    rec.games.book = rec.games.book || {};
+    const T = rec.games.book;
+    // the gamble: put the last win on red or black; a correct guess doubles it, up to 5 times in a row
+    if (act === 'gamble') {
+      const pick = String(b.pick || '');
+      if (!['red', 'black'].includes(pick)) return bad(id, `book gamble ${pick.slice(0, 10)}`, 'Pick red or black.');
+      if (!(T.last > 0) || T.steps >= 5) return { code: 409, body: { error: 'Nothing to gamble.' } };
+      if (T.last * 2 > 5000000) return { code: 409, body: { error: 'That win is too big to gamble.' } };
+      const stake = T.last;
+      if (!A.debit(id, stake, 'book', 'Tomb of Amun-Ra gamble')) return { code: 409, body: { error: 'Nothing to gamble.' } };
+      const card = { s: ['♥', '♦', '♠', '♣'][rnd(4)], r: ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'][rnd(13)] };
+      const red = card.s === '♥' || card.s === '♦';
+      let won = (pick === 'red') === red;
+      // secret luck from the admin room works here too
+      const st = luck.steer(id);
+      if (st > 0 && !won) { won = true; card.s = pick === 'red' ? '♥' : '♠'; } else if (st < 0 && won) { won = false; card.s = pick === 'red' ? '♠' : '♥'; }
+      T.steps = (T.steps || 0) + 1;
+      if (won) { A.credit(id, stake * 2, 'book', 'Tomb of Amun-Ra gamble won'); T.last = stake * 2; }
+      else T.last = 0;
+      A.round(id, 'book', { staked: stake, paid: won ? stake * 2 : 0, spins: 0, tags: [] });
+      A.touch(id);
+      return ok(id, { card, won, last: T.last, steps: T.steps }, 'book');
+    }
+    if (act === 'collect') { T.last = 0; T.steps = 0; A.touch(id); return ok(id, { last: 0 }, 'book'); }
+    const bet = Math.round(Number(b.bet));
+    if (!SLOT_BETS.includes(bet) && !(VIP_SLOT_BETS.includes(bet) && vip(id))) return bad(id, `book bet ${String(b.bet).slice(0, 20)}`, 'That bet size is not on this machine.');
+    if (!A.debit(id, bet, 'book', 'Tomb of Amun-Ra spin')) return { code: 409, body: { error: 'Not enough in your bankroll.' } };
+    const plan = luck.pick(id, () => BE.play(rng), p => Math.round(p.total * bet) - bet);
+    const payout = Math.round(plan.total * bet);
+    if (payout > 0) A.credit(id, payout, 'book', 'Tomb of Amun-Ra win');
+    const jackpot = P && !A.inTour(rec, 'book') ? P.jackpotSpin(id, bet, 'book', rng) : 0;
+    // only plain wins from the base game can be gambled
+    T.last = payout > 0 && !plan.fs ? payout : 0; T.steps = 0;
+    const tags = []; if (plan.fs) tags.push('free-spins', 'bonus', 'book');
+    A.round(id, 'book', { staked: bet, paid: payout, spins: 1, mult: Math.round(plan.total), tags });
+    return ok(id, { plan, payout, jackpot, gamble: T.last, pool: P ? Math.round(P.jackpot().pool) : 0 }, 'book');
+  }
+
+  return { plinko, mines, slots2, chicken, book, PLINKO, minesMult, ROAD, roadMult };
 };
 module.exports.PLINKO = PLINKO;
 module.exports.minesMult = minesMult;

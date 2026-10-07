@@ -59,6 +59,7 @@ const ACH = [
   ['crash-10', '🚀', 'To the moon', 'Cash out at 10× or more in Crash'],
   ['crash-50', '💎', 'Diamond hands', 'Cash out at 50× or more in Crash'],
   ['skyline', '🏙️', 'Skyline', 'Win 100× or more in Dice City'],
+  ['book', '📜', 'Book worm', 'Open the book and start free spins in Tomb of Amun-Ra'],
   ['road-10', '🐔', 'Why did the chicken…', 'Cash out at 10× or more in Cluck Crossing'],
   ['crossed', '🏁', 'The other side', 'Get the chicken all the way across the road'],
   ['mines-10', '💣', 'Minesweeper', 'Clear 10 safe tiles in one Mines game'],
@@ -83,7 +84,7 @@ const ACH = [
 const ACH_BY = Object.fromEntries(ACH.map(a => [a.k, a]));
 
 /* ---------- daily challenges ---------- */
-const BJ_GAMES = ['blackjack', 'live-bj'], RL_GAMES = ['roulette', 'live-rl'], SLOT_GAMES = ['slots', 'slots2'];
+const BJ_GAMES = ['blackjack', 'live-bj'], RL_GAMES = ['roulette', 'live-rl'], SLOT_GAMES = ['slots', 'slots2', 'book'];
 const CHALLENGES = [
   { id: 'bj-win', text: 'Win 3 rounds of blackjack', target: 3, tier: 1, inc: e => (BJ_GAMES.includes(e.game) && e.paid > e.staked ? 1 : 0) },
   { id: 'slot-30', text: 'Spin the slots 30 times', target: 30, tier: 1, inc: e => (SLOT_GAMES.includes(e.game) ? 1 : 0) },

@@ -16,7 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
-const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'chicken.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'crash.html', 'baccarat-live.html', 'dicecity.html', 'profile.html'];
+const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'chicken.html', 'book.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'crash.html', 'baccarat-live.html', 'dicecity.html', 'profile.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
   const preferred = [path.join(__dirname, 'public'), __dirname];
@@ -178,7 +178,7 @@ const P = require('./progress')(A, { meta: META, save: saveMeta, announce, flag:
 A.setProgress(P);
 // secret luck control for the admin room (see luck.js); never shown to players
 const LUCK = require('./luck')(A);
-const SOLO_GAMES = new Set(['slots', 'slots2', 'roulette', 'blackjack', 'craps', 'plinko', 'mines', 'chicken']);
+const SOLO_GAMES = new Set(['slots', 'slots2', 'roulette', 'blackjack', 'craps', 'plinko', 'mines', 'chicken', 'book']);
 // the next result of a live table, set in the admin room; used once
 function takeRig(game) { const R = META.rig || {}; if (R[game] === undefined || R[game] === null) return null; const v = R[game]; delete R[game]; saveMeta(); return v; }
 const games = require('./games')(A, { flag: (id, kind, detail) => flag(id, kind, detail), isClosed: () => META.settings.closed, P, L: LUCK });
@@ -360,7 +360,7 @@ async function playerApi(req, res, p, ip) {
   }
   if (p === '/api/tip') { const r = P.tip(id, b.to, b.cents, b.note); return reply(r); }
   let m;
-  if ((m = p.match(/^\/api\/g\/(slots|slots2|roulette|blackjack|craps|plinko|mines|chicken)$/))) {
+  if ((m = p.match(/^\/api\/g\/(slots|slots2|roulette|blackjack|craps|plinko|mines|chicken|book)$/))) {
     const r = games.handle(m[1], id, b);
     return send(res, r.code, withPop(id, r.body));
   }
@@ -520,14 +520,14 @@ async function adminApi(req, res, sub, ip) {
     return send(res, 200, { ok: true, count: n });
   }
   if (sub === '/api/event') {
-    const games_ = ['all', 'slots', 'blackjack', 'roulette', 'craps', 'plinko', 'mines', 'chicken', 'crash', 'live-bc', 'live-dc'];
+    const games_ = ['all', 'slots', 'book', 'blackjack', 'roulette', 'craps', 'plinko', 'mines', 'chicken', 'crash', 'live-bc', 'live-dc'];
     if (b.boost !== undefined) {
       if (!b.boost) META.events.boost = null;
       else {
         const mult = Number(b.boost.mult), hours = Math.min(48, Math.max(0.25, Number(b.boost.hours) || 1));
         if (![1.5, 2, 3].includes(mult) || !games_.includes(b.boost.game)) return send(res, 400, { error: 'Pick a game and a boost.' });
         META.events.boost = { game: b.boost.game, mult, until: Date.now() + hours * 3600000, t: Date.now() };
-        announce(`🎉 Happy hour! Winnings ${b.boost.game === 'all' ? 'everywhere' : 'on ' + ({ slots: 'the slots', blackjack: 'blackjack', roulette: 'roulette', craps: 'craps', plinko: 'Plinko', mines: 'Mines', chicken: 'Cluck Crossing', crash: 'Crash', 'live-bc': 'baccarat', 'live-dc': 'Dice City' })[b.boost.game]} are boosted ×${mult} for ${hours < 1 ? Math.round(hours * 60) + ' minutes' : hours + ' hour' + (hours === 1 ? '' : 's')}!`);
+        announce(`🎉 Happy hour! Winnings ${b.boost.game === 'all' ? 'everywhere' : 'on ' + ({ slots: 'the slots', blackjack: 'blackjack', roulette: 'roulette', craps: 'craps', plinko: 'Plinko', mines: 'Mines', chicken: 'Cluck Crossing', book: 'Tomb of Amun-Ra', crash: 'Crash', 'live-bc': 'baccarat', 'live-dc': 'Dice City' })[b.boost.game]} are boosted ×${mult} for ${hours < 1 ? Math.round(hours * 60) + ' minutes' : hours + ' hour' + (hours === 1 ? '' : 's')}!`);
       }
       audit('event', META.events.boost ? `Happy hour ×${META.events.boost.mult} on ${META.events.boost.game}` : 'Happy hour ended', ip);
     }

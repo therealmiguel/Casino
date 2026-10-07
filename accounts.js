@@ -21,7 +21,7 @@ module.exports = function createAccounts(hooks = {}) {
   let P = null;                       // progression (levels, achievements, tournament), plugged in by the server
   const setProgress = p => { P = p; };
   // which wallet a bet uses: tournament chips for the solo games while the player is in tournament mode
-  const TOUR_GAMES = new Set(['slots', 'slots2', 'roulette', 'blackjack', 'plinko', 'mines', 'chicken']);
+  const TOUR_GAMES = new Set(['slots', 'slots2', 'book', 'roulette', 'blackjack', 'plinko', 'mines', 'chicken']);
   const inTour = (rec, game) => !!(P && TOUR_GAMES.has(game) && P.tourActive(rec));
   const wal = (rec, game) => (inTour(rec, game) ? rec.tour : rec);
   const balOf = (id, game) => { const rec = players.get(id); return rec ? wal(rec, game).bal : 0; };
