@@ -8,7 +8,7 @@ const WF = require('./wordfilter');
 
 module.exports = function createLive2({ A, cleanName, auth, isClosed, flag, vip, persist, onFeed, takeRig }) {
   const rigOf = k => (takeRig ? takeRig(k) : null);
-  const maxFor = pid => (vip && vip(pid) ? 500000 : 100000);
+  const maxFor = pid => { if (A.cash && A.HIGH && A.get(pid) && A.cash(pid) >= A.HIGH) return 1e12; return vip && vip(pid) ? 500000 : 100000; };   // high rollers: no table maximum
   const bal = pid => { const r = A.get(pid); return r ? r.bal : 0; };
   const nameOf = (pid, fallback) => cleanName(fallback) || (A.get(pid) || {}).name || 'Player';
   const conns = new Set();   // { res, game, pid, name }

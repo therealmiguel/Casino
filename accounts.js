@@ -21,6 +21,7 @@ module.exports = function createAccounts(hooks = {}) {
   let P = null;                       // progression (levels, achievements, tournament), plugged in by the server
   const setProgress = p => { P = p; };
   // which wallet a bet uses: tournament chips for the solo games while the player is in tournament mode
+  const HIGH = 10000000;      // $100,000: high rollers play without table limits
   const TOUR_GAMES = new Set(['slots', 'slots2', 'book', 'roulette', 'blackjack', 'plinko', 'mines', 'chicken']);
   const inTour = (rec, game) => !!(P && TOUR_GAMES.has(game) && P.tourActive(rec));
   const wal = (rec, game) => (inTour(rec, game) ? rec.tour : rec);
@@ -103,7 +104,11 @@ module.exports = function createAccounts(hooks = {}) {
     if (!rec || !(cents > 0)) return;
     const w = wal(rec, game);
     w.bal += cents;
-    if (w === rec) { houseFor(game).paid += cents; rec.st.paid += cents; rec.peak = Math.max(rec.peak, cash(id)); logTx(rec, game, cents, note); }
+    if (w === rec) {
+      houseFor(game).paid += cents; rec.st.paid += cents; rec.peak = Math.max(rec.peak, cash(id)); logTx(rec, game, cents, note);
+      // first time over $100,000: tell them about the high roller tables
+      if (!rec.highSeen && cash(id) >= HIGH) { rec.highSeen = true; rec.pop = rec.pop || []; rec.pop.push({ type: 'high', icon: '👑', title: 'You’re a High Roller', text: 'Over $100,000: no table limits, and an All in button on the games.' }); }
+    }
     touch(id);
   }
   // a bet that was never played comes back (it doesn't count as the house paying out)
@@ -177,7 +182,7 @@ module.exports = function createAccounts(hooks = {}) {
     const tour = !!(P && P.tourActive(rec));
     const lvl = P ? P.levelOf((rec.life || {}).xp || 0) : 0;
     return { id, name: rec.name, cents: ctx === 'solo' && tour ? rec.tour.bal : rec.bal, bank: rec.bal, cash: cash(id), peak: rec.peak, resets: rec.resets, stats: rec.st, banned: !!rec.banned,
-      level: lvl, vip: !!(P && P.vipOf(rec)), mode: tour ? 'tour' : 'main', tourBal: tour ? rec.tour.bal : null, free: rec.free && rec.free.n > 0 ? rec.free : null };
+      level: lvl, vip: !!(P && P.vipOf(rec)), high: cash(id) >= HIGH, mode: tour ? 'tour' : 'main', tourBal: tour ? rec.tour.bal : null, free: rec.free && rec.free.n > 0 ? rec.free : null };
   }
   // popups waiting for this player (achievements, level ups, gifts)
   function takePop(id) { const rec = players.get(id); if (!rec || !rec.pop || !rec.pop.length) return null; const p = rec.pop; rec.pop = []; touch(id); return p; }
@@ -207,7 +212,7 @@ module.exports = function createAccounts(hooks = {}) {
     return o;
   }
   return {
-    START, players, load, get, auth, debit, credit, refund, move, round, reset, setName, me, takePop, publicList, remove, takeDirty, putBack, setProgress, balOf, inTour, TOUR_GAMES,
+    START, HIGH, players, load, get, auth, debit, credit, refund, move, round, reset, setName, me, takePop, publicList, remove, takeDirty, putBack, setProgress, balOf, inTour, TOUR_GAMES,
     cash, tableMoney, logTx, touch, house, houseFor, extras, hash, cleanName, usd, all: () => players,
   };
 };

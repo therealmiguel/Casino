@@ -1321,6 +1321,67 @@ window.CasinoPolish = (() => {
   }
   return { bigWin };
 })();
+
+/* High rollers: players with $100,000 or more play without table limits and get an All in button.
+   CasinoHigh.button({ amount, go, disabled }) makes the button; it only shows for high rollers,
+   It sets the bet to everything you have; you still press the game's own button to play
+   (with confirm: true it asks for a second tap first). */
+window.CasinoHigh = (() => {
+  const HIGH = 10000000;
+  const css = `
+  .mc-allin{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:none;height:40px;padding:0 14px 0 10px;border:0;border-radius:999px;cursor:pointer;
+    font:700 13.5px "DM Sans",system-ui,sans-serif;color:#FFE7A8;letter-spacing:.01em;white-space:nowrap;
+    background:linear-gradient(180deg,#2B1A08,#140B04);box-shadow:0 0 0 1.5px #D9A64C,0 0 18px rgba(232,180,80,.35),inset 0 1px 0 rgba(255,231,168,.2);transition:box-shadow .2s,background .2s}
+  .mc-allin:hover:not(:disabled){box-shadow:0 0 0 1.5px #FFD978,0 0 26px rgba(255,200,90,.55),inset 0 1px 0 rgba(255,231,168,.25)}
+  .mc-allin .cr{font-size:15px;line-height:1}
+  .mc-allin .v{font:500 12.5px "DM Mono",ui-monospace,monospace;color:#E9C98F;font-variant-numeric:tabular-nums}
+  .mc-allin.armed{color:#1E0F04;background:linear-gradient(180deg,#FFE7A8,#E0A640);box-shadow:0 0 0 2px #FFF1C8,0 0 30px rgba(255,200,90,.75);animation:mcAllin .7s ease-in-out infinite alternate}
+  .mc-allin.armed .v{color:#3A2208}
+  .mc-allin:disabled{opacity:.45;cursor:not-allowed;animation:none}
+  .mc-allin[hidden]{display:none!important}
+  .mc-allin.block{width:100%;height:44px;margin-top:8px}
+  @media (max-width:600px){.mc-allin:not(.block){height:36px;padding:0 11px 0 9px;font-size:12.5px;gap:5px}.mc-allin:not(.block) .v{display:none}}
+  @keyframes mcAllin{to{box-shadow:0 0 0 2px #FFF1C8,0 0 44px rgba(255,200,90,.95)}}
+  @media (prefers-reduced-motion:reduce){.mc-allin.armed{animation:none}}`;
+  let styled = false;
+  function style() { if (styled) return; styled = true; const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }
+  const me = () => (window.CasinoBoard && CasinoBoard.me) || {};
+  function isHigh() {
+    if (!window.CasinoWallet) return false;
+    const m = me();
+    if (m.mode === 'tour' && window.CASINO_CTX === 'solo') return false;      // tournament chips have their own limits
+    return CasinoWallet.cents() >= HIGH || !!m.high;
+  }
+  const usd = c => '$' + Math.floor(c / 100).toLocaleString('en-US');
+  function button(opts) {
+    style();
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'mc-allin' + (opts.block ? ' block' : '');
+    b.innerHTML = '<span class="cr" aria-hidden="true">👑</span><span class="t">All in</span><span class="v"></span>';
+    let armed = false, t = null;
+    function paint() {
+      const show = isHigh(); b.hidden = !show; if (!show) return;
+      const amt = Math.max(0, Math.floor(opts.amount() || 0));
+      b.querySelector('.v').textContent = usd(amt);
+      b.querySelector('.t').textContent = armed ? 'Tap again to bet' : 'All in';
+      b.classList.toggle('armed', armed);
+      b.disabled = amt < (opts.min || 100) || !!(opts.disabled && opts.disabled());
+      b.setAttribute('aria-label', armed ? `Tap again to bet everything: ${usd(amt)}` : `All in: bet everything, ${usd(amt)}`);
+    }
+    b.addEventListener('click', () => {
+      if (b.disabled) return;
+      if (opts.confirm && !armed) { armed = true; paint(); clearTimeout(t); t = setTimeout(() => { armed = false; paint(); }, 3000); return; }
+      armed = false; clearTimeout(t);
+      const amt = Math.floor(opts.amount() || 0);
+      if (amt > 0) opts.go(amt);
+      paint();
+    });
+    setInterval(paint, 600);
+    try { CasinoWallet.onChange(paint); } catch (e) {}
+    paint();
+    return b;
+  }
+  return { HIGH, isHigh, button };
+})();
 </script>
 
 <script>
@@ -1421,7 +1482,7 @@ const PREF = 'miguels-casino-book';
 let pref = {}; try { pref = JSON.parse(localStorage.getItem(PREF)) || {}; } catch (e) {}
 const S = { bank: CasinoWallet.cents(), bi: BETS.includes(pref.bet) ? BETS.indexOf(pref.bet) : 3, busy: false, auto: 0, turbo: !!pref.turbo, snd: pref.snd !== false, ready: false, gamble: 0, grid: null, hurry: false };
 const savePref = () => { try { localStorage.setItem(PREF, JSON.stringify({ bet: bet(), turbo: S.turbo, snd: S.snd })); } catch (e) {} };
-const bet = () => BETS[S.bi];
+const bet = () => (S.allIn && window.CasinoHigh && CasinoHigh.isHigh() ? S.allIn : BETS[S.bi]);
 const money = c => '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 });
 const wait = ms => new Promise(r => setTimeout(r, ms * (S.turbo ? 0.45 : 1) * (S.hurry ? 0.3 : 1)));
 let toastT;
@@ -1668,8 +1729,8 @@ function renderMeters() {
 }
 $('spin').onclick = () => play();
 $('gamBtn').onclick = () => gamble();
-$('minus').onclick = () => { if (S.bi > 0) { S.bi--; savePref(); renderMeters(); } };
-$('plus').onclick = () => { if (S.bi < BETS.length - 1) { S.bi++; savePref(); renderMeters(); } };
+$('minus').onclick = () => { if (S.allIn) { S.allIn = 0; savePref(); renderMeters(); return; } if (S.bi > 0) { S.bi--; savePref(); renderMeters(); } };
+$('plus').onclick = () => { S.allIn = 0; if (S.bi < BETS.length - 1) { S.bi++; savePref(); renderMeters(); } };
 $('autoBtn').onclick = () => { if (S.auto > 0) { stopAuto(); return; } S.auto = 25; renderMeters(); if (!S.busy) play(); };
 $('turboBtn').onclick = () => { S.turbo = !S.turbo; savePref(); renderMeters(); };
 $('sndBtn').onclick = () => { S.snd = !S.snd; $('sndBtn').classList.toggle('off', !S.snd); savePref(); unlock(); };
@@ -1693,6 +1754,11 @@ CasinoBoard.connect().then(ok => {
   if (me.jackpot) setMega(me.jackpot);
   S.bank = CasinoWallet.cents(); S.ready = true; renderMeters();
 });
+// high rollers: All in sets the bet to everything (− goes back to the normal bets)
+if (window.CasinoHigh) {
+  const allIn = CasinoHigh.button({ amount: () => Math.floor(CasinoWallet.cents() / 10) * 10, disabled: () => S.busy, go: c => { S.allIn = c; savePref(); renderMeters(); } });
+  $('plus').after(allIn);
+}
 window.__book = { S, play, E };
 })();
 </script>

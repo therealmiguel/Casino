@@ -38,9 +38,11 @@ for (const R of Object.values(ROAD)) {
 }
 function roadMult(diff, k) { return ROAD[diff].mult[k]; }
 
-module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLOT_BETS, VIP_SLOT_BETS, luck }) {
+module.exports = function createGames2(A, { flag, P, rng, rnd, vip, high, slotBetOk, ok, bad, SLOT_BETS, VIP_SLOT_BETS, luck }) {
   luck = luck || { pick: (id, g) => g(), steer: () => 0 };
-  const betOk = (id, c, max) => Number.isInteger(c) && c >= 10 && c <= (vip(id) ? max * 5 : max);
+  high = high || (() => false);
+  slotBetOk = slotBetOk || ((id, bet) => SLOT_BETS.includes(bet) || (VIP_SLOT_BETS.includes(bet) && vip(id)));
+  const betOk = (id, c, max) => Number.isInteger(c) && c >= 10 && (high(id) ? c <= 1e12 : c <= (vip(id) ? max * 5 : max));
 
   /* ---------- Plinko ---------- */
   function plinko(id, b) {
@@ -110,7 +112,7 @@ module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLO
   function slots2(id, b) {
     const rec = A.get(id);
     const bet = Math.round(Number(b.bet));
-    if (!SLOT_BETS.includes(bet) && !(VIP_SLOT_BETS.includes(bet) && vip(id))) return bad(id, `cascade bet ${String(b.bet).slice(0, 20)}`, 'That bet size is not on this machine.');
+    if (!slotBetOk(id, bet)) return bad(id, `cascade bet ${String(b.bet).slice(0, 20)}`, 'That bet size is not on this machine.');
     const buy = !!b.buy;
     const cost = buy ? bet * CE.BUY_PRICE : bet;
     if (!A.debit(id, cost, 'slots2', buy ? 'Cosmic Cascade bonus buy' : 'Cosmic Cascade spin')) return { code: 409, body: { error: 'Not enough in your bankroll.' } };
@@ -198,7 +200,7 @@ module.exports = function createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLO
     }
     if (act === 'collect') { T.last = 0; T.steps = 0; A.touch(id); return ok(id, { last: 0 }, 'book'); }
     const bet = Math.round(Number(b.bet));
-    if (!SLOT_BETS.includes(bet) && !(VIP_SLOT_BETS.includes(bet) && vip(id))) return bad(id, `book bet ${String(b.bet).slice(0, 20)}`, 'That bet size is not on this machine.');
+    if (!slotBetOk(id, bet)) return bad(id, `book bet ${String(b.bet).slice(0, 20)}`, 'That bet size is not on this machine.');
     if (!A.debit(id, bet, 'book', 'Tomb of Amun-Ra spin')) return { code: 409, body: { error: 'Not enough in your bankroll.' } };
     const plan = luck.pick(id, () => BE.play(rng), p => Math.round(p.total * bet) - bet);
     const payout = Math.round(plan.total * bet);

@@ -1284,6 +1284,67 @@ window.CasinoPolish = (() => {
   }
   return { bigWin };
 })();
+
+/* High rollers: players with $100,000 or more play without table limits and get an All in button.
+   CasinoHigh.button({ amount, go, disabled }) makes the button; it only shows for high rollers,
+   It sets the bet to everything you have; you still press the game's own button to play
+   (with confirm: true it asks for a second tap first). */
+window.CasinoHigh = (() => {
+  const HIGH = 10000000;
+  const css = `
+  .mc-allin{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:none;height:40px;padding:0 14px 0 10px;border:0;border-radius:999px;cursor:pointer;
+    font:700 13.5px "DM Sans",system-ui,sans-serif;color:#FFE7A8;letter-spacing:.01em;white-space:nowrap;
+    background:linear-gradient(180deg,#2B1A08,#140B04);box-shadow:0 0 0 1.5px #D9A64C,0 0 18px rgba(232,180,80,.35),inset 0 1px 0 rgba(255,231,168,.2);transition:box-shadow .2s,background .2s}
+  .mc-allin:hover:not(:disabled){box-shadow:0 0 0 1.5px #FFD978,0 0 26px rgba(255,200,90,.55),inset 0 1px 0 rgba(255,231,168,.25)}
+  .mc-allin .cr{font-size:15px;line-height:1}
+  .mc-allin .v{font:500 12.5px "DM Mono",ui-monospace,monospace;color:#E9C98F;font-variant-numeric:tabular-nums}
+  .mc-allin.armed{color:#1E0F04;background:linear-gradient(180deg,#FFE7A8,#E0A640);box-shadow:0 0 0 2px #FFF1C8,0 0 30px rgba(255,200,90,.75);animation:mcAllin .7s ease-in-out infinite alternate}
+  .mc-allin.armed .v{color:#3A2208}
+  .mc-allin:disabled{opacity:.45;cursor:not-allowed;animation:none}
+  .mc-allin[hidden]{display:none!important}
+  .mc-allin.block{width:100%;height:44px;margin-top:8px}
+  @media (max-width:600px){.mc-allin:not(.block){height:36px;padding:0 11px 0 9px;font-size:12.5px;gap:5px}.mc-allin:not(.block) .v{display:none}}
+  @keyframes mcAllin{to{box-shadow:0 0 0 2px #FFF1C8,0 0 44px rgba(255,200,90,.95)}}
+  @media (prefers-reduced-motion:reduce){.mc-allin.armed{animation:none}}`;
+  let styled = false;
+  function style() { if (styled) return; styled = true; const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }
+  const me = () => (window.CasinoBoard && CasinoBoard.me) || {};
+  function isHigh() {
+    if (!window.CasinoWallet) return false;
+    const m = me();
+    if (m.mode === 'tour' && window.CASINO_CTX === 'solo') return false;      // tournament chips have their own limits
+    return CasinoWallet.cents() >= HIGH || !!m.high;
+  }
+  const usd = c => '$' + Math.floor(c / 100).toLocaleString('en-US');
+  function button(opts) {
+    style();
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'mc-allin' + (opts.block ? ' block' : '');
+    b.innerHTML = '<span class="cr" aria-hidden="true">👑</span><span class="t">All in</span><span class="v"></span>';
+    let armed = false, t = null;
+    function paint() {
+      const show = isHigh(); b.hidden = !show; if (!show) return;
+      const amt = Math.max(0, Math.floor(opts.amount() || 0));
+      b.querySelector('.v').textContent = usd(amt);
+      b.querySelector('.t').textContent = armed ? 'Tap again to bet' : 'All in';
+      b.classList.toggle('armed', armed);
+      b.disabled = amt < (opts.min || 100) || !!(opts.disabled && opts.disabled());
+      b.setAttribute('aria-label', armed ? `Tap again to bet everything: ${usd(amt)}` : `All in: bet everything, ${usd(amt)}`);
+    }
+    b.addEventListener('click', () => {
+      if (b.disabled) return;
+      if (opts.confirm && !armed) { armed = true; paint(); clearTimeout(t); t = setTimeout(() => { armed = false; paint(); }, 3000); return; }
+      armed = false; clearTimeout(t);
+      const amt = Math.floor(opts.amount() || 0);
+      if (amt > 0) opts.go(amt);
+      paint();
+    });
+    setInterval(paint, 600);
+    try { CasinoWallet.onChange(paint); } catch (e) {}
+    paint();
+    return b;
+  }
+  return { HIGH, isHigh, button };
+})();
 </script>
 
 <script>
@@ -1344,7 +1405,9 @@ function place(k) {
   const lim = k === 'player' || k === 'banker' ? me.max : me.sideMax;
   if (k === 'player' && S.local.banker) return toast('Bet on Player or Banker, not both.');
   if (k === 'banker' && S.local.player) return toast('Bet on Player or Banker, not both.');
-  const cur = S.local[k] || 0, add = Math.min(S.chip, lim - cur);
+  const cur = S.local[k] || 0;
+  let add = Math.min(S.chip, lim - cur);
+  if (S.allIn) { add = Math.min(me.cents + total(S.sent) - total(S.local), lim - cur); S.allIn = false; document.body.classList.remove('allin-pick'); }
   if (add <= 0) return toast(`That spot takes up to ${money(lim)}.`);
   const avail = me.cents + total(S.sent) - total(S.local);
   if (add > avail) return toast('Not enough in your bankroll.');
@@ -1480,6 +1543,17 @@ CasinoBoard.connect().then(ok => {
   open();
 });
 window.__bacc = { S };
+// high rollers: All in, then tap the spot that gets everything
+if (window.CasinoHigh) {
+  const allIn = CasinoHigh.button({
+    amount: () => S.V ? S.V.me.cents + total(S.sent) - total(S.local) : 0,
+    disabled: () => !betting(),
+    go: () => { S.allIn = true; document.body.classList.add('allin-pick'); toast('All in: tap Player, Banker or Tie to put everything on it.'); },
+  });
+  $('vipChip').after(allIn);
+  const st2 = document.createElement('style'); st2.textContent = '.allin-pick .spot:not(:disabled){box-shadow:0 0 0 2px #FFD978,0 0 22px rgba(255,200,90,.45)!important}'; document.head.appendChild(st2);
+}
+
 })();
 </script>
 <script>window.CASINO_ROOM = 'bc';</script>

@@ -9,7 +9,7 @@ const RR = require('./roulette_rules');
 const { createPoker } = require('./poker');
 
 module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, flag, vip, extraRisk, takeRig }) {
-  const maxFor = pid => (vip && vip(pid) ? 500000 : 100000);
+  const maxFor = pid => { if (A.cash && A.HIGH && A.get(pid) && A.cash(pid) >= A.HIGH) return 1e12; return vip && vip(pid) ? 500000 : 100000; };   // high rollers: no table maximum
   /* ---------------- connections & notices ---------------- */
   const conns = new Set();                 // { res, game, pid, name }
   const notices = new Map();               // pid -> [{ id, game, payout, staked, net, ... }]  (for messages only; money is already paid)
@@ -402,7 +402,7 @@ module.exports = function createLive({ A, cleanName, saveState, auth, isClosed, 
     let sum = 0, count = 0;
     for (const [k, v] of Object.entries(raw)) {
       const amt = Math.round(Number(v));
-      if (!RR.SPOTS.has(k) || !(amt >= 100) || amt > 100000 || amt % 100) return { code: 400, body: { error: 'That bet is not on the layout.' }, flag: `live roulette bet ${String(k).slice(0, 30)}=${String(v).slice(0, 12)}` };
+      if (!RR.SPOTS.has(k) || !(amt >= 100) || amt > (A.cash && A.HIGH && A.cash(pid) >= A.HIGH ? 1e12 : 100000) || amt % 100) return { code: 400, body: { error: 'That bet is not on the layout.' }, flag: `live roulette bet ${String(k).slice(0, 30)}=${String(v).slice(0, 12)}` };
       if (++count > 160) return { code: 400, body: { error: 'Too many bets.' } };
       clean[k] = amt; sum += amt;
     }

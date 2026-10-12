@@ -250,7 +250,7 @@ module.exports = function createProgress(A, opts) {
     const J = M.jackpot;
     J.pool += bet * 0.01; jpChanged = true;
     // the bigger the bet, the better the chance: 1 in 20,000 at the $100 bet
-    const p = (bet / 10000) / 20000;
+    const p = Math.min(1 / 2000, (bet / 10000) / 20000);   // capped, so an all-in bet can't buy the jackpot
     if (rng() >= p) return 0;
     const won = Math.round(J.pool);
     const rec = A.get(id);

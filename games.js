@@ -20,6 +20,10 @@ const VIP_SLOT_BETS = [20000, 50000];
 module.exports = function createGames(A, { flag, isClosed, P, L }) {
   const luck = L || { pick: (id, g) => g(), steer: () => 0, bias: () => null };
   const vip = id => !!(P && P.vipOf(A.get(id)));
+  // high rollers ($100,000 or more in the bankroll) have no table maximum: they can bet everything
+  const high = id => !!(A.cash && A.HIGH && A.get(id) && A.cash(id) >= A.HIGH);
+  const NOLIMIT = 1e12;
+  const slotBetOk = (id, bet) => SLOT_BETS.includes(bet) || (VIP_SLOT_BETS.includes(bet) && vip(id)) || (high(id) && Number.isInteger(bet) && bet >= 20 && bet % 10 === 0 && bet <= NOLIMIT);
   const wallet = id => ({ bal: () => A.get(id).bal, debit: c => A.debit(id, c, 'blackjack', 'Blackjack bet'), credit: c => A.credit(id, c, 'blackjack', 'Blackjack payout') });
   const bad = (id, what, msg, code = 400) => { flag(id, 'invalid', what); return { code, body: { error: msg } }; };
   const ok = (id, body, game) => ({ code: 200, body: Object.assign(body, { cents: A.balOf(id, game), mode: A.inTour(A.get(id), game) ? 'tour' : 'main' }) });
@@ -29,7 +33,7 @@ module.exports = function createGames(A, { flag, isClosed, P, L }) {
     const rec = A.get(id);
     const freeSpin = !!b.free && rec.free && rec.free.n > 0 && !A.inTour(rec, 'slots');
     const bet = freeSpin ? rec.free.bet : Math.round(Number(b.bet));
-    if (!SLOT_BETS.includes(bet) && !(VIP_SLOT_BETS.includes(bet) && vip(id)) && !freeSpin) return bad(id, `slots bet of ${b.bet}`, 'That bet size is not on this machine.');
+    if (!slotBetOk(id, bet) && !freeSpin) return bad(id, `slots bet of ${b.bet}`, 'That bet size is not on this machine.');
     const buy = !!b.buy && !freeSpin;
     const cost = freeSpin ? 0 : buy ? bet * SlotEngine.BUY_PRICE : bet;
     if (freeSpin) { rec.free.n--; A.touch(id); }
@@ -75,7 +79,7 @@ module.exports = function createGames(A, { flag, isClosed, P, L }) {
     for (const [k, v] of Object.entries(raw)) {
       const amt = Number(v);
       if (!RR.SPOTS.has(k)) return bad(id, `roulette spot ${String(k).slice(0, 40)}`, 'That bet is not on the layout.');
-      const spotMax = vip(id) ? 5000 : 1000;
+      const spotMax = high(id) ? NOLIMIT / 100 : vip(id) ? 5000 : 1000;
       if (!Number.isInteger(amt) || amt < 1 || amt > spotMax) return bad(id, `roulette amount ${String(v).slice(0, 20)}`, `Each spot takes $1 to $${spotMax.toLocaleString('en-US')}.`);
       if (++n > 157) return bad(id, 'too many roulette spots', 'Too many bets.');
       bets[k] = amt * 100; staked += amt * 100;
@@ -93,7 +97,7 @@ module.exports = function createGames(A, { flag, isClosed, P, L }) {
 
   /* ---------- blackjack (solo table) ---------- */
   const BJ_ACTIONS = new Set(['deal', 'insurance', 'hit', 'stand', 'double', 'split', 'surrender']);
-  const bjLimits = id => (vip(id) ? { max: 500000, sideMax: 50000 } : { max: BJ.MAX, sideMax: BJ.SIDE_MAX });
+  const bjLimits = id => (high(id) ? { max: NOLIMIT, sideMax: 50000 } : vip(id) ? { max: 500000, sideMax: 50000 } : { max: BJ.MAX, sideMax: BJ.SIDE_MAX });
   function sessionOf(id) {
     const rec = A.get(id);
     if (!rec.games.bj) rec.games.bj = BJ.createSession();
@@ -188,7 +192,7 @@ module.exports = function createGames(A, { flag, isClosed, P, L }) {
   function craps(id, b) {
     const T = crapsTable(id);
     const action = String(b.action || '');
-    if (action === 'state') return ok(id, { bets: T.bets, point: T.point, maxBet: vip(id) ? 250000 : MAXBET }, 'craps');
+    if (action === 'state') return ok(id, { bets: T.bets, point: T.point, maxBet: high(id) ? NOLIMIT : vip(id) ? 250000 : MAXBET }, 'craps');
     if (action !== 'sync' && action !== 'roll') return bad(id, `craps action ${action.slice(0, 20)}`, 'Unknown move.');
     const cfg = cfgOf(b);
     if (!cfg) return bad(id, 'craps settings', 'Those table settings are not offered.');
@@ -196,7 +200,7 @@ module.exports = function createGames(A, { flag, isClosed, P, L }) {
     const next = {};
     for (const [k, v] of Object.entries(raw)) { const n = Number(v); if (n) next[k] = n; }
     if (Object.keys(next).length > 80) return bad(id, 'too many craps bets', 'Too many bets.');
-    const why = checkLayout(T.bets, T.point, next, cfg, vip(id) ? 250000 : MAXBET);
+    const why = checkLayout(T.bets, T.point, next, cfg, high(id) ? NOLIMIT : vip(id) ? 250000 : MAXBET);
     if (why) {
       if (/^(bad amount|unknown bet)/.test(why)) return bad(id, `craps: ${why}`, 'That bet is not on the layout.');
       return { code: 409, body: { error: why, bets: T.bets, point: T.point, cents: A.get(id).bal } };
@@ -225,7 +229,7 @@ module.exports = function createGames(A, { flag, isClosed, P, L }) {
     return ok(id, { dice: [d1, d2], bets: T.bets, point: T.point, bank: r.bank, outcome: r.outcome, before }, 'craps');
   }
 
-  const G2 = createGames2(A, { flag, P, rng, rnd, vip, ok, bad, SLOT_BETS, VIP_SLOT_BETS, luck });
+  const G2 = createGames2(A, { flag, P, rng, rnd, vip, high, slotBetOk, ok, bad, SLOT_BETS, VIP_SLOT_BETS, luck });
   function handle(game, id, body) {
     if (isClosed()) return { code: 503, body: { error: 'The casino is closed for a moment. Try again soon.' } };
     if (game === 'slots') return slots(id, body);
