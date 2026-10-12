@@ -98,10 +98,12 @@ module.exports = function createFixtures({ fetchImpl, now = () => Date.now() } =
   async function loadLeague(lg) {
     const from = now() - 1 * 86400000, to = now() + 8 * 86400000;
     const datesOk = !/^(racing|tennis)\//.test(lg[0]);
-    const url = BASE + lg[0] + '/scoreboard' + (datesOk ? `?dates=${ymd(from)}-${ymd(to)}&limit=200` : '');
-    const r = await doFetch(url);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const j = await r.json();
+    let j = null, why = '';
+    // the whole week in one go; if ESPN doesn't like that for a league, its current round instead
+    for (const url of datesOk ? [BASE + lg[0] + `/scoreboard?dates=${ymd(from)}-${ymd(to)}`, BASE + lg[0] + '/scoreboard'] : [BASE + lg[0] + '/scoreboard']) {
+      try { const r = await doFetch(url); if (r.ok) { j = await r.json(); break; } why = 'HTTP ' + r.status; } catch (e) { why = e.message; }
+    }
+    if (!j) throw new Error(why || 'no data');
     return (j.events || []).flatMap(ev => { try { return normalize(ev, lg); } catch (e) { return []; } });
   }
   let lastFull = 0;
@@ -136,7 +138,7 @@ module.exports = function createFixtures({ fetchImpl, now = () => Date.now() } =
     const soon = events.filter(e => e.state === 'pre' && e.start > t - 600000 && e.start < t + 3 * 86400000);
     const featured = [...live.sort((a, b) => b.score - a.score), ...soon.sort((a, b) => b.score - a.score || a.start - b.start)].slice(0, 10)
       .sort((a, b) => ((b.state === 'in') - (a.state === 'in')) || a.start - b.start);
-    return { updated, now: t, featured, events, icons: ICON, sports: [...new Set(LEAGUES.map(l => l[2]))], ok: updated > 0, failing: Object.keys(errors).length };
+    return { updated, now: t, featured, events, icons: ICON, sports: [...new Set(LEAGUES.map(l => l[2]))], ok: updated > 0, failing: Object.keys(errors).length, errors };
   }
   return { start, refresh, view, _test: { normalize, LEAGUES } };
 };
