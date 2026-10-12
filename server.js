@@ -662,6 +662,11 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/live/stream') { if (!ready) return send(res, 503, { error: 'Opening.' }); return live.stream(req, res, url, ip); }
     if (p === '/api/live/summary') return send(res, 200, live.summary());
+    if (p === '/api/fixtures/match' && req.method === 'GET') {
+      if (!allow('fx:' + ip, 2, 20)) return send(res, 429, { error: 'Slow down a little.' });
+      try { const v = await fixtures.summary(String(url.searchParams.get('path') || ''), String(url.searchParams.get('id') || '')); return v ? send(res, 200, v) : send(res, 404, { error: 'No such game.' }); }
+      catch (e) { return send(res, 502, { error: 'The match details aren’t available right now.' }); }
+    }
     if (p === '/api/fixtures' && req.method === 'GET') return send(res, 200, fixtures.view(), 'application/json', { 'Cache-Control': 'public, max-age=30' });
     if (p === '/api/radio' && req.method === 'GET') return send(res, 200, radio.publicView());
     { const m = /^\/api\/radio\/song\/([a-f0-9]{16})\.mp3$/.exec(p); if (m && (req.method === 'GET' || req.method === 'HEAD')) return radio.serveSong(req, res, m[1]); }

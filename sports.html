@@ -1195,6 +1195,167 @@ window.BigGames = (() => {
   }
   const crest = t => t.logo ? `<img src="${esc(t.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">` : `<b class="bg-ini">${esc((t.abbr || t.short || '?').slice(0, 3))}</b>`;
   const showScore = e => e.state !== 'pre' && e.home && e.home.score !== '';
+  /* ---------- the match sheet: everything about one game ---------- */
+  const clickable = e => e.kind === 'match' && /^\d{1,12}$/.test(String(e.id)) && !/^tennis\//.test(e.path || '');
+  const attrs = e => (clickable(e) ? ` data-mid="${esc(e.id)}" data-mpath="${esc(e.path)}" tabindex="0" role="button" aria-label="Match details: ${esc(e.home.name)} against ${esc(e.away.name)}"` : '');
+  const sheetCss = `
+  [data-mid]{cursor:pointer}
+  .bg-card[data-mid]:hover{box-shadow:0 0 0 1px rgba(232,193,112,.5),0 16px 34px rgba(0,0,0,.45)}
+  .bg-row[data-mid]:hover{background:rgba(232,193,112,.05)}
+  .ms-scrim{position:fixed;inset:0;z-index:9980;background:rgba(6,2,4,.66);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:16px}
+  .ms{position:relative;width:min(760px,100%);max-height:min(88vh,900px);overflow:auto;border-radius:22px;color:#F5EBDD;font:14px/1.45 "DM Sans",system-ui,sans-serif;
+    background:radial-gradient(120% 50% at 50% 0%,rgba(232,193,112,.12),transparent 60%),linear-gradient(180deg,#22101A,#150810);box-shadow:0 0 0 1px rgba(232,193,112,.32),0 40px 90px rgba(0,0,0,.65);animation:msIn .25s cubic-bezier(.2,1,.4,1)}
+  @keyframes msIn{from{opacity:0;transform:translateY(16px)}}
+  .ms .x{position:sticky;top:10px;float:right;margin:10px 10px 0 0;z-index:2;width:34px;height:34px;border-radius:50%;border:0;cursor:pointer;color:#F5EBDD;background:rgba(232,193,112,.12);font:600 18px/1 system-ui}
+  .ms-head{padding:22px 22px 10px;text-align:center}
+  .ms-lg{font-size:12.5px;color:#B69C9F}
+  .ms-score{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin-top:14px}
+  .ms-team{display:flex;flex-direction:column;align-items:center;gap:8px;font-weight:600;font-size:15px;min-width:0}
+  .ms-team img,.ms-team .bg-ini{width:64px;height:64px;object-fit:contain}
+  .ms-team small{color:#B69C9F;font-weight:500;font-size:12px}
+  .ms-team.won span{color:#F7DFA3}
+  .ms-num{font:500 44px/1 "DM Mono",ui-monospace,monospace;color:#F7DFA3;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .ms-num i{font-style:normal;color:#B69C9F;font-size:24px;margin:0 8px}
+  .ms-st{margin-top:8px;font-size:13px;color:#E8C170}
+  .ms-meta{margin-top:4px;font-size:12px;color:#B69C9F}
+  .ms-per{margin:14px auto 0;border-collapse:collapse;font:500 13px "DM Mono",ui-monospace,monospace}
+  .ms-per td,.ms-per th{padding:4px 8px;text-align:center;border-bottom:1px solid rgba(232,193,112,.12)}
+  .ms-per th{color:#B69C9F;font-weight:500} .ms-per td:first-child{text-align:left;font-family:"DM Sans",system-ui,sans-serif;font-weight:600}
+  .ms-tabs{position:sticky;top:0;z-index:1;display:flex;gap:6px;overflow-x:auto;padding:10px 18px;background:rgba(26,10,18,.96);border-bottom:1px solid rgba(232,193,112,.14);scrollbar-width:none}
+  .ms-tabs button{flex:none;border:0;cursor:pointer;padding:7px 13px;border-radius:999px;font:600 13.5px "DM Sans",system-ui,sans-serif;color:#F5EBDD;background:rgba(232,193,112,.07)}
+  .ms-tabs button[aria-selected=true]{color:#1A0B0F;background:linear-gradient(180deg,#F7DFA3,#E8C170)}
+  .ms-body{padding:16px 22px 24px}
+  .ms-wp{display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:12.5px;color:#B69C9F}
+  .ms-wp div{flex:1;height:8px;border-radius:9px;overflow:hidden;background:rgba(127,227,168,.25)} .ms-wp b{display:block;height:100%;background:#E8C170}
+  .ms-stat{display:grid;grid-template-columns:56px 1fr 56px;gap:4px 10px;align-items:center;margin:0 0 12px}
+  .ms-stat span{font:500 14px "DM Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums} .ms-stat span:last-child{text-align:right}
+  .ms-stat em{font-style:normal;text-align:center;font-size:12.5px;color:#B69C9F}
+  .ms-bars{grid-column:1/-1;display:flex;gap:4px;height:6px}
+  .ms-bars i{display:block;height:100%;border-radius:9px;background:#E8C170} .ms-bars i:last-child{background:#8FA8D8}
+  .ms-ev{list-style:none;margin:0;padding:0}
+  .ms-ev li{display:grid;grid-template-columns:1fr 54px 1fr;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(232,193,112,.08);font-size:13.5px}
+  .ms-ev .m{text-align:center;font:500 12.5px "DM Mono",ui-monospace,monospace;color:#B69C9F}
+  .ms-ev .h{text-align:right} .ms-ev .c{grid-column:1/-1;text-align:center}
+  .ms-ev small{display:block;color:#B69C9F;font-size:12px}
+  .ms-ico{display:inline-block;width:10px;height:14px;border-radius:2px;vertical-align:-2px;margin:0 6px}
+  .ms-ico.yellow{background:#F2C94C} .ms-ico.red{background:#E5484D}
+  .ms-lu{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .ms-lu h5{margin:0 0 8px;font:600 13px "DM Sans",system-ui,sans-serif;color:#E8C170}
+  .ms-lu ol{list-style:none;margin:0;padding:0;font-size:13.5px}
+  .ms-lu li{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid rgba(232,193,112,.06)}
+  .ms-lu li b{width:24px;flex:none;color:#B69C9F;font:500 12.5px "DM Mono",ui-monospace,monospace}
+  .ms-lu li em{margin-left:auto;font-style:normal;color:#B69C9F;font-size:12px}
+  .ms-lu .subs{margin-top:10px;opacity:.75}
+  .ms-box{overflow-x:auto;margin-bottom:18px}
+  .ms-box h5{margin:0 0 6px;font:600 13px "DM Sans",system-ui,sans-serif;color:#E8C170}
+  .ms-box table{border-collapse:collapse;font:500 12.5px "DM Mono",ui-monospace,monospace;white-space:nowrap}
+  .ms-box th,.ms-box td{padding:5px 7px;text-align:right;border-bottom:1px solid rgba(232,193,112,.08)}
+  .ms-box th{color:#B69C9F;font-weight:500} .ms-box td:first-child,.ms-box th:first-child{text-align:left;font-family:"DM Sans",system-ui,sans-serif;position:sticky;left:0;background:#1C0C15}
+  .ms-ld{display:grid;gap:10px}
+  .ms-ld .r{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;padding:10px 12px;border-radius:14px;background:rgba(232,193,112,.05)}
+  .ms-ld .r>em{font-style:normal;font-size:12px;color:#B69C9F;text-align:center}
+  .ms-ld .p{display:flex;align-items:center;gap:8px;min-width:0} .ms-ld .p.a{flex-direction:row-reverse;text-align:right}
+  .ms-ld img{width:36px;height:36px;border-radius:50%;object-fit:cover;background:rgba(232,193,112,.1);flex:none}
+  .ms-ld .p span{min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .ms-ld .p b{display:block;color:#F7DFA3;font:500 15px "DM Mono",ui-monospace,monospace}
+  .ms-pl{list-style:none;margin:0;padding:0}
+  .ms-pl li{display:grid;grid-template-columns:64px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid rgba(232,193,112,.08);font-size:13.5px}
+  .ms-pl li span{font:500 12px "DM Mono",ui-monospace,monospace;color:#B69C9F}
+  .ms-pl li.sc{color:#F7DFA3}
+  .ms-empty{color:#B69C9F;text-align:center;padding:24px 0}
+  @media (max-width:640px){
+    .ms-scrim{align-items:flex-end;padding:0}
+    .ms{border-radius:22px 22px 0 0;max-height:92vh}
+    .ms-team img,.ms-team .bg-ini{width:48px;height:48px} .ms-num{font-size:34px}
+    .ms-lu{grid-template-columns:1fr} .ms-body{padding:14px 16px 24px}
+  }
+  @media (prefers-reduced-motion:reduce){.ms{animation:none}}`;
+  let sheet = null, sheetT = null, lastFocus = null;
+  const num = v => { const n = parseFloat(String(v).replace('%', '')); return isFinite(n) ? n : null; };
+  function tabsFor(m) {
+    const t = [];
+    if (m.stats.length) t.push(['stats', 'Stats']);
+    if (m.events.length) t.push(['events', m.sport === 'football' ? 'Timeline' : 'Scoring']);
+    if (m.lineups) t.push(['lineups', 'Lineups']);
+    if (m.box.length) t.push(['box', 'Box score']);
+    if (m.leaders.length) t.push(['leaders', 'Top players']);
+    if (m.plays.length) t.push(['plays', 'Play by play']);
+    return t;
+  }
+  function body(m, tab) {
+    if (tab === 'stats') {
+      return (m.winProb !== null ? `<div class="ms-wp"><span>${esc(m.home.short)} ${m.winProb}%</span><div><b style="width:${m.winProb}%"></b></div><span>${100 - m.winProb}% ${esc(m.away.short)}</span></div>` : '') +
+        m.stats.map(s => { const a = num(s.home), b = num(s.away), t = (a || 0) + (b || 0); return `<div class="ms-stat"><span>${esc(s.home)}</span><em>${esc(s.label)}</em><span>${esc(s.away)}</span>${a !== null && b !== null && t > 0 ? `<div class="ms-bars"><i style="width:${a / t * 100}%"></i><i style="width:${b / t * 100}%"></i></div>` : ''}</div>`; }).join('');
+    }
+    if (tab === 'events') {
+      const ico = t => (t === 'goal' ? '⚽' : t === 'yellow' ? '<span class="ms-ico yellow"></span>' : t === 'red' ? '<span class="ms-ico red"></span>' : t === 'sub' ? '🔁' : t === 'score' ? '🏁' : '•');
+      return `<ul class="ms-ev">${m.events.map(e => {
+        const what = `${ico(e.type)} ${esc(e.who.length ? e.who[0] : '')}${e.who[1] ? `<small>${e.type === 'sub' ? 'for ' : 'assist '}${esc(e.who[1])}</small>` : ''}${!e.who.length ? `<small>${esc(e.text)}</small>` : ''}${e.score ? `<small>${esc(e.score)}</small>` : ''}`;
+        return e.side === 'home' ? `<li><span class="h">${what}</span><span class="m">${esc(e.min)}</span><span></span></li>` : e.side === 'away' ? `<li><span></span><span class="m">${esc(e.min)}</span><span>${what}</span></li>` : `<li><span class="c">${esc(e.min)} · ${esc(e.text)}</span></li>`;
+      }).join('')}</ul>`;
+    }
+    if (tab === 'lineups') {
+      const col = (s, t) => { const L = m.lineups[s]; if (!L) return ''; const li = p => `<li><b>${esc(p.n)}</b>${esc(p.name)}${p.goals ? ' ' + '⚽'.repeat(Math.min(p.goals, 4)) : ''}${p.cards.includes('R') ? '<span class="ms-ico red"></span>' : p.cards.includes('Y') ? '<span class="ms-ico yellow"></span>' : ''}${p.out ? ' 🔻' : ''}${p.in ? ' 🔺' : ''}<em>${esc(p.pos)}</em></li>`;
+        return `<div><h5>${esc(t.name)}${L.formation ? ' · ' + esc(L.formation) : ''}</h5><ol>${L.starters.map(li).join('')}</ol>${L.subs.length ? `<ol class="subs">${L.subs.map(li).join('')}</ol>` : ''}</div>`; };
+      return `<div class="ms-lu">${col('home', m.home)}${col('away', m.away)}</div>`;
+    }
+    if (tab === 'box') return m.box.map(b => `<div class="ms-box"><h5>${esc(b.side === 'home' ? m.home.name : m.away.name)}${b.title ? ' · ' + esc(b.title) : ''}</h5><table><thead><tr><th>Player</th>${b.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr><td>${esc(r.name)}${r.pos ? ` <span style="opacity:.6">${esc(r.pos)}</span>` : ''}</td>${r.stats.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('');
+    if (tab === 'leaders') {
+      const p = (x, cls) => (x ? `<div class="p ${cls}">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">` : '<img alt="">'}<span><b>${esc(x.value)}</b>${esc(x.name)}</span></div>` : '<div></div>');
+      return `<div class="ms-ld">${m.leaders.map(r => `<div class="r">${p(r.home, 'h')}<em>${esc(r.cat)}</em>${p(r.away, 'a')}</div>`).join('')}</div>`;
+    }
+    if (tab === 'plays') return `<ul class="ms-pl">${m.plays.map(p => `<li class="${p.scoring ? 'sc' : ''}"><span>${esc(p.t)}${p.score ? '<br>' + esc(p.score) : ''}</span><div>${esc(p.text)}</div></li>`).join('')}</ul>`;
+    return '';
+  }
+  function paintSheet(m, tab) {
+    const tabs = tabsFor(m); if (!tabs.some(t => t[0] === tab)) tab = tabs.length ? tabs[0][0] : '';
+    sheet.dataset.tab = tab;
+    const sc = m.state !== 'pre' && m.home.score !== '';
+    const per = m.home.periods.length > 1 && m.home.periods.length === m.away.periods.length;
+    const status = m.state === 'in' ? `<span class="bg-live"><i></i>Live · ${esc(m.detail)}</span>` : m.state === 'post' ? esc(m.detail || 'Final') : `${dayName(m.start)}, ${tf.format(new Date(m.start))}`;
+    const box = sheet.querySelector('.ms');
+    const keepScroll = box.scrollTop;
+    box.innerHTML = `<button class="x" aria-label="Close">×</button>
+      <div class="ms-head"><div class="ms-lg">${ICON[m.sport] || ''} ${esc(m.league)}</div>
+        <div class="ms-score"><div class="ms-team${m.state === 'post' && m.home.winner ? ' won' : ''}">${crest(m.home)}<span>${esc(m.home.name)}</span>${m.home.record ? `<small>${esc(m.home.record)}</small>` : ''}</div>
+          <div class="ms-num">${sc ? `${esc(m.home.score)}<i>–</i>${esc(m.away.score)}` : '<i>vs</i>'}</div>
+          <div class="ms-team${m.state === 'post' && m.away.winner ? ' won' : ''}">${crest(m.away)}<span>${esc(m.away.name)}</span>${m.away.record ? `<small>${esc(m.away.record)}</small>` : ''}</div></div>
+        <div class="ms-st">${status}</div>
+        ${m.venue || m.attendance ? `<div class="ms-meta">${esc(m.venue)}${m.attendance ? ` · ${Number(m.attendance).toLocaleString()} fans` : ''}</div>` : ''}
+        ${per ? `<table class="ms-per"><tr><th></th>${m.home.periods.map((_, i) => `<th>${i + 1}</th>`).join('')}<th>T</th></tr><tr><td>${esc(m.home.short)}</td>${m.home.periods.map(x => `<td>${esc(x)}</td>`).join('')}<td>${esc(m.home.score)}</td></tr><tr><td>${esc(m.away.short)}</td>${m.away.periods.map(x => `<td>${esc(x)}</td>`).join('')}<td>${esc(m.away.score)}</td></tr></table>` : ''}
+      </div>
+      ${tabs.length ? `<div class="ms-tabs" role="tablist">${tabs.map(([k, v]) => `<button role="tab" data-t="${k}" aria-selected="${k === tab}">${v}</button>`).join('')}</div><div class="ms-body" role="tabpanel">${body(m, tab)}</div>`
+        : `<div class="ms-body"><p class="ms-empty">${m.state === 'pre' ? 'Lineups and stats show up here around kick-off.' : 'No details for this game yet.'}</p></div>`}`;
+    box.scrollTop = keepScroll;
+    box.querySelector('.x').onclick = closeSheet;
+    box.querySelectorAll('[data-t]').forEach(b => { b.onclick = () => paintSheet(m, b.dataset.t); });
+  }
+  async function openSheet(pathKey, id) {
+    closeSheet(); lastFocus = document.activeElement;
+    if (!document.getElementById('ms-css')) { const s = document.createElement('style'); s.id = 'ms-css'; s.textContent = sheetCss; document.head.appendChild(s); }
+    sheet = document.createElement('div'); sheet.className = 'ms-scrim';
+    sheet.innerHTML = '<div class="ms" role="dialog" aria-modal="true" aria-label="Match details"><p class="ms-empty" style="padding:60px 0">Loading the match…</p></div>';
+    sheet.addEventListener('click', e => { if (e.target === sheet) closeSheet(); });
+    document.body.appendChild(sheet);
+    const me = sheet;
+    async function pull(first) {
+      try {
+        const r = await fetch(`api/fixtures/match?path=${encodeURIComponent(pathKey)}&id=${encodeURIComponent(id)}`, { cache: 'no-store' });
+        const m = await r.json(); if (sheet !== me) return;
+        if (!r.ok) { if (first) me.querySelector('.ms').innerHTML = `<button class="x" aria-label="Close">×</button><p class="ms-empty" style="padding:60px 20px">${esc(m.error || 'The match details aren’t available right now.')}</p>`; me.querySelector('.x').onclick = closeSheet; return; }
+        paintSheet(m, me.dataset.tab || 'stats');
+        if (first) { const x = me.querySelector('.x'); if (x) x.focus(); }
+        clearTimeout(sheetT); if (m.state === 'in') sheetT = setTimeout(() => pull(false), 30000);
+      } catch (e) { if (first && sheet === me) me.querySelector('.ms').innerHTML = '<p class="ms-empty" style="padding:60px 20px">Couldn’t load the match. Check your connection.</p>'; }
+    }
+    pull(true);
+  }
+  function closeSheet() { clearTimeout(sheetT); if (sheet) { sheet.remove(); sheet = null; if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true }); } }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheet) closeSheet(); });
+  // any card or row with a match id opens its sheet
+  function hook(root) {
+    root.addEventListener('click', e => { const t = e.target.closest('[data-mid]'); if (t) openSheet(t.dataset.mpath, t.dataset.mid); });
+    root.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-mid]')) { e.preventDefault(); openSheet(e.target.dataset.mpath, e.target.dataset.mid); } });
+  }
   // a big card for the featured strip
   function card(e) {
     if (e.kind === 'race') {
@@ -1203,7 +1364,7 @@ window.BigGames = (() => {
         ${e.podium && e.podium.length ? `<ol class="bg-pod">${e.podium.map(p => `<li>${crest(p)}${esc(p.short)}</li>`).join('')}</ol>` : `<p class="bg-venue">${esc(e.venue)}</p>`}</article>`;
     }
     const sc = showScore(e);
-    return `<article class="bg-card${e.state === 'in' ? ' is-live' : ''}"><header><span>${ICON[e.sport] || ''} ${esc(e.league)}</span>${when(e)}</header>
+    return `<article class="bg-card${e.state === 'in' ? ' is-live' : ''}"${attrs(e)}><header><span>${ICON[e.sport] || ''} ${esc(e.league)}</span>${when(e)}</header>
       <div class="bg-vs">
         <div class="bg-t${e.state === 'post' && e.home.winner ? ' won' : ''}">${crest(e.home)}<span>${esc(e.home.short)}</span></div>
         <div class="bg-mid">${sc ? `<b>${esc(e.home.score)}</b><i>–</i><b>${esc(e.away.score)}</b>` : `<i>vs</i>`}</div>
@@ -1220,7 +1381,7 @@ window.BigGames = (() => {
     const sc = showScore(e);
     const nm = t => `<span class="nm"><span class="f">${esc(t.name)}</span><span class="sh">${esc(t.short)}</span></span>`;
     const time = e.state === 'pre' ? tf.format(new Date(e.start)) : e.state === 'in' ? `<span class="bg-live"><i></i>${esc(e.detail || 'Live')}</span>` : esc(e.detail || 'Final');
-    return `<li class="bg-row${e.state === 'in' ? ' is-live' : ''}"><span class="bg-time">${time}</span>
+    return `<li class="bg-row${e.state === 'in' ? ' is-live' : ''}"${attrs(e)}><span class="bg-time">${time}</span>
       <span class="bg-h${e.state === 'post' && e.home.winner ? ' won' : ''}">${nm(e.home)}${crest(e.home)}</span>
       <span class="bg-s">${sc ? `${esc(e.home.score)}<i>–</i>${esc(e.away.score)}` : '<i>vs</i>'}</span>
       <span class="bg-a${e.state === 'post' && e.away.winner ? ' won' : ''}">${crest(e.away)}${nm(e.away)}</span>
@@ -1279,14 +1440,14 @@ window.BigGames = (() => {
   @media (prefers-reduced-motion:reduce){.bg-live i{animation:none}}`;
   function style() { if (document.getElementById('bg-css')) return; const s = document.createElement('style'); s.id = 'bg-css'; s.textContent = css; document.head.appendChild(s); }
   async function load() { const r = await fetch('api/fixtures', { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
-  return { card, row, load, style, dayKey, dayName, ICON, SPORT, esc };
+  return { card, row, load, style, dayKey, dayName, ICON, SPORT, esc, hook, openSheet };
 })();
 
 </script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  const B = window.BigGames; B.style();
+  const B = window.BigGames; B.style(); B.hook(document.querySelector('main'));
   let V = null, sport = 'all', timer = null;
   try { sport = sessionStorage.getItem('mc-bg-sport') || 'all'; } catch (e) {}
   function draw() {
