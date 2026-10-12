@@ -200,12 +200,13 @@ module.exports = function createFixtures({ fetchImpl, now = () => Date.now() } =
       }
     }
     // box score (basketball, american football, hockey, baseball): the main table of each team
-    for (const t of arr(j.boxscore && j.boxscore.players)) {
+    for (const t of arr(j.boxscore && j.boxscore.players).slice().sort((a, b) => (sideOf(a.team, homeId, awayId) === 'home' ? 0 : 1) - (sideOf(b.team, homeId, awayId) === 'home' ? 0 : 1))) {
       const s = sideOf(t.team, homeId, awayId) || (t.team && t.team.displayName === out.home.name ? 'home' : 'away');
-      const g = arr(t.statistics)[0]; if (!g) continue;
-      const cols = arr(g.labels).length ? g.labels : arr(g.names);
-      const rows = arr(g.athletes).filter(a => arr(a.stats).length).slice(0, 14).map(a => ({ name: nm(a.athlete), pos: (a.athlete && a.athlete.position && a.athlete.position.abbreviation) || '', starter: !!a.starter, stats: a.stats.map(String) }));
-      if (rows.length) out.box.push({ side: s, title: g.name || g.text || '', cols: cols.slice(0, 12), rows: rows.map(r => Object.assign(r, { stats: r.stats.slice(0, 12) })) });
+      for (const g of arr(t.statistics).slice(0, lg[2] === 'american-football' ? 3 : 1)) {
+        const cols = arr(g.labels).length ? g.labels : arr(g.names);
+        const rows = arr(g.athletes).filter(a => arr(a.stats).length).slice(0, 14).map(a => ({ name: nm(a.athlete), pos: (a.athlete && a.athlete.position && a.athlete.position.abbreviation) || '', starter: !!a.starter, stats: a.stats.map(String) }));
+        if (rows.length) out.box.push({ side: s, title: g.text || g.name || '', cols: cols.slice(0, 12), rows: rows.map(r => Object.assign(r, { stats: r.stats.slice(0, 12) })) });
+      }
     }
     // the latest plays, newest first
     const plays = arr(j.plays).length ? arr(j.plays) : arr(j.commentary).map(c => ({ text: c.text, clock: c.time || c.clock, team: c.play && c.play.team }));
