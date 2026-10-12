@@ -443,7 +443,15 @@ window.CasinoNet = (() => {
       }
     }
     if (typeof j.cents === 'number') CasinoWallet._server(j.cents);
-    if (Array.isArray(j.pop) && j.pop.length) CasinoUI.popups(j.pop);
+    if (Array.isArray(j.pop) && j.pop.length) {
+      const hype = j.pop.filter(p => p.type === 'hype'), rest = j.pop.filter(p => p.type !== 'hype');
+      if (rest.length) CasinoUI.popups(rest);
+      if (window.CasinoVoice) {
+        const delay = window.CASINO_CTX === 'lobby' || !window.CASINO_CTX ? 300 : 2400;
+        hype.forEach(h => setTimeout(() => CasinoVoice.win(h.x, h.tags || []), delay));
+        if (rest.length) setTimeout(() => CasinoVoice.pops(rest), delay + (hype.length ? 2800 : 200));
+      }
+    }
     if (j.wheel && window.CasinoWheel) CasinoWheel.offer(j.wheel);
     if (r.status === 403 && /suspended/i.test(j.error || '')) CasinoUI.suspended();
     return { ok: r.ok, status: r.status, body: j };
@@ -622,7 +630,14 @@ window.CasinoUI = (() => {
 // one volume for every game, and soft lounge music if you want it (set in the lobby)
 window.CasinoSound = (() => {
   const KEY = 'miguels-casino-sound';
-  const load = () => { try { return Object.assign({ on: true, vol: 0.8, music: false, mvol: 0.4 }, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return { on: true, vol: 0.8, music: false, mvol: 0.4 }; } };
+  const DEF = { on: true, vol: 0.8, music: true, mvol: 0.45, style: 'mix', voice: true, vvol: 0.9, v: 2 };
+  const load = () => {
+    let c = null; try { c = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+    if (!c) return Object.assign({}, DEF);
+    // settings saved before the new music came out: switch the music and the announcer on once
+    if (c.v !== 2) Object.assign(c, { music: true, mvol: Math.max(c.mvol || 0, 0.45), style: 'mix', voice: true, vvol: 0.9, v: 2 });
+    return Object.assign({}, DEF, c);
+  };
   let cfg = load();
   const masters = new Set();
   const level = () => (cfg.on ? cfg.vol : 0);
@@ -639,30 +654,8 @@ window.CasinoSound = (() => {
   function apply() { masters.forEach(g => { try { g.gain.value = level(); } catch (e) {} }); music(); }
   function set(k, v) { cfg[k] = v; try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} apply(); }
   addEventListener('storage', e => { if (e.key === KEY) { cfg = load(); apply(); } });
-  // music: slow jazzy chords, made on the fly
-  let mctx = null, mgain = null, timer = null, step = 0;
-  const CHORDS = [[57, 60, 64, 67], [62, 65, 69, 72], [55, 59, 62, 65], [60, 64, 67, 71]];   // Am7, Dm7, G7, Cmaj7
-  const hz = n => 440 * Math.pow(2, (n - 69) / 12);
-  function note(f, t, d, type, v, dest) { const o = mctx.createOscillator(), g = mctx.createGain(); o.type = type; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g).connect(dest); o.start(t); o.stop(t + d + 0.05); }
-  function bar() {
-    const t = mctx.currentTime + 0.05, ch = CHORDS[step % 4], beat = 0.75;
-    const lp = mctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.connect(mgain);
-    ch.forEach(n => note(hz(n), t, beat * 4, 'triangle', 0.05, lp));
-    [0, 2].forEach(b => note(hz(ch[0] - 24), t + b * beat, beat * 1.6, 'sine', 0.12, mgain));
-    [1, 2.5, 3].forEach(b => note(hz(ch[(b * 2) % 4] + 12), t + b * beat, beat * 0.9, 'sine', 0.03, lp));
-    step++;
-  }
-  function music() {
-    const want = cfg.music && cfg.on;
-    if (!want) { if (timer) { clearInterval(timer); timer = null; } if (mgain) mgain.gain.value = 0; return; }
-    if (!Base) return;
-    if (!mctx) { try { mctx = new Base(); } catch (e) { return; } mgain = mctx.createGain(); mgain.connect(desc && desc.get ? desc.get.call(mctx) : mctx.destination); }
-    mgain.gain.value = cfg.mvol * 0.6;
-    if (mctx.state === 'suspended') mctx.resume().catch(() => {});
-    if (!timer && mctx.state === 'running') { bar(); timer = setInterval(bar, 3000); }
-  }
-  const unlock = () => { if (cfg.music) music(); };
-  document.addEventListener('pointerdown', unlock); document.addEventListener('keydown', unlock);
+  // the music itself lives in casino_audio.js
+  function music() { if (window.CasinoMusic) CasinoMusic.update(cfg); }
   // a soft chime for badges and level ups
   let dctx = null;
   function ding() {
@@ -674,7 +667,7 @@ window.CasinoSound = (() => {
       [1047, 1319, 1568].forEach((f, i) => { const o = dctx.createOscillator(), g = dctx.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t + i * 0.08); g.gain.exponentialRampToValueAtTime(0.08, t + i * 0.08 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.08 + 0.5); o.connect(g).connect(dctx.destination); o.start(t + i * 0.08); o.stop(t + i * 0.08 + 0.55); });
     } catch (e) {}
   }
-  return { get: () => Object.assign({}, cfg), set, ding };
+  return { get: () => Object.assign({}, cfg), set, ding, _Base: Base, _dest: c => (desc && desc.get ? desc.get.call(c) : c.destination) };
 })();
 
 
@@ -791,6 +784,7 @@ window.CasinoWheel = (() => {
     el.querySelector('#mcwRes').innerHTML = `<b>${usd(prize)}</b><span>${seg === 0 ? 'THE TOP PRIZE! Unbelievable!' : 'added to your bankroll'}</span>`;
     [0, 0.1, 0.2, 0.32].forEach((w, i) => tone([659, 784, 988, 1319][i], 0.35, w, 0.08));
     confetti(); if (seg === 0) setTimeout(confetti, 700);
+    try { if (seg === 0) { CasinoMusic.fanfare(true); CasinoVoice.line('wheelTop', { force: true }); } else CasinoVoice.say(`You won ${usd(prize).replace('.00', '')}!`, { force: true }); } catch (e) {}
     try { CasinoWallet.refresh(); } catch (e) {}
     await new Promise(x => setTimeout(x, seg === 0 ? 5000 : 3200));
     busy = false; close(false);
@@ -799,6 +793,7 @@ window.CasinoWheel = (() => {
     if (!w || done.has(w.id)) return;
     if (W && W.id === w.id) return;
     W = w;
+    try { if (window.CasinoVoice) { CasinoMusic.fanfare(false); CasinoVoice.line('wheel', { force: true }); } } catch (e) {}
     if (document.body) show(); else addEventListener('DOMContentLoaded', show);
   }
   async function check() { if (!/^https?:$/.test(location.protocol)) return; try { await CasinoNet.api('api/wheel', {}); } catch (e) {} }
@@ -807,6 +802,475 @@ window.CasinoWheel = (() => {
   setTimeout(check, 2500);
   return { offer, check };
 })();
+
+/* Music and the announcer for every page of Miguel's Casino.
+   All the music is made live in the browser (drums, bass, synths and sung "oohs", "aahs" and "hey!"s),
+   so there are no audio files to download. The announcer uses the device's own text-to-speech voice. */
+window.CasinoMusic = (() => {
+  const Base = CasinoSound._Base;
+  const hz = n => 440 * Math.pow(2, (n - 69) / 12);
+  let ctx = null, out = null, comp = null, drums = null, synths = null, duckG = null, verb = null, verbIn = null, echo = null, noise = null;
+  let cfg = CasinoSound.get(), timer = null, track = null, trackIdx = 0, step = 0, nextT = 0, barsInTrack = 0, voiceDuck = 1;
+  const listeners = new Set();
+
+  /* ---------- the studio: buses, reverb, echo ---------- */
+  function build() {
+    if (ctx || !Base) return !!ctx;
+    try { ctx = new Base(); } catch (e) { return false; }
+    comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.2;
+    out = ctx.createGain(); out.gain.value = 0;
+    out.connect(comp); comp.connect(CasinoSound._dest(ctx));
+    drums = ctx.createGain(); drums.gain.value = 0.55; drums.connect(out);
+    duckG = ctx.createGain(); duckG.connect(out);              // everything but the drums pumps with the kick
+    synths = ctx.createGain(); synths.gain.value = 1.35; synths.connect(duckG);
+    // reverb from a burst of fading noise
+    verb = ctx.createConvolver();
+    const len = Math.floor(ctx.sampleRate * 2.4), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6); }
+    verb.buffer = ir; verbIn = ctx.createGain(); verbIn.gain.value = 0.32; verbIn.connect(verb); const vOut = ctx.createGain(); vOut.gain.value = 0.9; verb.connect(vOut).connect(out);
+    // a dotted-eighth echo for plucks and vocals
+    echo = ctx.createDelay(1.5); const fb = ctx.createGain(); fb.gain.value = 0.32; const eOut = ctx.createGain(); eOut.gain.value = 0.35; const eLp = ctx.createBiquadFilter(); eLp.type = 'lowpass'; eLp.frequency.value = 3000;
+    echo.connect(eLp).connect(fb).connect(echo); eLp.connect(eOut).connect(duckG);
+    noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const nd = noise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    return true;
+  }
+  const env = (g, t, a, peak, d, end = 0.0001) => { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(end, t + a + d); };
+  function osc(type, f, t, stop) { const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); o.start(t); o.stop(stop); return o; }
+  function nsrc(t, dur) { const s = ctx.createBufferSource(); s.buffer = noise; s.loop = true; s.start(t, Math.random() * 0.5); s.stop(t + dur); return s; }
+  function filt(type, f, q = 1) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; }
+
+  /* ---------- instruments ---------- */
+  const I = {
+    kick(t, v = 1) {
+      const o = osc('sine', 160, t, t + 0.45), g = ctx.createGain();
+      o.frequency.exponentialRampToValueAtTime(42, t + 0.13); env(g, t, 0.002, v, 0.4); o.connect(g).connect(drums);
+      const c = osc('triangle', 900, t, t + 0.02), cg = ctx.createGain(); env(cg, t, 0.001, v * 0.25, 0.015); c.connect(cg).connect(drums);
+      // the pump: synths dip on every kick
+      duckG.gain.cancelScheduledValues(t); duckG.gain.setValueAtTime(0.32, t); duckG.gain.linearRampToValueAtTime(1, t + 0.26);
+    },
+    snare(t, v = 0.6, tail = 0.18, wet = 0.2) {
+      const n = nsrc(t, tail + 0.05), hp = filt('highpass', 1300), g = ctx.createGain(); env(g, t, 0.002, v, tail); n.connect(hp).connect(g); g.connect(drums);
+      const w = ctx.createGain(); w.gain.value = wet; g.connect(w).connect(verbIn);
+      const o = osc('triangle', 200, t, t + 0.12), og = ctx.createGain(); o.frequency.exponentialRampToValueAtTime(120, t + 0.1); env(og, t, 0.002, v * 0.6, 0.1); o.connect(og).connect(drums);
+    },
+    clap(t, v = 0.55) {
+      const n = nsrc(t, 0.3), bp = filt('bandpass', 1400, 0.9), g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      [0, 0.011, 0.022].forEach(d => { g.gain.setValueAtTime(v, t + d); g.gain.exponentialRampToValueAtTime(v * 0.25, t + d + 0.009); });
+      g.gain.setValueAtTime(v, t + 0.032); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      n.connect(bp).connect(g); g.connect(drums); const w = ctx.createGain(); w.gain.value = 0.25; g.connect(w).connect(verbIn);
+    },
+    hat(t, v = 0.18, open = false) { const n = nsrc(t, open ? 0.3 : 0.06), hp = filt('highpass', open ? 7500 : 8500), g = ctx.createGain(); env(g, t, 0.001, v, open ? 0.22 : 0.035); n.connect(hp).connect(g).connect(drums); },
+    shaker(t, v = 0.06) { const n = nsrc(t, 0.08), bp = filt('bandpass', 6000, 1.4), g = ctx.createGain(); env(g, t, 0.012, v, 0.05); n.connect(bp).connect(g).connect(drums); },
+    crash(t, v = 0.3) { const n = nsrc(t, 1.8), hp = filt('highpass', 5000), g = ctx.createGain(); env(g, t, 0.002, v, 1.6); n.connect(hp).connect(g); g.connect(drums); const w = ctx.createGain(); w.gain.value = 0.3; g.connect(w).connect(verbIn); },
+    riser(t, dur, v = 0.22) {
+      const n = nsrc(t, dur + 0.05), bp = filt('bandpass', 400, 2.2), g = ctx.createGain();
+      bp.frequency.setValueAtTime(400, t); bp.frequency.exponentialRampToValueAtTime(7000, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.04);
+      n.connect(bp).connect(g).connect(out);
+    },
+    bass(t, n, d, v = 0.32, type = 'sawtooth', cut = 900) {
+      const o = osc(type, hz(n), t, t + d + 0.1), s = osc('sine', hz(n - 12), t, t + d + 0.1), lp = filt('lowpass', cut, 6), g = ctx.createGain();
+      lp.frequency.setValueAtTime(cut * 2.2, t); lp.frequency.exponentialRampToValueAtTime(cut * 0.4, t + Math.min(d, 0.25));
+      env(g, t, 0.005, v, d); const sg = ctx.createGain(); sg.gain.value = 0.7;
+      o.connect(lp).connect(g); s.connect(sg).connect(g); g.connect(synths);
+    },
+    pad(t, notes, d, v = 0.06, cut = 1800) {
+      const lp = filt('lowpass', cut, 0.7), g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + Math.min(0.4, d * 0.3)); g.gain.setValueAtTime(v, t + d * 0.8); g.gain.linearRampToValueAtTime(0.0001, t + d + 0.3);
+      notes.forEach(n => [-7, 7].forEach(dt => { const o = osc('sawtooth', hz(n), t, t + d + 0.35); o.detune.value = dt; o.connect(lp); }));
+      lp.connect(g); g.connect(synths); const w = ctx.createGain(); w.gain.value = 0.5; g.connect(w).connect(verbIn);
+    },
+    stab(t, notes, d = 0.14, v = 0.07, type = 'sawtooth', cut = 2600) {
+      const lp = filt('lowpass', cut, 2), g = ctx.createGain(); lp.frequency.setValueAtTime(cut * 1.6, t); lp.frequency.exponentialRampToValueAtTime(cut * 0.5, t + d);
+      env(g, t, 0.003, v, d); notes.forEach(n => { const o = osc(type, hz(n), t, t + d + 0.1); o.detune.value = (Math.random() - 0.5) * 10; o.connect(lp); });
+      lp.connect(g); g.connect(synths); const w = ctx.createGain(); w.gain.value = 0.3; g.connect(w).connect(verbIn);
+    },
+    keys(t, notes, d, v = 0.05) {   // an electric piano
+      notes.forEach(n => {
+        const o = osc('sine', hz(n), t, t + d + 0.2), m = osc('sine', hz(n) * 2, t, t + d + 0.2), mg = ctx.createGain(), g = ctx.createGain();
+        mg.gain.setValueAtTime(hz(n) * 1.2, t); mg.gain.exponentialRampToValueAtTime(hz(n) * 0.1, t + 0.4); m.connect(mg).connect(o.frequency);
+        env(g, t, 0.004, v, d); o.connect(g).connect(synths); const w = ctx.createGain(); w.gain.value = 0.35; g.connect(w).connect(verbIn);
+      });
+    },
+    pluck(t, n, d = 0.18, v = 0.07, wet = 0.5) {
+      const o = osc('square', hz(n), t, t + d + 0.1), o2 = osc('sawtooth', hz(n + 12), t, t + d + 0.1), lp = filt('lowpass', 4500, 4), g = ctx.createGain();
+      lp.frequency.setValueAtTime(5200, t); lp.frequency.exponentialRampToValueAtTime(500, t + d);
+      env(g, t, 0.002, v, d); const g2 = ctx.createGain(); g2.gain.value = 0.4; o.connect(lp); o2.connect(g2).connect(lp); lp.connect(g); g.connect(synths);
+      const e = ctx.createGain(); e.gain.value = wet; g.connect(e).connect(echo);
+    },
+    lead(t, n, d, v = 0.06, glide = null) {
+      const o = osc('sawtooth', hz(glide ?? n), t, t + d + 0.15), o2 = osc('square', hz(glide ?? n), t, t + d + 0.15); o2.detune.value = 9;
+      if (glide !== null) { o.frequency.exponentialRampToValueAtTime(hz(n), t + 0.06); o2.frequency.exponentialRampToValueAtTime(hz(n), t + 0.06); }
+      const lfo = osc('sine', 5.6, t, t + d + 0.15), lg = ctx.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(hz(n) * 0.012, t + Math.min(d, 0.35)); lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
+      const lp = filt('lowpass', 3200, 1), g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.02); g.gain.setValueAtTime(v, t + d * 0.85); g.gain.linearRampToValueAtTime(0.0001, t + d + 0.1);
+      const g2 = ctx.createGain(); g2.gain.value = 0.5; o.connect(lp); o2.connect(g2).connect(lp); lp.connect(g); g.connect(synths);
+      const e = ctx.createGain(); e.gain.value = 0.35; g.connect(e).connect(echo); const w = ctx.createGain(); w.gain.value = 0.3; g.connect(w).connect(verbIn);
+    },
+    /* the singers: a buzzing tone shaped by three vowel filters, the way a throat and mouth shape a voice */
+    vox(t, n, d, vowel = 'a', v = 0.1, to = null, opts = {}) {
+      const F = VOWELS[vowel], F2 = to ? VOWELS[to] : null;
+      const src = ctx.createGain(), g = ctx.createGain();
+      const f0 = hz(n), voices = opts.choir ? [-12, 0, 11] : [0];
+      voices.forEach((dt, k) => {
+        const o = osc('sawtooth', f0, t, t + d + 0.2); o.detune.value = dt + (opts.choir ? (k - 1) * 4 : 0);
+        if (opts.fall) o.frequency.exponentialRampToValueAtTime(f0 * 0.82, t + d);
+        const lfo = osc('sine', 5.2 + k * 0.3, t, t + d + 0.2), lg = ctx.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f0 * 0.009, t + Math.min(0.3, d)); lfo.connect(lg).connect(o.frequency);
+        o.connect(src);
+      });
+      const breath = nsrc(t, d + 0.1), bg = ctx.createGain(); bg.gain.value = 0.08; breath.connect(bg).connect(src);
+      F.forEach(([f, q, a], i) => {
+        const bp = filt('bandpass', f, q), fg = ctx.createGain(); fg.gain.value = a;
+        if (F2) bp.frequency.linearRampToValueAtTime(F2[i][0], t + d * 0.7);
+        src.connect(bp).connect(fg).connect(g);
+      });
+      const att = opts.att ?? 0.04;
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + att); g.gain.setValueAtTime(v, t + Math.max(att, d * 0.7)); g.gain.linearRampToValueAtTime(0.0001, t + d + (opts.rel ?? 0.12));
+      g.connect(synths); const w = ctx.createGain(); w.gain.value = opts.wet ?? 0.5; g.connect(w).connect(verbIn);
+      if (opts.echo) { const e = ctx.createGain(); e.gain.value = opts.echo; g.connect(e).connect(echo); }
+    },
+    // a crowd shouting "HEY!"
+    hey(t, v = 0.2) {
+      const n = nsrc(t, 0.07), bp = filt('bandpass', 2600, 1.2), g = ctx.createGain(); env(g, t, 0.004, v * 0.6, 0.06); n.connect(bp).connect(g).connect(synths);
+      [52, 55, 59, 47].forEach((p, k) => I.vox(t + 0.035 + k * 0.006, p, 0.16, 'e', v * 0.5, 'i', { att: 0.012, rel: 0.06, fall: true, wet: 0.45 }));
+    },
+  };
+  // formants: [frequency, Q, level]
+  const VOWELS = {
+    a: [[800, 9, 1], [1150, 10, 0.5], [2900, 12, 0.18]],
+    e: [[530, 9, 1], [1840, 11, 0.45], [2480, 12, 0.2]],
+    i: [[300, 9, 1], [2250, 12, 0.35], [3000, 14, 0.2]],
+    o: [[480, 9, 1], [820, 10, 0.5], [2700, 12, 0.12]],
+    u: [[330, 9, 1], [720, 10, 0.35], [2500, 12, 0.08]],
+  };
+
+  /* ---------- the songs ---------- */
+  // each song is a list of sections; play(t, s, barInSection, sec, chord) runs on every 16th note
+  const TRACKS = [
+    {
+      id: 'vegas', name: 'Vegas Nights', bpm: 118,
+      // Dm9 G13 Cmaj9 A7: a funky disco loop
+      chords: [{ r: 38, c: [53, 57, 60, 64] }, { r: 43, c: [53, 57, 59, 64] }, { r: 36, c: [52, 55, 59, 62] }, { r: 45, c: [55, 57, 61, 64] }],
+      sections: [['intro', 4], ['verse', 8], ['build', 2], ['chorus', 8], ['break', 4], ['build', 2], ['chorus', 8]],
+      hook: [[0, 69, 3, 'o'], [4, 72, 3, 'o'], [8, 74, 6, 'a'], [14, 72, 2, 'o']],
+      play(t, s, b, sec, ch, L) {
+        const full = sec === 'chorus', grooves = sec !== 'intro' && sec !== 'break';
+        if (sec !== 'break' && s % 4 === 0) I.kick(t, 0.95);
+        if (sec === 'build') { if (s % 2 === 0 || b === 1) I.snare(t, 0.12 + (b * 16 + s) * 0.012, 0.1, 0.1); if (b === 0 && s === 0) I.riser(t, L * 32, 0.2); if (b === 1 && s === 14) I.hey(t, 0.22); return; }
+        if (grooves && (s === 4 || s === 12)) I.clap(t, 0.5);
+        if (s % 4 === 2) I.hat(t, sec === 'intro' ? 0.1 : 0.16, true); else if (grooves) I.hat(t, 0.05);
+        if (grooves && s % 2 === 0) I.bass(t, ch.r + (s % 4 === 2 ? 12 : 0), L * 1.6, 0.28, 'sawtooth', 700);
+        if (grooves && (s === 3 || s === 6 || s === 11 || s === 14)) I.stab(t, ch.c.map(n => n + 12), 0.13, 0.05);
+        if (s === 0 && (sec === 'intro' || sec === 'break' || full)) I.pad(t, ch.c, L * 16, sec === 'break' ? 0.05 : 0.03, 1500);
+        if (full) {
+          this.hook.forEach(([at, n, len, v]) => { if (s === at) I.vox(t, n - (b % 2 ? 2 : 0), L * len, v, 0.12, null, { echo: 0.2 }); });
+          if (s === 0 && b % 4 === 0) { if (b === 0) I.crash(t, 0.25); I.hey(t + L * 14, 0.18); }
+          if (s % 2 === 0) I.shaker(t, 0.05);
+        }
+        if (sec === 'break' && s === 0) I.vox(t, ch.c[3] + 12, L * 14, 'u', 0.07, 'a', { choir: true, wet: 0.8 });
+      },
+    },
+    {
+      id: 'house', name: 'High Roller', bpm: 124,
+      // Fm Db Ab Eb: big-room piano house
+      chords: [{ r: 41, c: [60, 65, 68] }, { r: 37, c: [61, 65, 68] }, { r: 44, c: [60, 63, 68] }, { r: 39, c: [58, 63, 67] }],
+      sections: [['intro', 4], ['verse', 8], ['build', 4], ['drop', 8], ['break', 4], ['build', 4], ['drop', 8]],
+      chops: [[0, 2, 'a'], [3, 1, 'o'], [6, 2, 'a'], [10, 1, 'e'], [12, 2, 'a']],
+      play(t, s, b, sec, ch, L) {
+        const drop = sec === 'drop';
+        if (sec === 'build') {
+          const roll = b < 2 ? s % 4 === 0 : b < 3 ? s % 2 === 0 : true;
+          if (roll) I.snare(t, 0.1 + (b * 16 + s) * 0.006, 0.08, 0.15);
+          if (s === 0 && b === 0) I.riser(t, L * 64, 0.24);
+          if (s % 8 === 0) I.pad(t, ch.c, L * 8, 0.035, 900 + b * 600);
+          if (b === 3 && s === 12) I.hey(t, 0.24);
+          return;
+        }
+        if (sec !== 'break' && s % 4 === 0) I.kick(t, 1);
+        if (sec !== 'intro' && sec !== 'break' && (s === 4 || s === 12)) I.clap(t, 0.45);
+        if (s % 4 === 2) I.hat(t, 0.14, true); else if (sec !== 'break' && s % 2 === 1) I.hat(t, 0.05);
+        if (sec !== 'intro' && sec !== 'break' && s % 4 === 2) I.bass(t, ch.r + 12, L * 1.5, 0.3, 'sawtooth', 600);
+        if ((sec === 'verse' || drop) && [0, 3, 6, 10, 12].includes(s)) I.keys(t, ch.c.map(n => n + 12), L * 2.5, 0.045);
+        if (s === 0) I.pad(t, ch.c, L * 16, sec === 'break' ? 0.05 : 0.025, sec === 'break' ? 1200 : 2200);
+        if (drop) {
+          this.chops.forEach(([at, len, v], k) => { if (s === at) I.vox(t, ch.c[k % 3] + 12, L * len, v, 0.12, null, { att: 0.01, rel: 0.05, echo: 0.25 }); });
+          if (s % 2 === 0) I.pluck(t, ch.c[(s / 2) % 3] + 24, L * 1.2, 0.035, 0.35);
+          if (b === 0 && s === 0) I.crash(t, 0.3);
+          if (s === 0 && b % 4 === 3) I.hey(t + L * 12, 0.2);
+        }
+        if (sec === 'break' && s === 0) I.vox(t, ch.c[2] + 12, L * 14, 'a', 0.07, 'o', { choir: true, wet: 0.85 });
+      },
+    },
+    {
+      id: 'synth', name: 'Neon Drive', bpm: 100,
+      // Am F C G: synthwave
+      chords: [{ r: 45, c: [57, 60, 64] }, { r: 41, c: [57, 60, 65] }, { r: 36, c: [55, 60, 64] }, { r: 43, c: [55, 59, 62] }],
+      sections: [['intro', 4], ['verse', 8], ['chorus', 8], ['break', 4], ['chorus', 8]],
+      melody: [[[0, 76, 4], [6, 74, 2], [8, 72, 4], [12, 74, 4]], [[0, 72, 4], [6, 69, 2], [8, 72, 6]], [[0, 67, 4], [6, 72, 2], [8, 76, 4], [12, 79, 4]], [[0, 78, 4], [8, 74, 8]]],
+      play(t, s, b, sec, ch, L, bar) {
+        const ch2 = sec === 'chorus';
+        if (sec !== 'break' && (s === 0 || s === 8 || (ch2 && s % 4 === 0))) I.kick(t, 0.95);
+        if (sec !== 'intro' && sec !== 'break' && (s === 4 || s === 12)) I.snare(t, 0.55, 0.3, 0.6);
+        if (sec !== 'break' && s % 2 === 0) I.hat(t, s % 4 === 2 ? 0.08 : 0.04);
+        if (sec !== 'intro' && s % 2 === 0) I.bass(t, ch.r + (s % 4 === 2 ? 12 : 0), L * 1.7, 0.24, 'sawtooth', 500);
+        if (s === 0) I.pad(t, ch.c, L * 16, sec === 'intro' || sec === 'break' ? 0.05 : 0.03, 1400);
+        if (sec === 'verse' && s % 2 === 0) I.pluck(t, ch.c[(s / 2) % 3] + 12, L * 1.5, 0.03, 0.5);
+        if (ch2) {
+          (this.melody[bar % 4] || []).forEach(([at, n, len]) => { if (s === at) I.lead(t, n, L * len, 0.05, at === 0 ? n - 2 : null); });
+          if (s === 0) I.vox(t, ch.c[1] + 12, L * 15, 'a', 0.05, null, { choir: true, wet: 0.8, att: 0.3 });
+          if (s === 0 && b === 0) I.crash(t, 0.22);
+        }
+        if (sec === 'break' && s === 0) I.vox(t, ch.c[2] + 12, L * 14, 'o', 0.06, 'a', { choir: true, wet: 0.9, att: 0.4 });
+        if (sec === 'break' && b === 3 && s === 0) I.riser(t, L * 15, 0.18);
+      },
+    },
+    {
+      id: 'lounge', name: 'Velvet Lounge', bpm: 92,
+      // Am7 Dm7 G7 Cmaj7, swung, with a scat singer
+      chords: [{ r: 45, c: [55, 60, 64, 67] }, { r: 38, c: [53, 57, 60, 65] }, { r: 43, c: [53, 59, 62, 65] }, { r: 36, c: [52, 55, 59, 64] }],
+      sections: [['a', 8], ['scat', 8]],
+      scat: [[[0, 76, 2, 'u'], [3, 74, 1, 'a'], [4, 72, 2, 'u'], [8, 69, 4, 'a']], [[0, 77, 2, 'u'], [3, 76, 1, 'a'], [4, 74, 3, 'o']], [[2, 71, 2, 'u'], [4, 74, 2, 'a'], [8, 77, 4, 'o']], [[0, 76, 6, 'a']]],
+      play(t, s, b, sec, ch, L, bar) {
+        const sw = s % 2 === 1 ? L * 0.33 : 0;           // swing the off-beats
+        if (s % 4 === 0) I.bass(t, ch.r + [0, 7, 12, 10][s / 4], L * 3.4, 0.26, 'triangle', 500);
+        if (s % 4 === 0 || s % 4 === 3) I.shaker(t + sw, s % 4 === 0 ? 0.05 : 0.035);
+        if (s === 4 || s === 12) I.hat(t, 0.07, false);
+        if (s === 0 || s === 7) I.keys(t + sw, ch.c, L * (s ? 5 : 6), 0.04);
+        if (s === 0 && b % 2 === 0) I.kick(t, 0.35);
+        if (sec === 'scat') (this.scat[bar % 4] || []).forEach(([at, n, len, v]) => { if (s === at) I.vox(t + (at % 2 ? L * 0.33 : 0), n - 12, L * len, v, 0.1, null, { att: 0.02, wet: 0.45 }); });
+      },
+    },
+  ];
+  TRACKS.forEach(T => { T.bars = T.sections.reduce((a, s) => a + s[1], 0); });
+
+  /* ---------- the sequencer ---------- */
+  function pickTrack() {
+    const st = cfg.style || 'mix';
+    const i = TRACKS.findIndex(T => T.id === st);
+    if (i >= 0) return i;
+    // mix: start with a random party track
+    return Math.floor(Math.random() * 3);
+  }
+  function setTrack(i) { trackIdx = (i + TRACKS.length) % TRACKS.length; track = TRACKS[trackIdx]; step = 0; barsInTrack = 0; listeners.forEach(f => f(info())); }
+  function where(bar) {
+    let b = bar % track.bars;
+    for (const [name, n] of track.sections) { if (b < n) return [name, b]; b -= n; }
+    return [track.sections[0][0], 0];
+  }
+  function tick() {
+    if (!ctx || !track) return;
+    const L = 60 / track.bpm / 4;
+    if (nextT < ctx.currentTime) nextT = ctx.currentTime + 0.05;
+    while (nextT < ctx.currentTime + 0.18) {
+      const bar = Math.floor(step / 16), s = step % 16, [sec, b] = where(bar);
+      if (s === 0 && b === 0) onSection(sec, bar);
+      try { track.play(nextT, s, b, sec, track.chords[bar % track.chords.length], L, bar); } catch (e) { console.error(e); }
+      step++; nextT += L;
+      // mix mode: after one full song move on to the next one, on a clean bar line
+      if (step % (16 * track.bars) === 0 && (cfg.style || 'mix') === 'mix') { const T = nextT; setTrack(trackIdx + 1 === 3 ? 0 : (trackIdx + 1) % 3); nextT = T + 0.4; return; }
+    }
+  }
+  function onSection(sec, bar) {
+    // the DJ shouts something now and then when the beat drops
+    if ((sec === 'chorus' || sec === 'drop') && bar > 0 && window.CasinoVoice) CasinoVoice.dj();
+  }
+  function level() { return cfg.music && cfg.on ? cfg.mvol * 0.75 * voiceDuck : 0; }
+  function update(c) {
+    cfg = c || CasinoSound.get();
+    const want = cfg.music && cfg.on;
+    if (!want) { if (out) out.gain.setTargetAtTime(0, ctx.currentTime, 0.15); if (timer) { clearInterval(timer); timer = null; } return; }
+    if (!gestured && !ctx) return;               // browsers only allow sound after a tap
+    if (!build()) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    out.gain.setTargetAtTime(level(), ctx.currentTime, 0.2);
+    const st = cfg.style || 'mix';
+    if (!track || (st !== 'mix' && track.id !== st)) setTrack(pickTrack());
+    if (!timer && ctx.state === 'running') { nextT = ctx.currentTime + 0.1; timer = setInterval(tick, 30); }
+  }
+  // music gets quieter while the announcer talks
+  function duck(on) { voiceDuck = on ? 0.35 : 1; if (out && ctx && cfg.music && cfg.on) out.gain.setTargetAtTime(level(), ctx.currentTime, on ? 0.05 : 0.4); }
+  // a short fanfare on a big moment, even when the music is off
+  function fanfare(big) {
+    if (!cfg.on || (!gestured && !ctx) || !build()) return;
+    if (ctx.state === 'suspended') { ctx.resume().catch(() => {}); return; }
+    const t = ctx.currentTime + 0.03, prev = out.gain.value;
+    if (!(cfg.music && cfg.on)) { out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(0.75 * cfg.vol, t); out.gain.setTargetAtTime(0, t + 2.6, 0.3); }
+    const notes = big ? [60, 64, 67, 72, 76, 79, 84] : [64, 67, 72, 76];
+    notes.forEach((n, i) => I.stab(t + i * 0.07, [n, n + 7], 0.3, 0.06, 'sawtooth', 3200));
+    I.stab(t + notes.length * 0.07, [72, 76, 79, 84], 1.1, 0.07, 'sawtooth', 3600);
+    I.crash(t + notes.length * 0.07, 0.25);
+    I.hey(t + notes.length * 0.07 + 0.05, 0.22);
+    if (big) I.vox(t + notes.length * 0.07, 79, 1.4, 'a', 0.07, 'o', { choir: true, wet: 0.8 });
+    void prev;
+  }
+  const info = () => ({ playing: !!timer, track: track ? track.name : '', id: track ? track.id : '', style: cfg.style || 'mix' });
+  function next() { if (!build()) return; setTrack(trackIdx + 1); nextT = ctx.currentTime + 0.2; }
+  let gestured = false;
+  const unlock = () => { gestured = true; if (ctx && ctx.state === 'suspended') ctx.resume().then(() => update()).catch(() => {}); else if (!timer) update(); };
+  document.addEventListener('pointerdown', unlock); document.addEventListener('keydown', unlock);
+  document.addEventListener('visibilitychange', () => { if (!ctx) return; if (document.hidden) ctx.suspend().catch(() => {}); else if (cfg.music && cfg.on) ctx.resume().then(() => update()).catch(() => {}); });
+  return { update, duck, fanfare, next, info, onChange: f => listeners.add(f), TRACKS: TRACKS.map(T => ({ id: T.id, name: T.name })), _I: I, _ctx: () => ctx, _comp: () => comp };
+})();
+
+/* The announcer: a voice that calls out big wins, bonuses, level ups and the Casino Wheel. */
+window.CasinoVoice = (() => {
+  const synth = window.speechSynthesis;
+  let voice = null, lastAt = 0, lastDj = Date.now(), unlocked = false;
+  const recent = [];
+  function pickVoice() {
+    if (!synth) return null;
+    const vs = synth.getVoices().filter(v => /^en/i.test(v.lang));
+    if (!vs.length) return null;
+    const like = [/Google UK English Male/i, /Microsoft (Guy|Andrew|Christopher|Davis|Ryan|Brian|Eric)/i, /\b(Daniel|Aaron|Alex|Arthur|Fred|Rishi|Oliver)\b/i, /Google US English/i, /male/i];
+    for (const re of like) { const v = vs.find(x => re.test(x.name)); if (v) return v; }
+    return vs.find(v => /en-US|en-GB/i.test(v.lang)) || vs[0];
+  }
+  if (synth) { voice = pickVoice(); synth.addEventListener && synth.addEventListener('voiceschanged', () => { voice = pickVoice(); }); }
+  const enabled = () => { const c = CasinoSound.get(); return !!synth && c.on && c.voice !== false; };
+  const pickLine = list => { const fresh = list.filter(l => !recent.includes(l)); const l = (fresh.length ? fresh : list)[Math.floor(Math.random() * (fresh.length || list.length))]; recent.push(l); if (recent.length > 6) recent.shift(); return l; };
+  function say(text, o = {}) {
+    if (!enabled() || !text) return false;
+    const now = Date.now();
+    if (!o.force && now - lastAt < 2500) return false;
+    lastAt = now;
+    try {
+      if (o.force) synth.cancel();
+      const u = new SpeechSynthesisUtterance(text), c = CasinoSound.get();
+      if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = 'en-US';
+      u.rate = o.rate || 1.06; u.pitch = o.pitch || 0.92; u.volume = Math.max(0, Math.min(1, (c.vvol ?? 0.9) * Math.max(0.4, c.vol)));
+      u.onstart = () => CasinoMusic.duck(true); u.onend = u.onerror = () => CasinoMusic.duck(false);
+      synth.speak(u);
+      return true;
+    } catch (e) { return false; }
+  }
+  const L = {
+    jackpot: ['Jackpot! Unbelievable!', 'Jackpot! What a hit!', 'Jackpot! Ladies and gentlemen, we have a jackpot!'],
+    epic: ['Epic win!', 'Absolutely legendary!', 'Off the charts!'],
+    mega: ['Mega win!', 'Massive win!', 'Oh, that is huge!'],
+    big: ['Big win!', 'Big win, let’s go!', 'Now that’s a win!'],
+    nice: ['Nice win!', 'Nice one!', 'Winner!'],
+    blackjack: ['Blackjack!', 'Blackjack! Twenty one!'],
+    freespins: ['Free spins!', 'Bonus time! Free spins!'],
+    bonus: ['Bonus!', 'Bonus round!'],
+    grand: ['The Grand! Incredible!'],
+    lightning: ['Lightning strikes!'],
+    level: ['Level up!', 'Level up! Nice!'],
+    badge: ['Badge unlocked!'],
+    wheel: ['Spin the wheel! Everybody gets a spin!', 'It’s wheel time! Spin to win!'],
+    wheelTop: ['The top prize! Unbelievable!'],
+    trophy: ['Congratulations, champion!'],
+    welcome: ['Welcome to Miguel’s Casino!', 'Welcome back to Miguel’s Casino!'],
+    dj: ['Miguel’s Casino!', 'Let’s go!', 'Turn it up!', 'Here we go!', 'Feel the vibe!', 'Make some noise!'],
+    wizard: ['You win! All hail the Archmage!', 'Victory! Well played!'],
+    tableWin: ['Winner!', 'Nice hand!', 'You got it!'],
+  };
+  function line(kind, o) { const l = L[kind]; if (!l) return false; return say(pickLine(l), o); }
+  // a result came in: x = paid ÷ staked
+  function win(x, tags = []) {
+    let kind = null, big = false;
+    if (tags.includes('grand')) { kind = 'grand'; big = true; }
+    else if (tags.includes('lightning-500')) kind = 'lightning';
+    else if (x >= 100) { kind = 'epic'; big = true; }
+    else if (x >= 25) { kind = 'mega'; big = true; }
+    else if (x >= 10) kind = 'big';
+    else if (tags.includes('free-spins')) kind = 'freespins';
+    else if (tags.includes('natural')) kind = 'blackjack';
+    else if (tags.includes('hold-blast') || tags.includes('bonus')) kind = 'bonus';
+    else if (x >= 5) kind = 'nice';
+    if (!kind) return;
+    if (x >= 10 || big) CasinoMusic.fanfare(big);
+    line(kind, { force: x >= 10 || big });
+  }
+  // the casino's little corner cards
+  function pops(list) {
+    for (const p of list) {
+      if (p.type === 'ach' && /jackpot/i.test(p.title)) { CasinoMusic.fanfare(true); return line('jackpot', { force: true }); }
+      if (p.type === 'level') return line('level');
+      if (p.type === 'trophy') return line('trophy');
+      if (p.type === 'ach') return line('badge');
+    }
+  }
+  function dj() {
+    const c = CasinoSound.get();
+    if (!c.music || Date.now() - lastDj < 100000 || Math.random() > 0.6) return;
+    lastDj = Date.now(); line('dj', { rate: 1.12, pitch: 0.85 });
+  }
+  // browsers only allow speech after a tap; say hello on the first one in the lobby
+  function unlock() {
+    if (unlocked || !synth) return; unlocked = true;
+    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } catch (e) {}
+    let seen = false; try { seen = sessionStorage.getItem('mc-welcomed') === '1'; sessionStorage.setItem('mc-welcomed', '1'); } catch (e) {}
+    if (!seen && window.CASINO_CTX === 'lobby') setTimeout(() => line('welcome'), 300);
+  }
+  document.addEventListener('pointerdown', unlock, { once: false }); document.addEventListener('keydown', unlock);
+  return { say, line, win, pops, dj, available: !!synth };
+})();
+
+/* A small music tab on the left edge of every page: play or pause, skip, pick a style, announcer on or off. */
+(() => {
+  const css = `.mcm-tab{position:fixed;left:0;top:calc(50% + 60px);z-index:9990;width:34px;height:44px;border:0;border-radius:0 12px 12px 0;background:rgba(30,20,12,.82);color:#F7DFA3;cursor:pointer;display:grid;place-items:center;box-shadow:0 0 0 1px rgba(247,223,163,.35),0 8px 20px rgba(0,0,0,.4);backdrop-filter:blur(6px)}
+  .mcm-tab svg{width:18px;height:18px}
+  .mcm-tab.on svg{animation:mcmB .9s ease-in-out infinite alternate}
+  @keyframes mcmB{to{transform:scale(1.15)}}
+  .mcm{position:fixed;left:10px;top:calc(50% - 90px);z-index:9991;width:min(270px,calc(100vw - 20px));padding:14px;border-radius:16px;background:linear-gradient(180deg,#2A1B10,#170E08);color:#FFF4DA;box-shadow:0 0 0 1px rgba(247,223,163,.45),0 20px 50px rgba(0,0,0,.6);font:600 13.5px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif}
+  .mcm h4{margin:0 0 2px;font:800 11px system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#D8C8A8}
+  .mcm .mcm-now{font-weight:800;font-size:16px;color:#F7DFA3;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .mcm .eq{display:inline-flex;gap:2px;align-items:flex-end;height:14px}.mcm .eq i{width:3px;background:#F7DFA3;animation:mcmE .6s ease-in-out infinite alternate}.mcm .eq i:nth-child(2){animation-delay:.2s}.mcm .eq i:nth-child(3){animation-delay:.4s}
+  .mcm.off .eq i{animation:none;height:3px}
+  @keyframes mcmE{from{height:3px}to{height:14px}}
+  .mcm .mcm-row{display:flex;gap:6px;margin:0 0 10px;padding:0;background:none;border:0;box-shadow:none}
+  .mcm button.mcm-b{flex:1;height:36px;border-radius:10px;border:1px solid rgba(247,223,163,.3);background:rgba(247,223,163,.08);color:inherit;font:700 13px system-ui,sans-serif;cursor:pointer}
+  .mcm button.mcm-b.act{background:linear-gradient(180deg,#FFE9A8,#F2C65A);color:#1B1206;border-color:transparent}
+  .mcm select,.mcm input[type=range]{width:100%;margin:4px 0 10px;accent-color:#F2C65A}
+  .mcm select{height:34px;border-radius:9px;border:1px solid rgba(247,223,163,.3);background:#1F140B;color:inherit;padding:0 8px;font:600 13px system-ui,sans-serif}
+  .mcm label{display:block;color:#D8C8A8;font-size:12px}
+  .mcm .mcm-x{position:absolute;right:8px;top:8px;width:26px;height:26px;border:0;border-radius:50%;background:rgba(247,223,163,.12);color:inherit;cursor:pointer;font:700 15px system-ui}
+  .mcm .mcm-sw{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#FFF4DA;font-size:13px;margin-bottom:6px}`;
+  let tab = null, panel = null;
+  const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+  function init() {
+    if (tab || !document.body) return;
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    tab = document.createElement('button'); tab.className = 'mcm-tab'; tab.type = 'button'; tab.title = 'Music'; tab.setAttribute('aria-label', 'Music and announcer'); tab.innerHTML = ICON;
+    tab.onclick = () => (panel ? close() : open());
+    document.body.appendChild(tab); paint();
+  }
+  function paint() {
+    if (!tab) return;
+    const c = CasinoSound.get(), i = CasinoMusic.info();
+    tab.classList.toggle('on', !!(c.music && c.on && i.playing));
+    if (!panel) return;
+    panel.classList.toggle('off', !(c.music && c.on && i.playing));
+    panel.querySelector('.tn').textContent = c.music && c.on ? (i.track || 'Tap play') : 'Music is off';
+    panel.querySelector('#mcmPlay').textContent = c.music && c.on ? '❚❚ Pause' : '▶ Play';
+    panel.querySelector('#mcmPlay').classList.toggle('act', !(c.music && c.on));
+  }
+  function open() {
+    const c = CasinoSound.get();
+    panel = document.createElement('div'); panel.className = 'mcm'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Music');
+    panel.innerHTML = `<button class="mcm-x" aria-label="Close">×</button><h4>Now playing</h4><div class="mcm-now"><span class="eq"><i></i><i></i><i></i></span><span class="tn"></span></div>
+      <div class="mcm-row"><button class="mcm-b" id="mcmPlay"></button><button class="mcm-b" id="mcmNext">⏭ Next</button></div>
+      <label>Style<select id="mcmStyle"><option value="mix">Party mix (all songs)</option>${CasinoMusic.TRACKS.map(T => `<option value="${T.id}">${T.name}</option>`).join('')}</select></label>
+      <label>Music volume<input type="range" id="mcmVol" min="0" max="1" step="0.05" value="${c.mvol}"></label>
+      <div class="mcm-sw"><span>Announcer voice</span><input type="checkbox" id="mcmVoice" ${c.voice !== false ? 'checked' : ''}></div>
+      ${CasinoVoice.available ? '' : '<label>This browser has no voice for the announcer.</label>'}`;
+    document.body.appendChild(panel);
+    panel.querySelector('.mcm-x').onclick = close;
+    panel.querySelector('#mcmStyle').value = c.style || 'mix';
+    panel.querySelector('#mcmPlay').onclick = () => { const k = CasinoSound.get(); if (!k.on) CasinoSound.set('on', true); CasinoSound.set('music', !(k.music && k.on)); setTimeout(paint, 150); };
+    panel.querySelector('#mcmNext').onclick = () => { const k = CasinoSound.get(); if (!k.music) CasinoSound.set('music', true); if ((k.style || 'mix') !== 'mix') { CasinoSound.set('style', 'mix'); panel.querySelector('#mcmStyle').value = 'mix'; } CasinoMusic.next(); setTimeout(paint, 150); };
+    panel.querySelector('#mcmStyle').onchange = e => { CasinoSound.set('style', e.target.value); if (!CasinoSound.get().music) CasinoSound.set('music', true); setTimeout(paint, 150); };
+    panel.querySelector('#mcmVol').oninput = e => CasinoSound.set('mvol', +e.target.value);
+    panel.querySelector('#mcmVoice').onchange = e => { CasinoSound.set('voice', e.target.checked); if (e.target.checked) CasinoVoice.say('Announcer on!', { force: true }); };
+    paint();
+  }
+  function close() { if (panel) { panel.remove(); panel = null; } }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  document.addEventListener('pointerdown', e => { if (panel && !panel.contains(e.target) && e.target !== tab && !tab.contains(e.target)) close(); });
+  CasinoMusic.onChange(paint); setInterval(paint, 2000);
+  if (document.body) init(); else addEventListener('DOMContentLoaded', init);
+})();
+CasinoMusic.update();
 </script>
 
 <script>

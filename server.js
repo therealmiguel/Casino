@@ -202,7 +202,16 @@ live2 = require('./live2')({
   onFeed: items => { const msg = `event: feed\ndata: ${JSON.stringify(items)}\n\n`; for (const res of streams) res.write(msg); },
 });
 // every finished round also goes to the live tables' round recaps
-{ const round = A.round; A.round = (id, game, e) => { const r = round(id, game, e); try { live2.collect(game, id, e || {}); } catch (x) {} try { if (SOLO_GAMES.has(game)) LUCK.after(id); } catch (x) {} return r; }; }
+{ const round = A.round; A.round = (id, game, e) => { const r = round(id, game, e); try { live2.collect(game, id, e || {}); } catch (x) {} try { if (SOLO_GAMES.has(game)) LUCK.after(id); } catch (x) {} try { hype(id, game, e); } catch (x) {} return r; }; }
+// big wins and bonuses on the solo games: the page's announcer calls them out
+const HYPE_TAGS = new Set(['natural', 'free-spins', 'bonus', 'hold-blast', 'grand', 'lightning-500']);
+function hype(id, game, e) {
+  if (!SOLO_GAMES.has(game) || !e || !(e.staked > 0)) return;
+  const x = (e.paid || 0) / e.staked, tags = (e.tags || []).filter(t => HYPE_TAGS.has(t));
+  if (x < 5 && !tags.length) return;
+  const rec = A.get(id); if (!rec) return;
+  rec.pop = rec.pop || []; rec.pop.push({ type: 'hype', x: Math.round(x * 100) / 100, tags }); if (rec.pop.length > 12) rec.pop.shift();
+}
 // Wizard, the card game: played for points, not chips
 const wizard = require('./wizard')({
   A, cleanName: A.cleanName,
