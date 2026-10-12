@@ -16,7 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
-const PAGES = ['index.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'chicken.html', 'book.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'crash.html', 'baccarat-live.html', 'dicecity.html', 'wizard.html', 'profile.html'];
+const PAGES = ['index.html', 'sports.html', 'blackjack.html', 'roulette.html', 'craps.html', 'slots.html', 'cascade.html', 'plinko.html', 'mines.html', 'chicken.html', 'book.html', 'blackjack-live.html', 'roulette-live.html', 'poker-live.html', 'crash.html', 'baccarat-live.html', 'dicecity.html', 'wizard.html', 'profile.html'];
 function findPublicDir() {
   const hasPages = dir => { try { return fs.existsSync(path.join(dir, 'index.html')); } catch (e) { return false; } };
   const preferred = [path.join(__dirname, 'public'), __dirname];
@@ -213,6 +213,7 @@ function hype(id, game, e) {
   rec.pop = rec.pop || []; rec.pop.push({ type: 'hype', x: Math.round(x * 100) / 100, net: (e.paid || 0) - e.staked, tags }); if (rec.pop.length > 12) rec.pop.shift();
 }
 // Wizard, the card game: played for points, not chips
+const fixtures = require('./fixtures')();
 const radio = require('./radio')({ redis, useRedis: USE_REDIS, dataDir: DATA_DIR, headers: { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' } });
 const wizard = require('./wizard')({
   A, cleanName: A.cleanName,
@@ -661,6 +662,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/live/stream') { if (!ready) return send(res, 503, { error: 'Opening.' }); return live.stream(req, res, url, ip); }
     if (p === '/api/live/summary') return send(res, 200, live.summary());
+    if (p === '/api/fixtures' && req.method === 'GET') return send(res, 200, fixtures.view(), 'application/json', { 'Cache-Control': 'public, max-age=30' });
     if (p === '/api/radio' && req.method === 'GET') return send(res, 200, radio.publicView());
     { const m = /^\/api\/radio\/song\/([a-f0-9]{16})\.mp3$/.exec(p); if (m && (req.method === 'GET' || req.method === 'HEAD')) return radio.serveSong(req, res, m[1]); }
     if (p === '/api/wz/stream') { if (!ready) return send(res, 503, { error: 'Opening.' }); return wizard.stream(req, res, url, ip); }
@@ -717,6 +719,7 @@ server.listen(PORT, '0.0.0.0', () => {
   try {
     const liveSaved = await load();
     await radio.load();
+    fixtures.start();
     ready = true; loadError = '';
     live.restore(liveSaved);
     boardChanged();

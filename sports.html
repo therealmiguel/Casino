@@ -1,0 +1,1326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Big games</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Limelight&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@500&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --velvet:#16080E; --velvet-2:#240C16; --velvet-3:#34111F;
+  --gold:#E8C170; --gold-2:#F7DFA3; --ivory:#F5EBDD; --muted:#B69C9F;
+  --display:"Limelight","Didot","Georgia",serif; --body:"DM Sans","Segoe UI",system-ui,sans-serif; --mono:"DM Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--velvet)}
+body{margin:0;min-height:100vh;color:var(--ivory);font-family:var(--body);background:radial-gradient(90% 50% at 50% 0%,var(--velvet-3),var(--velvet-2) 45%,var(--velvet)) fixed}
+:focus-visible{outline:2px solid var(--gold-2);outline-offset:3px}
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:10px 16px;background:rgba(22,8,14,.92);backdrop-filter:blur(10px);border-bottom:1px solid rgba(232,193,112,.16)}
+.bar h1{margin:0;font:400 24px/1 var(--display);color:var(--gold-2)}
+.bar .sp{flex:1}
+.bar .upd{font-size:12.5px;color:var(--muted)}
+main{max-width:1080px;margin:0 auto;padding:24px 16px 60px}
+.hero h2{margin:0;font:400 clamp(34px,6vw,54px)/1 var(--display);color:var(--gold-2)}
+.hero p{margin:8px 0 0;color:var(--muted);max-width:58ch;line-height:1.5}
+.rail{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:18px 2px 14px;scrollbar-width:thin}
+.chips{position:sticky;top:57px;z-index:10;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:12px 0;margin-top:10px;background:linear-gradient(180deg,rgba(26,9,16,.97),rgba(26,9,16,.88));backdrop-filter:blur(8px)}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;border:0;cursor:pointer;padding:8px 14px;border-radius:999px;font:600 14px var(--body);color:var(--ivory);background:rgba(232,193,112,.07);box-shadow:inset 0 0 0 1px rgba(232,193,112,.2)}
+.chips button[aria-pressed=true]{color:#1A0B0F;background:linear-gradient(180deg,var(--gold-2),var(--gold))}
+.chips button small{font:500 12px var(--mono);opacity:.7;margin-left:4px}
+.day{margin-top:26px}
+.day h3{margin:0 0 6px;font:400 26px/1.1 var(--display);color:var(--gold-2)}
+.lg{margin:16px 0 0}
+.lg h4{margin:0 0 2px;display:flex;align-items:center;gap:8px;font:600 13.5px var(--body);color:var(--gold)}
+.lg ul{list-style:none;margin:0;padding:0}
+.empty{margin-top:40px;text-align:center;color:var(--muted);line-height:1.6}
+.src{margin-top:40px;text-align:center;font-size:12px;color:var(--muted);opacity:.8}
+@media (max-width:640px){ .bar h1{font-size:20px} .bar .upd{display:none} .chips{top:53px} }
+.lobbylink{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:999px;border:1px solid rgba(232,193,112,.45);color:#F7DFA3;text-decoration:none;font:600 13px system-ui,-apple-system,"Segoe UI",sans-serif;white-space:nowrap;flex:none;background:rgba(0,0,0,.2)}
+.lobbylink:hover{background:rgba(232,193,112,.14)}
+.lobbylink svg{width:15px;height:15px}
+@media (max-width:640px){.lobbylink span{display:none}.lobbylink{padding:0 9px}}
+</style>
+</head>
+<body>
+<header class="bar">
+    <a href="index.html" class="lobbylink" title="Back to Miguel's Casino" aria-label="Back to Miguel's Casino lobby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Lobby</span></a>
+  <h1>Big games</h1>
+  <div class="sp"></div>
+  <span class="upd" id="upd"></span>
+</header>
+<main>
+  <section class="hero">
+    <h2>Coming up</h2>
+    <p>The biggest matches of the next few days and everything on the schedule this week, with live scores. Times are in your time zone.</p>
+  </section>
+  <div class="rail" id="rail" aria-label="Featured matches"></div>
+  <nav class="chips" id="chips" aria-label="Sports"></nav>
+  <div id="list"></div>
+  <p class="empty" id="empty" hidden></p>
+  <p class="src">Schedules and scores from ESPN. Updated every few minutes.</p>
+</main>
+<script>window.CASINO_CTX = 'lobby';</script>
+<script>
+// A word filter for chat and player names (English and German).
+// Text is normalised first (accents, look-alike digits and symbols, repeated letters), so "f.u.u.c.k" or "sch3isse" still match.
+'use strict';
+const WordFilter = (() => {
+  // stems: matched anywhere inside a word
+  const STEMS = [
+    'fuck', 'fuk', 'fck', 'shit', 'bitch', 'cunt', 'pussy', 'whore', 'slut', 'nigg', 'niga', 'nigr', 'faggot', 'fagot', 'retard', 'wank', 'twat', 'asshole', 'dildo', 'porn', 'jizz', 'hitler',
+    'scheis', 'fotze', 'wichs', 'arschloch', 'schwuchtel', 'hurensohn', 'missgeburt', 'fick', 'nutte', 'neger', 'kanake', 'spast', 'behindert', 'schlampe', 'muschi', 'pimmel',
+  ];
+  // whole words only (these are parts of ordinary words too)
+  const WORDS = ['fag', 'fags', 'dick', 'dicks', 'cock', 'cocks', 'kys', 'hure', 'huren', 'arsch', 'cum', 'tits', 'nazi', 'nazis', 'kkk', 'rape', 'raped', 'rapist', 'penis', 'vagina'];
+  const MAP = { '0': 'o', '1': 'i', '!': 'i', '|': 'i', '3': 'e', '4': 'a', '@': 'a', '5': 's', '$': 's', '7': 't', '8': 'b', '9': 'g', 'ß': 'ss', 'ä': 'a', 'ö': 'o', 'ü': 'u', '€': 'e', '+': 't' };
+  const norm = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .replace(/[0-9!|@$€+ß]/g, c => MAP[c] || c).replace(/[äöü]/g, c => MAP[c]);
+  // the words of a message, each normalised; runs of single letters are joined (catches "f u c k")
+  function pieces(text) {
+    const n = norm(text);
+    const raw = n.split(/[^a-z]+/).filter(Boolean);
+    const words = raw.map(w => w.replace(/(.)\1+/g, '$1'));
+    const runs = []; let cur = '';
+    for (const w of raw) { if (w.length === 1) cur += w; else { if (cur.length >= 3) runs.push(cur); cur = ''; } }
+    if (cur.length >= 3) runs.push(cur);
+    return { words, runs: runs.map(r => r.replace(/(.)\1+/g, '$1')) };
+  }
+  const STEMS_D = STEMS.map(s => s.replace(/(.)\1+/g, '$1'));
+  function bad(text) {
+    const { words, runs } = pieces(text);
+    return [...words, ...runs].some(w => WORDS.includes(w) || STEMS_D.some(s => w.includes(s)));
+  }
+  // chat: hide bad words with stars, keep the rest of the message
+  function clean(text) {
+    return String(text || '').replace(/[\p{L}\p{N}$@!|€+.*_-]+/gu, tok => (bad(tok) ? '*'.repeat(Math.min(8, tok.length)) : tok));
+  }
+  return { bad, clean };
+})();
+/* Miguel's Casino (online): the casino's server keeps every bankroll and decides every game.
+   This page only shows a copy of your balance and sends your moves. */
+window.CASINO_ONLINE = true;
+window.CasinoNet = (() => {
+  const SEAT_KEY = 'miguels-casino-seat';
+  function seat() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(SEAT_KEY)); } catch (e) {}
+    if (!s || !s.id || !s.token) {
+      const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
+      s = { id: 'p-' + hex(12), token: hex(24) };
+      try { localStorage.setItem(SEAT_KEY, JSON.stringify(s)); } catch (e) {}
+    }
+    return s;
+  }
+  // POST to the casino with this browser's seat; returns { ok, status, body }
+  async function api(path, body = {}) {
+    const s = seat();
+    let r, j = {};
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id: s.id, token: s.token }, body)) });
+        j = await r.json().catch(() => ({}));
+        if (r.status === 429 && attempt < 2) { await new Promise(res => setTimeout(res, 700 * (attempt + 1))); continue; }
+        if (r.status === 503 && /opening/i.test(j.error || '') && attempt < 2) { await new Promise(res => setTimeout(res, 2500)); continue; }
+        break;
+      } catch (e) {
+        if (attempt === 2) return { ok: false, status: 0, body: { error: 'No connection to the casino. Check your internet and try again.' } };
+        await new Promise(res => setTimeout(res, 800));
+      }
+    }
+    if (typeof j.cents === 'number') CasinoWallet._server(j.cents);
+    if (Array.isArray(j.pop) && j.pop.length) {
+      const hype = j.pop.filter(p => p.type === 'hype'), rest = j.pop.filter(p => p.type !== 'hype');
+      if (rest.length) CasinoUI.popups(rest);
+      if (window.CasinoVoice) {
+        const delay = window.CASINO_CTX === 'lobby' || !window.CASINO_CTX ? 300 : 2400;
+        hype.forEach(h => setTimeout(() => { CasinoVoice.win(h.x, h.tags || []); if (window.CasinoPolish) CasinoPolish.bigWin(h.x, h.net); }, delay));
+        if (rest.length) setTimeout(() => CasinoVoice.pops(rest), delay + (hype.length ? 2800 : 200));
+      }
+    }
+    if (j.wheel && window.CasinoWheel) CasinoWheel.offer(j.wheel);
+    if (r.status === 403 && /suspended/i.test(j.error || '')) CasinoUI.suspended();
+    return { ok: r.ok, status: r.status, body: j };
+  }
+  return { seat, api };
+})();
+
+window.CasinoWallet = (() => {
+  const START = 100000, CACHE = 'miguels-casino-cache';
+  let cache = null;
+  try { cache = JSON.parse(localStorage.getItem(CACHE)); } catch (e) {}
+  const mine = cache && cache.id === CasinoNet.seat().id;
+  let bal = mine && Number.isFinite(cache.cents) ? cache.cents : 0;
+  let info_ = { peak: mine ? cache.peak || 0 : 0, resets: mine ? cache.resets || 0 : 0 };
+  let view = null, onExternal = null, isBusy = () => false;
+  const listeners = [];
+  const cents = () => bal;
+  function bind(v, ext, busy) { view = v; onExternal = ext; if (busy) isBusy = busy; }
+  function remember() { try { localStorage.setItem(CACHE, JSON.stringify({ id: CasinoNet.seat().id, cents: bal, peak: info_.peak, resets: info_.resets })); } catch (e) {} }
+  // the server just told us the balance
+  function _server(c) { bal = c; remember(); listeners.forEach(f => { try { f(c); } catch (e) {} }); }
+  // move this page's own balance to match the server (only while nothing is in play)
+  function apply(c) {
+    if (view && onExternal) { const d = c - view(); if (d) onExternal(d); }
+    _server(c);
+  }
+  async function refresh() {
+    if (isBusy()) return null;
+    const r = await CasinoNet.api('api/me', { name: CasinoBoard.name(), ctx: window.CASINO_CTX || 'lobby' });
+    if (r.ok) { info_ = { peak: r.body.peak, resets: r.body.resets }; if (!isBusy()) apply(r.body.cents); CasinoUI.notice(r.body.notice); CasinoUI.mode(r.body); if (r.body.banned) CasinoUI.suspended(); }
+    return r.ok ? r.body : null;
+  }
+  // a fresh $1,000, only when you are out of chips everywhere
+  async function reset() {
+    const r = await CasinoNet.api('api/wallet/reset');
+    if (r.ok) { info_.resets = r.body.resets; apply(r.body.cents); }
+    return r;
+  }
+  const info = () => ({ cents: bal, peak: Math.max(info_.peak || 0, bal), resets: info_.resets || 0 });
+  const onChange = f => listeners.push(f);
+  let last = 0;
+  const maybeRefresh = () => { if (Date.now() - last > 4000) { last = Date.now(); refresh(); } };
+  addEventListener('focus', maybeRefresh);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeRefresh(); });
+  // money only moves on the server now, so these do nothing
+  const sync = () => {}, pull = () => {}, add = () => {}, noteReset = () => {};
+  return { cents, bind, sync, pull, add, noteReset, info, refresh, reset, apply, onChange, _server, START };
+})();
+
+window.CasinoBoard = (() => {
+  const NAME_KEY = 'miguels-casino-name';
+  let ready = null, mode = null, denied = false, meInfo = null, timer = null;
+  function name() { try { return (localStorage.getItem(NAME_KEY) || '').trim(); } catch (e) { return ''; } }
+  function setName(n) { try { localStorage.setItem(NAME_KEY, n); } catch (e) {} push(); }
+  function connect() {
+    if (ready) return ready;
+    ready = (async () => {
+      if (!/^https?:$/.test(location.protocol)) return false;
+      const r = await CasinoNet.api('api/me', { name: name(), ctx: window.CASINO_CTX || 'lobby' });
+      if (!r.ok) { if (r.status === 403) { denied = true; mode = 'server'; return true; } ready = null; return false; }
+      meInfo = r.body; mode = 'server';
+      CasinoWallet.apply(r.body.cents);
+      CasinoUI.notice(r.body.notice);
+      CasinoUI.mode(r.body);
+      if (r.body.banned) CasinoUI.suspended();
+      if (r.body.name && !name()) { try { localStorage.setItem(NAME_KEY, r.body.name); } catch (e) {} }
+      return true;
+    })().catch(() => { ready = null; return false; });
+    return ready;
+  }
+  async function push() {
+    if (!(await connect())) return false;
+    const r = await CasinoNet.api('api/me', { name: name(), ctx: window.CASINO_CTX || 'lobby' });
+    if (r.ok) meInfo = r.body;
+    if (r.ok && r.body.nameError) { try { localStorage.setItem(NAME_KEY, r.body.name || ''); } catch (e) {} dispatchEvent(new CustomEvent('casino:nameError', { detail: r.body.nameError })); }
+    return r.ok;
+  }
+  function schedule(ms = 2500) { clearTimeout(timer); timer = setTimeout(push, ms); }
+  function subscribe(onRows, onError) {
+    let es = null, poll = null;
+    const load = () => fetch('api/players', { cache: 'no-store' }).then(r => r.json()).then(onRows).catch(() => {});
+    if (window.EventSource) {
+      es = new EventSource('api/stream');
+      es.addEventListener('players', e => { try { onRows(JSON.parse(e.data)); } catch (x) {} });
+      es.addEventListener('notice', e => { try { CasinoUI.notice(JSON.parse(e.data)); } catch (x) {} });
+      es.addEventListener('jackpot', e => { try { dispatchEvent(new CustomEvent('casino:jackpot', { detail: JSON.parse(e.data) })); } catch (x) {} });
+      es.addEventListener('wheel', () => { if (window.CasinoWheel) CasinoWheel.check(); });
+      es.addEventListener('feed', e => { try { dispatchEvent(new CustomEvent('casino:feed', { detail: { items: JSON.parse(e.data), fresh: true } })); } catch (x) {} });
+      es.addEventListener('feedall', e => { try { dispatchEvent(new CustomEvent('casino:feed', { detail: { items: JSON.parse(e.data), fresh: false } })); } catch (x) {} });
+      es.onerror = () => { if (onError && es.readyState === 2) onError(); };
+    } else { load(); poll = setInterval(load, 8000); }
+    return () => { if (es) es.close(); if (poll) clearInterval(poll); };
+  }
+  const identity = () => CasinoNet.seat();
+  const snapshot = () => null;
+  return { name, setName, connect, push, schedule, snapshot, subscribe, identity, get uid() { return CasinoNet.seat().id; }, get mode() { return mode; }, get denied() { return denied; }, get me() { return meInfo; } };
+})();
+
+// announcements from the casino, and the notice for a suspended account
+window.CasinoUI = (() => {
+  let bar = null, shownKey = '';
+  const css = `.mc-notice{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:9999;max-width:min(680px,calc(100% - 24px));display:flex;gap:10px;align-items:center;padding:10px 12px 10px 16px;border-radius:14px;
+    font:600 14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1B1206;background:linear-gradient(180deg,#FFE9A8,#F2C65A);box-shadow:0 12px 30px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.2);animation:mcIn .35s ease}
+    .mc-notice.party{background:linear-gradient(90deg,#FF9AD5,#FFD36E,#8EF0B4);} .mc-notice.warn{background:linear-gradient(180deg,#FFB4A8,#F2786D);}
+    .mc-notice.ban{background:linear-gradient(180deg,#3A1414,#220A0A);color:#FFD9D2;box-shadow:0 12px 30px rgba(0,0,0,.5),0 0 0 1px #F2786D}
+    .mc-notice b{font-weight:800}
+    .mc-pops{position:fixed;left:14px;bottom:14px;z-index:9998;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:min(340px,calc(100% - 28px))}
+    .mc-pop{display:flex;gap:11px;align-items:center;padding:11px 14px 11px 11px;border-radius:14px;background:linear-gradient(180deg,#2A1B10,#170E08);color:#FFF4DA;box-shadow:0 0 0 1px rgba(247,223,163,.5),0 14px 34px rgba(0,0,0,.55);font:14px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;animation:mcPop .45s cubic-bezier(.2,1.3,.4,1);pointer-events:auto}
+    .mc-pop i{font-style:normal;font-size:26px;width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:rgba(247,223,163,.12);flex:none}
+    .mc-pop b{display:block;font-weight:800;color:#F7DFA3}
+    .mc-pop small{display:block;color:#D8C8A8;font-size:12.5px}
+    .mc-pop.out{animation:mcOut .35s ease forwards}
+    @keyframes mcPop{from{opacity:0;transform:translateX(-30px) scale(.9)}to{opacity:1;transform:none}}
+    @keyframes mcOut{to{opacity:0;transform:translateX(-30px)}}
+    .mc-tour{position:fixed;left:12px;bottom:110px;pointer-events:none;white-space:nowrap;z-index:9997;padding:7px 12px;border-radius:999px;font:800 11.5px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#1B1206;background:linear-gradient(90deg,#8EF0B4,#F2C65A);box-shadow:0 8px 20px rgba(0,0,0,.4)}
+    .mc-notice button{flex:none;border:0;background:rgba(0,0,0,.14);color:inherit;width:26px;height:26px;border-radius:50%;cursor:pointer;font:700 15px system-ui}
+    @keyframes mcIn{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}`;
+  function ensure() {
+    if (bar) return bar;
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    bar = document.createElement('div'); bar.className = 'mc-notice'; bar.hidden = true; bar.setAttribute('role', 'status');
+    document.body.appendChild(bar);
+    return bar;
+  }
+  function show(text, kind, closable) {
+    const b = ensure();
+    b.className = 'mc-notice ' + (kind || '');
+    b.textContent = '';
+    const s = document.createElement('span'); s.textContent = text; b.appendChild(s);
+    if (closable) { const x = document.createElement('button'); x.type = 'button'; x.setAttribute('aria-label', 'Close'); x.textContent = '×'; x.onclick = () => { b.hidden = true; try { sessionStorage.setItem('mc-notice-closed', shownKey); } catch (e) {} }; b.appendChild(x); }
+    b.hidden = false;
+  }
+  let banned = false;
+  function notice(n) {
+    if (banned) return;
+    if (!document.body) { addEventListener('DOMContentLoaded', () => notice(n)); return; }
+    if (!n || !n.text) { if (bar && !banned) bar.hidden = true; return; }
+    shownKey = String(n.t || n.text);
+    let closed = ''; try { closed = sessionStorage.getItem('mc-notice-closed') || ''; } catch (e) {}
+    if (closed === shownKey) return;
+    show('📣 ' + n.text, n.kind === 'party' ? 'party' : n.kind === 'warn' ? 'warn' : '', true);
+  }
+  function suspended() {
+    banned = true;
+    if (!document.body) { addEventListener('DOMContentLoaded', suspended); return; }
+    show('Your account has been suspended by the casino, so you can’t play right now. Ask Miguel if you think this is a mistake.', 'ban', false);
+  }
+  // achievements, level ups, gifts: little cards in the corner, a moment after the result is on screen
+  let popBox = null, queue = [], showing = 0;
+  function popups(list) {
+    if (!document.body) { addEventListener('DOMContentLoaded', () => popups(list)); return; }
+    ensure();
+    if (!popBox) { popBox = document.createElement('div'); popBox.className = 'mc-pops'; popBox.setAttribute('aria-live', 'polite'); document.body.appendChild(popBox); }
+    const delay = window.CASINO_CTX === 'lobby' || !window.CASINO_CTX ? 300 : 2600;
+    list.forEach((p, i) => setTimeout(() => showPop(p), delay + i * 900));
+  }
+  function showPop(p) {
+    const el = document.createElement('div'); el.className = 'mc-pop';
+    const ic = document.createElement('i'); ic.textContent = p.icon || '⭐';
+    const tx = document.createElement('div'); const b = document.createElement('b'); b.textContent = (p.type === 'ach' ? 'Badge unlocked · ' : '') + p.title; const sm = document.createElement('small'); sm.textContent = p.text || '';
+    tx.append(b, sm); el.append(ic, tx); popBox.appendChild(el);
+    try { if (window.CasinoSound) CasinoSound.ding(); } catch (e) {}
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, 5200);
+  }
+  // playing with tournament chips: say so on every solo table
+  let ribbon = null;
+  function mode(me) {
+    if (!document.body) { addEventListener('DOMContentLoaded', () => mode(me)); return; }
+    const on = me && me.mode === 'tour' && window.CASINO_CTX === 'solo';
+    if (on && !ribbon) { ensure(); ribbon = document.createElement('div'); ribbon.className = 'mc-tour'; ribbon.textContent = '🏁 Tournament chips'; ribbon.title = 'You are playing with this week’s tournament chips. Switch back in the lobby.'; document.body.appendChild(ribbon); }
+    if (ribbon) ribbon.hidden = !on;
+  }
+  return { notice, suspended, popups, mode };
+})();
+
+// one volume for every game, and soft lounge music if you want it (set in the lobby)
+window.CasinoSound = (() => {
+  const KEY = 'miguels-casino-sound';
+  const DEF = { on: true, vol: 0.8, music: true, mvol: 0.45, style: 'mix', voice: true, vvol: 0.9, v: 2 };
+  const load = () => {
+    let c = null; try { c = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+    if (!c) return Object.assign({}, DEF);
+    // settings saved before the new music came out: switch the music and the announcer on once
+    if (c.v !== 2) Object.assign(c, { music: true, mvol: Math.max(c.mvol || 0, 0.45), style: 'mix', voice: true, vvol: 0.9, v: 2 });
+    return Object.assign({}, DEF, c);
+  };
+  let cfg = load();
+  const masters = new Set();
+  const level = () => (cfg.on ? cfg.vol : 0);
+  const Base = window.AudioContext || window.webkitAudioContext;
+  const desc = Base && (Object.getOwnPropertyDescriptor(window.BaseAudioContext ? BaseAudioContext.prototype : Base.prototype, 'destination') || Object.getOwnPropertyDescriptor(Base.prototype, 'destination'));
+  if (Base && desc && desc.get) {
+    // every game's sounds go through one volume knob
+    class CasinoAudio extends Base {
+      constructor(...a) { super(...a); const g = Base.prototype.createGain.call(this); g.gain.value = level(); g.connect(desc.get.call(this)); this._mc = g; masters.add(g); }
+      get destination() { return this._mc || desc.get.call(this); }
+    }
+    try { window.AudioContext = CasinoAudio; if (window.webkitAudioContext) window.webkitAudioContext = CasinoAudio; } catch (e) {}
+  }
+  function apply() { masters.forEach(g => { try { g.gain.value = level(); } catch (e) {} }); music(); }
+  function set(k, v) { cfg[k] = v; try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} apply(); }
+  addEventListener('storage', e => { if (e.key === KEY) { cfg = load(); apply(); } });
+  // the music itself lives in casino_audio.js
+  function music() { if (window.CasinoMusic) CasinoMusic.update(cfg); }
+  // a soft chime for badges and level ups
+  let dctx = null;
+  function ding() {
+    if (!cfg.on || !Base) return;
+    try {
+      if (!dctx) dctx = new window.AudioContext();
+      if (dctx.state !== 'running') return;
+      const t = dctx.currentTime;
+      [1047, 1319, 1568].forEach((f, i) => { const o = dctx.createOscillator(), g = dctx.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t + i * 0.08); g.gain.exponentialRampToValueAtTime(0.08, t + i * 0.08 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.08 + 0.5); o.connect(g).connect(dctx.destination); o.start(t + i * 0.08); o.stop(t + i * 0.08 + 0.55); });
+    } catch (e) {}
+  }
+  return { get: () => Object.assign({}, cfg), set, ding, _Base: Base, _dest: c => (desc && desc.get ? desc.get.call(c) : c.destination) };
+})();
+
+
+/* The Casino Wheel: when the admin starts it, every player online gets one free spin.
+   The game underneath keeps running; the wheel can be tucked away for a moment but comes back until it's spun. */
+window.CasinoWheel = (() => {
+  let W = null, el = null, pill = null, busy = false, done = new Set(), hideT = null;
+  try { JSON.parse(localStorage.getItem('miguels-casino-wheels') || '[]').forEach(x => done.add(x)); } catch (e) {}
+  const remember = id => { done.add(id); try { localStorage.setItem('miguels-casino-wheels', JSON.stringify([...done].slice(-20))); } catch (e) {} };
+  const usd = c => '$' + (c / 100).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  const N = 16, A = 360 / N;
+  const COLS = ['#F5C542', '#7A2BE2', '#E8364F', '#1FA36A', '#2E6BE6', '#E8364F', '#7A2BE2', '#F07F2A', '#1FA36A', '#2E6BE6', '#D63384', '#7A2BE2', '#E8364F', '#1FA36A', '#F07F2A', '#2E6BE6'];
+  function css() {
+    if (document.getElementById('mcw-css')) return;
+    const st = document.createElement('style'); st.id = 'mcw-css';
+    st.textContent = `
+    .mcw{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;background:radial-gradient(60% 60% at 50% 45%,rgba(60,20,90,.75),rgba(5,3,10,.92));backdrop-filter:blur(4px);font-family:Manrope,system-ui,sans-serif;color:#fff;animation:mcwIn .4s ease}
+    @keyframes mcwIn{from{opacity:0}}
+    .mcw .box{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px;max-width:96vw}
+    .mcw h2{margin:0;font:900 clamp(22px,4.5vw,40px)/1.05 system-ui,sans-serif;letter-spacing:.02em;text-align:center;background:linear-gradient(180deg,#FFF6C8,#F5C542 55%,#C27A00);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 18px rgba(245,197,66,.5))}
+    .mcw p{margin:0;color:#D9CCF0;font-weight:700;text-align:center;font-size:14.5px}
+    .mcw .wb{position:relative;width:min(78vw,58vh,460px);aspect-ratio:1}
+    .mcw svg.wh{width:100%;height:100%;filter:drop-shadow(0 0 40px rgba(245,197,66,.45));transition:transform 6s cubic-bezier(.1,.7,.06,1)}
+    .mcw .ptr{position:absolute;left:50%;top:-5%;width:9%;transform:translateX(-50%);z-index:2;filter:drop-shadow(0 4px 6px rgba(0,0,0,.6))}
+    .mcw .hub{position:absolute;left:50%;top:50%;width:22%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;border:0;cursor:pointer;font:900 clamp(14px,2.6vw,22px) system-ui;color:#3A1E00;background:radial-gradient(circle at 35% 30%,#FFF6C8,#F5C542 55%,#B87200);box-shadow:0 0 0 5px #3A1E00,0 0 30px rgba(245,197,66,.8);animation:mcwPulse 1.1s ease-in-out infinite}
+    .mcw .hub:disabled{animation:none;cursor:default;filter:saturate(.7)}
+    @keyframes mcwPulse{50%{transform:translate(-50%,-50%) scale(1.08)}}
+    .mcw .res{min-height:56px;text-align:center}
+    .mcw .res b{display:block;font:900 clamp(28px,6vw,52px)/1 system-ui;color:#FFE59A;text-shadow:0 0 24px rgba(245,197,66,.8)}
+    .mcw .res span{color:#D9CCF0;font-weight:700}
+    .mcw .row{display:flex;gap:10px;align-items:center}
+    .mcw .later{height:38px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#fff;font-weight:700;cursor:pointer}
+    .mcw .go{height:46px;padding:0 22px;border-radius:999px;border:0;background:linear-gradient(180deg,#FFE27A,#F5A623);color:#2A1500;font-weight:900;cursor:pointer}
+    .mcw .tm{font:700 13px ui-monospace,Menlo,monospace;color:#BFB0DA}
+    .mcw-pill{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:10049;height:48px;padding:0 20px;border-radius:999px;border:0;cursor:pointer;font:900 15px system-ui;color:#2A1500;background:linear-gradient(180deg,#FFE27A,#F5A623);box-shadow:0 0 0 3px rgba(255,255,255,.35),0 10px 30px rgba(245,166,35,.55);animation:mcwPill 1s ease-in-out infinite alternate}
+    @keyframes mcwPill{to{box-shadow:0 0 0 6px rgba(255,255,255,.15),0 10px 40px rgba(245,166,35,.9)}}
+    .mcw-c{position:fixed;z-index:10051;width:9px;height:14px;pointer-events:none;animation:mcwC 2.2s cubic-bezier(.2,.7,.4,1) forwards}
+    @keyframes mcwC{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}`;
+    document.head.appendChild(st);
+  }
+  function wheelSVG(segs) {
+    const R = 100, c = 110, rad = a => a * Math.PI / 180;
+    let s = `<svg class="wh" viewBox="0 0 220 220" aria-hidden="true"><circle cx="110" cy="110" r="109" fill="#2A1238" stroke="#F5C542" stroke-width="3"/>`;
+    segs.forEach((v, i) => {
+      const a0 = (i - 0.5) * A - 90, a1 = (i + 0.5) * A - 90;
+      const x0 = c + R * Math.cos(rad(a0)), y0 = c + R * Math.sin(rad(a0)), x1 = c + R * Math.cos(rad(a1)), y1 = c + R * Math.sin(rad(a1));
+      s += `<path d="M${c} ${c}L${x0.toFixed(2)} ${y0.toFixed(2)}A${R} ${R} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}Z" fill="${COLS[i % COLS.length]}" stroke="#1A0A24" stroke-width="1.2"/>`;
+      const am = i * A - 90, tx = c + R * 0.66 * Math.cos(rad(am)), ty = c + R * 0.66 * Math.sin(rad(am));
+      const lab = v >= 10000000 ? '$100K' : v >= 100000 ? '$' + v / 100000 + 'K' : '$' + v / 100;
+      s += `<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" fill="${i === 0 ? '#3A1E00' : '#fff'}" font-family="system-ui" font-weight="900" font-size="${i === 0 ? 13 : 11}" text-anchor="middle" dominant-baseline="middle" transform="rotate(${am} ${tx.toFixed(2)} ${ty.toFixed(2)})">${lab}</text>`;
+    });
+    for (let i = 0; i < N; i++) { const a = rad((i + 0.5) * A - 90); s += `<circle cx="${(c + 104 * Math.cos(a)).toFixed(2)}" cy="${(c + 104 * Math.sin(a)).toFixed(2)}" r="2.8" fill="#FFF6C8"/>`; }
+    return s + '</svg>';
+  }
+  function confetti() {
+    const cols = ['#F5C542', '#FF5FA8', '#5BF0A0', '#7AE0FF', '#C7A6FF', '#fff'];
+    for (let i = 0; i < 90; i++) {
+      const c = document.createElement('i'); c.className = 'mcw-c';
+      c.style.left = (40 + Math.random() * 20) + 'vw'; c.style.top = '45vh'; c.style.background = cols[i % cols.length];
+      c.style.setProperty('--dx', (Math.random() - 0.5) * 900 + 'px'); c.style.setProperty('--dy', (Math.random() * 700 - 400) + 'px'); c.style.setProperty('--r', (Math.random() * 1200 - 600) + 'deg');
+      document.body.appendChild(c); setTimeout(() => c.remove(), 2300);
+    }
+  }
+  function tone(f, d, when = 0, v = 0.06) { try { const ac = tone.ac || (tone.ac = new (window.AudioContext || window.webkitAudioContext)()); const t = ac.currentTime + when, o = ac.createOscillator(), g = ac.createGain(); o.type = 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d + 0.02); } catch (e) {} }
+  function timer() {
+    if (!el || !W) return;
+    const left = Math.max(0, W.until - Date.now()), m = Math.floor(left / 60000), s = Math.floor(left / 1000) % 60;
+    const t = el.querySelector('.tm'); if (t) t.textContent = `ends in ${m}:${String(s).padStart(2, '0')}`;
+    if (left <= 0 && !busy) close(true);
+  }
+  setInterval(timer, 1000);
+  function show() {
+    if (!W || el || !document.body) return;
+    css(); if (pill) { pill.remove(); pill = null; }
+    el = document.createElement('div'); el.className = 'mcw'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Casino Wheel');
+    el.innerHTML = `<div class="box"><h2>🎡 The Casino Wheel</h2><p>Everyone online gets one free spin. Top prize: <b style="color:#FFE59A">${usd(W.top)}</b></p>
+      <div class="wb"><svg class="ptr" viewBox="0 0 40 50"><path d="M20 48 4 8a16 16 0 0 1 32 0z" fill="#FFF6C8" stroke="#3A1E00" stroke-width="2.5"/></svg>${wheelSVG(W.segs)}<button class="hub" id="mcwSpin">SPIN</button></div>
+      <div class="res" id="mcwRes"></div>
+      <div class="row"><span class="tm"></span><button class="later" id="mcwLater">Back to my game for a sec</button></div></div>`;
+    document.body.appendChild(el); timer();
+    el.querySelector('#mcwSpin').onclick = spin;
+    el.querySelector('#mcwLater').onclick = later;
+  }
+  // tuck it away; it comes back by itself
+  function later() {
+    if (busy || !el) return;
+    el.remove(); el = null;
+    pill = document.createElement('button'); pill.className = 'mcw-pill'; pill.textContent = '🎡 Spin the Casino Wheel!';
+    pill.onclick = show; document.body.appendChild(pill);
+    clearTimeout(hideT); hideT = setTimeout(() => { if (W && !el) show(); }, 25000);
+  }
+  function close(expired) {
+    clearTimeout(hideT);
+    if (el) { el.remove(); el = null; } if (pill) { pill.remove(); pill = null; }
+    if (expired && W) remember(W.id);
+    W = null;
+  }
+  async function spin() {
+    if (busy || !W) return;
+    busy = true;
+    const btn = el.querySelector('#mcwSpin'); btn.disabled = true;
+    el.querySelector('#mcwLater').hidden = true;
+    const r = await CasinoNet.api('api/wheel', { action: 'spin' });
+    if (!r.ok && r.body.seg === undefined) { busy = false; el.querySelector('#mcwRes').innerHTML = `<span>${r.body.error || 'Try again.'}</span>`; if (/stopped/i.test(r.body.error || '')) setTimeout(() => close(true), 2000); else btn.disabled = false; return; }
+    const seg = r.body.seg, prize = r.body.prize, id = W.id;
+    remember(id);
+    const wh = el.querySelector('svg.wh');
+    const target = 8 * 360 - seg * A + (Math.random() - 0.5) * A * 0.6;
+    wh.style.transform = `rotate(${target}deg)`;
+    let last = -1; const t0 = performance.now();
+    const tick = now => { const p = Math.min(1, (now - t0) / 6000); const ang = target * (1 - Math.pow(1 - p, 3.4)); const sgi = Math.floor(ang / A); if (sgi !== last) { last = sgi; tone(1500, 0.03, 0, 0.02); } if (p < 1) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    await new Promise(x => setTimeout(x, 6200));
+    el.querySelector('#mcwRes').innerHTML = `<b>${usd(prize)}</b><span>${seg === 0 ? 'THE TOP PRIZE! Unbelievable!' : 'added to your bankroll'}</span>`;
+    [0, 0.1, 0.2, 0.32].forEach((w, i) => tone([659, 784, 988, 1319][i], 0.35, w, 0.08));
+    confetti(); if (seg === 0) setTimeout(confetti, 700);
+    try { if (seg === 0) { CasinoMusic.fanfare(true); CasinoVoice.line('wheelTop', { force: true }); } else CasinoVoice.say(`You won ${usd(prize).replace('.00', '')}!`, { force: true }); } catch (e) {}
+    try { CasinoWallet.refresh(); } catch (e) {}
+    await new Promise(x => setTimeout(x, seg === 0 ? 5000 : 3200));
+    busy = false; close(false);
+  }
+  function offer(w) {
+    if (!w || done.has(w.id)) return;
+    if (W && W.id === w.id) return;
+    W = w;
+    try { if (window.CasinoVoice) { CasinoMusic.fanfare(false); CasinoVoice.line('wheel', { force: true }); } } catch (e) {}
+    if (document.body) show(); else addEventListener('DOMContentLoaded', show);
+  }
+  async function check() { if (!/^https?:$/.test(location.protocol)) return; try { await CasinoNet.api('api/wheel', {}); } catch (e) {} }
+  // a quiet look every 15 seconds, so pages that are just sitting there find out too
+  setInterval(() => { if (!document.hidden && !W) check(); }, 15000);
+  setTimeout(check, 2500);
+  return { offer, check };
+})();
+
+/* Music and the announcer for every page of Miguel's Casino.
+   All the music is made live in the browser (drums, bass, synths and sung "oohs", "aahs" and "hey!"s),
+   so there are no audio files to download. The announcer uses the device's own text-to-speech voice. */
+window.CasinoMusic = (() => {
+  const Base = CasinoSound._Base;
+  const hz = n => 440 * Math.pow(2, (n - 69) / 12);
+  let ctx = null, out = null, comp = null, drums = null, synths = null, duckG = null, verb = null, verbIn = null, echo = null, noise = null;
+  let cfg = CasinoSound.get(), timer = null, track = null, trackIdx = 0, step = 0, nextT = 0, barsInTrack = 0, voiceDuck = 1;
+  const listeners = new Set();
+
+  /* ---------- the studio: buses, reverb, echo ---------- */
+  function build() {
+    if (ctx || !Base) return !!ctx;
+    try { ctx = new Base(); } catch (e) { return false; }
+    comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.2;
+    out = ctx.createGain(); out.gain.value = 0;
+    out.connect(comp); comp.connect(CasinoSound._dest(ctx));
+    drums = ctx.createGain(); drums.gain.value = 0.55; drums.connect(out);
+    duckG = ctx.createGain(); duckG.connect(out);              // everything but the drums pumps with the kick
+    synths = ctx.createGain(); synths.gain.value = 1.35; synths.connect(duckG);
+    // reverb from a burst of fading noise
+    verb = ctx.createConvolver();
+    const len = Math.floor(ctx.sampleRate * 2.4), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6); }
+    verb.buffer = ir; verbIn = ctx.createGain(); verbIn.gain.value = 0.32; verbIn.connect(verb); const vOut = ctx.createGain(); vOut.gain.value = 0.9; verb.connect(vOut).connect(out);
+    // a dotted-eighth echo for plucks and vocals
+    echo = ctx.createDelay(1.5); const fb = ctx.createGain(); fb.gain.value = 0.32; const eOut = ctx.createGain(); eOut.gain.value = 0.35; const eLp = ctx.createBiquadFilter(); eLp.type = 'lowpass'; eLp.frequency.value = 3000;
+    echo.connect(eLp).connect(fb).connect(echo); eLp.connect(eOut).connect(duckG);
+    noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const nd = noise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    return true;
+  }
+  const env = (g, t, a, peak, d, end = 0.0001) => { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(end, t + a + d); };
+  function osc(type, f, t, stop) { const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); o.start(t); o.stop(stop); return o; }
+  function nsrc(t, dur) { const s = ctx.createBufferSource(); s.buffer = noise; s.loop = true; s.start(t, Math.random() * 0.5); s.stop(t + dur); return s; }
+  function filt(type, f, q = 1) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; }
+
+  /* ---------- instruments ---------- */
+  const I = {
+    kick(t, v = 1) {
+      const o = osc('sine', 160, t, t + 0.45), g = ctx.createGain();
+      o.frequency.exponentialRampToValueAtTime(42, t + 0.13); env(g, t, 0.002, v, 0.4); o.connect(g).connect(drums);
+      const c = osc('triangle', 900, t, t + 0.02), cg = ctx.createGain(); env(cg, t, 0.001, v * 0.25, 0.015); c.connect(cg).connect(drums);
+      // the pump: synths dip on every kick
+      duckG.gain.cancelScheduledValues(t); duckG.gain.setValueAtTime(0.32, t); duckG.gain.linearRampToValueAtTime(1, t + 0.26);
+    },
+    snare(t, v = 0.6, tail = 0.18, wet = 0.2) {
+      const n = nsrc(t, tail + 0.05), hp = filt('highpass', 1300), g = ctx.createGain(); env(g, t, 0.002, v, tail); n.connect(hp).connect(g); g.connect(drums);
+      const w = ctx.createGain(); w.gain.value = wet; g.connect(w).connect(verbIn);
+      const o = osc('triangle', 200, t, t + 0.12), og = ctx.createGain(); o.frequency.exponentialRampToValueAtTime(120, t + 0.1); env(og, t, 0.002, v * 0.6, 0.1); o.connect(og).connect(drums);
+    },
+    clap(t, v = 0.55) {
+      const n = nsrc(t, 0.3), bp = filt('bandpass', 1400, 0.9), g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      [0, 0.011, 0.022].forEach(d => { g.gain.setValueAtTime(v, t + d); g.gain.exponentialRampToValueAtTime(v * 0.25, t + d + 0.009); });
+      g.gain.setValueAtTime(v, t + 0.032); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      n.connect(bp).connect(g); g.connect(drums); const w = ctx.createGain(); w.gain.value = 0.25; g.connect(w).connect(verbIn);
+    },
+    hat(t, v = 0.18, open = false) { const n = nsrc(t, open ? 0.3 : 0.06), hp = filt('highpass', open ? 7500 : 8500), g = ctx.createGain(); env(g, t, 0.001, v, open ? 0.22 : 0.035); n.connect(hp).connect(g).connect(drums); },
+    shaker(t, v = 0.06) { const n = nsrc(t, 0.08), bp = filt('bandpass', 6000, 1.4), g = ctx.createGain(); env(g, t, 0.012, v, 0.05); n.connect(bp).connect(g).connect(drums); },
+    crash(t, v = 0.3) { const n = nsrc(t, 1.8), hp = filt('highpass', 5000), g = ctx.createGain(); env(g, t, 0.002, v, 1.6); n.connect(hp).connect(g); g.connect(drums); const w = ctx.createGain(); w.gain.value = 0.3; g.connect(w).connect(verbIn); },
+    riser(t, dur, v = 0.22) {
+      const n = nsrc(t, dur + 0.05), bp = filt('bandpass', 400, 2.2), g = ctx.createGain();
+      bp.frequency.setValueAtTime(400, t); bp.frequency.exponentialRampToValueAtTime(7000, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.04);
+      n.connect(bp).connect(g).connect(out);
+    },
+    bass(t, n, d, v = 0.32, type = 'sawtooth', cut = 900) {
+      const o = osc(type, hz(n), t, t + d + 0.1), s = osc('sine', hz(n - 12), t, t + d + 0.1), lp = filt('lowpass', cut, 6), g = ctx.createGain();
+      lp.frequency.setValueAtTime(cut * 2.2, t); lp.frequency.exponentialRampToValueAtTime(cut * 0.4, t + Math.min(d, 0.25));
+      env(g, t, 0.005, v, d); const sg = ctx.createGain(); sg.gain.value = 0.7;
+      o.connect(lp).connect(g); s.connect(sg).connect(g); g.connect(synths);
+    },
+    pad(t, notes, d, v = 0.06, cut = 1800) {
+      const lp = filt('lowpass', cut, 0.7), g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + Math.min(0.4, d * 0.3)); g.gain.setValueAtTime(v, t + d * 0.8); g.gain.linearRampToValueAtTime(0.0001, t + d + 0.3);
+      notes.forEach(n => [-7, 7].forEach(dt => { const o = osc('sawtooth', hz(n), t, t + d + 0.35); o.detune.value = dt; o.connect(lp); }));
+      lp.connect(g); g.connect(synths); const w = ctx.createGain(); w.gain.value = 0.5; g.connect(w).connect(verbIn);
+    },
+    stab(t, notes, d = 0.14, v = 0.07, type = 'sawtooth', cut = 2600) {
+      const lp = filt('lowpass', cut, 2), g = ctx.createGain(); lp.frequency.setValueAtTime(cut * 1.6, t); lp.frequency.exponentialRampToValueAtTime(cut * 0.5, t + d);
+      env(g, t, 0.003, v, d); notes.forEach(n => { const o = osc(type, hz(n), t, t + d + 0.1); o.detune.value = (Math.random() - 0.5) * 10; o.connect(lp); });
+      lp.connect(g); g.connect(synths); const w = ctx.createGain(); w.gain.value = 0.3; g.connect(w).connect(verbIn);
+    },
+    keys(t, notes, d, v = 0.05) {   // an electric piano
+      notes.forEach(n => {
+        const o = osc('sine', hz(n), t, t + d + 0.2), m = osc('sine', hz(n) * 2, t, t + d + 0.2), mg = ctx.createGain(), g = ctx.createGain();
+        mg.gain.setValueAtTime(hz(n) * 1.2, t); mg.gain.exponentialRampToValueAtTime(hz(n) * 0.1, t + 0.4); m.connect(mg).connect(o.frequency);
+        env(g, t, 0.004, v, d); o.connect(g).connect(synths); const w = ctx.createGain(); w.gain.value = 0.35; g.connect(w).connect(verbIn);
+      });
+    },
+    pluck(t, n, d = 0.18, v = 0.07, wet = 0.5) {
+      const o = osc('square', hz(n), t, t + d + 0.1), o2 = osc('sawtooth', hz(n + 12), t, t + d + 0.1), lp = filt('lowpass', 4500, 4), g = ctx.createGain();
+      lp.frequency.setValueAtTime(5200, t); lp.frequency.exponentialRampToValueAtTime(500, t + d);
+      env(g, t, 0.002, v, d); const g2 = ctx.createGain(); g2.gain.value = 0.4; o.connect(lp); o2.connect(g2).connect(lp); lp.connect(g); g.connect(synths);
+      const e = ctx.createGain(); e.gain.value = wet; g.connect(e).connect(echo);
+    },
+    lead(t, n, d, v = 0.06, glide = null) {
+      const o = osc('sawtooth', hz(glide ?? n), t, t + d + 0.15), o2 = osc('square', hz(glide ?? n), t, t + d + 0.15); o2.detune.value = 9;
+      if (glide !== null) { o.frequency.exponentialRampToValueAtTime(hz(n), t + 0.06); o2.frequency.exponentialRampToValueAtTime(hz(n), t + 0.06); }
+      const lfo = osc('sine', 5.6, t, t + d + 0.15), lg = ctx.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(hz(n) * 0.012, t + Math.min(d, 0.35)); lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
+      const lp = filt('lowpass', 3200, 1), g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.02); g.gain.setValueAtTime(v, t + d * 0.85); g.gain.linearRampToValueAtTime(0.0001, t + d + 0.1);
+      const g2 = ctx.createGain(); g2.gain.value = 0.5; o.connect(lp); o2.connect(g2).connect(lp); lp.connect(g); g.connect(synths);
+      const e = ctx.createGain(); e.gain.value = 0.35; g.connect(e).connect(echo); const w = ctx.createGain(); w.gain.value = 0.3; g.connect(w).connect(verbIn);
+    },
+    /* the singers: a buzzing tone shaped by three vowel filters, the way a throat and mouth shape a voice */
+    vox(t, n, d, vowel = 'a', v = 0.1, to = null, opts = {}) {
+      const F = VOWELS[vowel], F2 = to ? VOWELS[to] : null;
+      const src = ctx.createGain(), g = ctx.createGain();
+      const f0 = hz(n), voices = opts.choir ? [-12, 0, 11] : [0];
+      voices.forEach((dt, k) => {
+        const o = osc('sawtooth', f0, t, t + d + 0.2); o.detune.value = dt + (opts.choir ? (k - 1) * 4 : 0);
+        if (opts.fall) o.frequency.exponentialRampToValueAtTime(f0 * 0.82, t + d);
+        const lfo = osc('sine', 5.2 + k * 0.3, t, t + d + 0.2), lg = ctx.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f0 * 0.009, t + Math.min(0.3, d)); lfo.connect(lg).connect(o.frequency);
+        o.connect(src);
+      });
+      const breath = nsrc(t, d + 0.1), bg = ctx.createGain(); bg.gain.value = 0.08; breath.connect(bg).connect(src);
+      F.forEach(([f, q, a], i) => {
+        const bp = filt('bandpass', f, q), fg = ctx.createGain(); fg.gain.value = a;
+        if (F2) bp.frequency.linearRampToValueAtTime(F2[i][0], t + d * 0.7);
+        src.connect(bp).connect(fg).connect(g);
+      });
+      const att = opts.att ?? 0.04;
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + att); g.gain.setValueAtTime(v, t + Math.max(att, d * 0.7)); g.gain.linearRampToValueAtTime(0.0001, t + d + (opts.rel ?? 0.12));
+      g.connect(synths); const w = ctx.createGain(); w.gain.value = opts.wet ?? 0.5; g.connect(w).connect(verbIn);
+      if (opts.echo) { const e = ctx.createGain(); e.gain.value = opts.echo; g.connect(e).connect(echo); }
+    },
+    // a crowd shouting "HEY!"
+    hey(t, v = 0.2) {
+      const n = nsrc(t, 0.07), bp = filt('bandpass', 2600, 1.2), g = ctx.createGain(); env(g, t, 0.004, v * 0.6, 0.06); n.connect(bp).connect(g).connect(synths);
+      [52, 55, 59, 47].forEach((p, k) => I.vox(t + 0.035 + k * 0.006, p, 0.16, 'e', v * 0.5, 'i', { att: 0.012, rel: 0.06, fall: true, wet: 0.45 }));
+    },
+  };
+  // formants: [frequency, Q, level]
+  const VOWELS = {
+    a: [[800, 9, 1], [1150, 10, 0.5], [2900, 12, 0.18]],
+    e: [[530, 9, 1], [1840, 11, 0.45], [2480, 12, 0.2]],
+    i: [[300, 9, 1], [2250, 12, 0.35], [3000, 14, 0.2]],
+    o: [[480, 9, 1], [820, 10, 0.5], [2700, 12, 0.12]],
+    u: [[330, 9, 1], [720, 10, 0.35], [2500, 12, 0.08]],
+  };
+
+  /* ---------- the songs ---------- */
+  // each song is a list of sections; play(t, s, barInSection, sec, chord) runs on every 16th note
+  const TRACKS = [
+    {
+      id: 'vegas', name: 'Vegas Nights', bpm: 118,
+      // Dm9 G13 Cmaj9 A7: a funky disco loop
+      chords: [{ r: 38, c: [53, 57, 60, 64] }, { r: 43, c: [53, 57, 59, 64] }, { r: 36, c: [52, 55, 59, 62] }, { r: 45, c: [55, 57, 61, 64] }],
+      sections: [['intro', 4], ['verse', 8], ['build', 2], ['chorus', 8], ['break', 4], ['build', 2], ['chorus', 8]],
+      hook: [[0, 69, 3, 'o'], [4, 72, 3, 'o'], [8, 74, 6, 'a'], [14, 72, 2, 'o']],
+      play(t, s, b, sec, ch, L) {
+        const full = sec === 'chorus', grooves = sec !== 'intro' && sec !== 'break';
+        if (sec !== 'break' && s % 4 === 0) I.kick(t, 0.95);
+        if (sec === 'build') { if (s % 2 === 0 || b === 1) I.snare(t, 0.12 + (b * 16 + s) * 0.012, 0.1, 0.1); if (b === 0 && s === 0) I.riser(t, L * 32, 0.2); if (b === 1 && s === 14) I.hey(t, 0.22); return; }
+        if (grooves && (s === 4 || s === 12)) I.clap(t, 0.5);
+        if (s % 4 === 2) I.hat(t, sec === 'intro' ? 0.1 : 0.16, true); else if (grooves) I.hat(t, 0.05);
+        if (grooves && s % 2 === 0) I.bass(t, ch.r + (s % 4 === 2 ? 12 : 0), L * 1.6, 0.28, 'sawtooth', 700);
+        if (grooves && (s === 3 || s === 6 || s === 11 || s === 14)) I.stab(t, ch.c.map(n => n + 12), 0.13, 0.05);
+        if (s === 0 && (sec === 'intro' || sec === 'break' || full)) I.pad(t, ch.c, L * 16, sec === 'break' ? 0.05 : 0.03, 1500);
+        if (full) {
+          this.hook.forEach(([at, n, len, v]) => { if (s === at) I.vox(t, n - (b % 2 ? 2 : 0), L * len, v, 0.12, null, { echo: 0.2 }); });
+          if (s === 0 && b % 4 === 0) { if (b === 0) I.crash(t, 0.25); I.hey(t + L * 14, 0.18); }
+          if (s % 2 === 0) I.shaker(t, 0.05);
+        }
+        if (sec === 'break' && s === 0) I.vox(t, ch.c[3] + 12, L * 14, 'u', 0.07, 'a', { choir: true, wet: 0.8 });
+      },
+    },
+    {
+      id: 'house', name: 'High Roller', bpm: 124,
+      // Fm Db Ab Eb: big-room piano house
+      chords: [{ r: 41, c: [60, 65, 68] }, { r: 37, c: [61, 65, 68] }, { r: 44, c: [60, 63, 68] }, { r: 39, c: [58, 63, 67] }],
+      sections: [['intro', 4], ['verse', 8], ['build', 4], ['drop', 8], ['break', 4], ['build', 4], ['drop', 8]],
+      chops: [[0, 2, 'a'], [3, 1, 'o'], [6, 2, 'a'], [10, 1, 'e'], [12, 2, 'a']],
+      play(t, s, b, sec, ch, L) {
+        const drop = sec === 'drop';
+        if (sec === 'build') {
+          const roll = b < 2 ? s % 4 === 0 : b < 3 ? s % 2 === 0 : true;
+          if (roll) I.snare(t, 0.1 + (b * 16 + s) * 0.006, 0.08, 0.15);
+          if (s === 0 && b === 0) I.riser(t, L * 64, 0.24);
+          if (s % 8 === 0) I.pad(t, ch.c, L * 8, 0.035, 900 + b * 600);
+          if (b === 3 && s === 12) I.hey(t, 0.24);
+          return;
+        }
+        if (sec !== 'break' && s % 4 === 0) I.kick(t, 1);
+        if (sec !== 'intro' && sec !== 'break' && (s === 4 || s === 12)) I.clap(t, 0.45);
+        if (s % 4 === 2) I.hat(t, 0.14, true); else if (sec !== 'break' && s % 2 === 1) I.hat(t, 0.05);
+        if (sec !== 'intro' && sec !== 'break' && s % 4 === 2) I.bass(t, ch.r + 12, L * 1.5, 0.3, 'sawtooth', 600);
+        if ((sec === 'verse' || drop) && [0, 3, 6, 10, 12].includes(s)) I.keys(t, ch.c.map(n => n + 12), L * 2.5, 0.045);
+        if (s === 0) I.pad(t, ch.c, L * 16, sec === 'break' ? 0.05 : 0.025, sec === 'break' ? 1200 : 2200);
+        if (drop) {
+          this.chops.forEach(([at, len, v], k) => { if (s === at) I.vox(t, ch.c[k % 3] + 12, L * len, v, 0.12, null, { att: 0.01, rel: 0.05, echo: 0.25 }); });
+          if (s % 2 === 0) I.pluck(t, ch.c[(s / 2) % 3] + 24, L * 1.2, 0.035, 0.35);
+          if (b === 0 && s === 0) I.crash(t, 0.3);
+          if (s === 0 && b % 4 === 3) I.hey(t + L * 12, 0.2);
+        }
+        if (sec === 'break' && s === 0) I.vox(t, ch.c[2] + 12, L * 14, 'a', 0.07, 'o', { choir: true, wet: 0.85 });
+      },
+    },
+    {
+      id: 'synth', name: 'Neon Drive', bpm: 100,
+      // Am F C G: synthwave
+      chords: [{ r: 45, c: [57, 60, 64] }, { r: 41, c: [57, 60, 65] }, { r: 36, c: [55, 60, 64] }, { r: 43, c: [55, 59, 62] }],
+      sections: [['intro', 4], ['verse', 8], ['chorus', 8], ['break', 4], ['chorus', 8]],
+      melody: [[[0, 76, 4], [6, 74, 2], [8, 72, 4], [12, 74, 4]], [[0, 72, 4], [6, 69, 2], [8, 72, 6]], [[0, 67, 4], [6, 72, 2], [8, 76, 4], [12, 79, 4]], [[0, 78, 4], [8, 74, 8]]],
+      play(t, s, b, sec, ch, L, bar) {
+        const ch2 = sec === 'chorus';
+        if (sec !== 'break' && (s === 0 || s === 8 || (ch2 && s % 4 === 0))) I.kick(t, 0.95);
+        if (sec !== 'intro' && sec !== 'break' && (s === 4 || s === 12)) I.snare(t, 0.55, 0.3, 0.6);
+        if (sec !== 'break' && s % 2 === 0) I.hat(t, s % 4 === 2 ? 0.08 : 0.04);
+        if (sec !== 'intro' && s % 2 === 0) I.bass(t, ch.r + (s % 4 === 2 ? 12 : 0), L * 1.7, 0.24, 'sawtooth', 500);
+        if (s === 0) I.pad(t, ch.c, L * 16, sec === 'intro' || sec === 'break' ? 0.05 : 0.03, 1400);
+        if (sec === 'verse' && s % 2 === 0) I.pluck(t, ch.c[(s / 2) % 3] + 12, L * 1.5, 0.03, 0.5);
+        if (ch2) {
+          (this.melody[bar % 4] || []).forEach(([at, n, len]) => { if (s === at) I.lead(t, n, L * len, 0.05, at === 0 ? n - 2 : null); });
+          if (s === 0) I.vox(t, ch.c[1] + 12, L * 15, 'a', 0.05, null, { choir: true, wet: 0.8, att: 0.3 });
+          if (s === 0 && b === 0) I.crash(t, 0.22);
+        }
+        if (sec === 'break' && s === 0) I.vox(t, ch.c[2] + 12, L * 14, 'o', 0.06, 'a', { choir: true, wet: 0.9, att: 0.4 });
+        if (sec === 'break' && b === 3 && s === 0) I.riser(t, L * 15, 0.18);
+      },
+    },
+    {
+      id: 'lounge', name: 'Velvet Lounge', bpm: 92,
+      // Am7 Dm7 G7 Cmaj7, swung, with a scat singer
+      chords: [{ r: 45, c: [55, 60, 64, 67] }, { r: 38, c: [53, 57, 60, 65] }, { r: 43, c: [53, 59, 62, 65] }, { r: 36, c: [52, 55, 59, 64] }],
+      sections: [['a', 8], ['scat', 8]],
+      scat: [[[0, 76, 2, 'u'], [3, 74, 1, 'a'], [4, 72, 2, 'u'], [8, 69, 4, 'a']], [[0, 77, 2, 'u'], [3, 76, 1, 'a'], [4, 74, 3, 'o']], [[2, 71, 2, 'u'], [4, 74, 2, 'a'], [8, 77, 4, 'o']], [[0, 76, 6, 'a']]],
+      play(t, s, b, sec, ch, L, bar) {
+        const sw = s % 2 === 1 ? L * 0.33 : 0;           // swing the off-beats
+        if (s % 4 === 0) I.bass(t, ch.r + [0, 7, 12, 10][s / 4], L * 3.4, 0.26, 'triangle', 500);
+        if (s % 4 === 0 || s % 4 === 3) I.shaker(t + sw, s % 4 === 0 ? 0.05 : 0.035);
+        if (s === 4 || s === 12) I.hat(t, 0.07, false);
+        if (s === 0 || s === 7) I.keys(t + sw, ch.c, L * (s ? 5 : 6), 0.04);
+        if (s === 0 && b % 2 === 0) I.kick(t, 0.35);
+        if (sec === 'scat') (this.scat[bar % 4] || []).forEach(([at, n, len, v]) => { if (s === at) I.vox(t + (at % 2 ? L * 0.33 : 0), n - 12, L * len, v, 0.1, null, { att: 0.02, wet: 0.45 }); });
+      },
+    },
+  ];
+  TRACKS.forEach(T => { T.bars = T.sections.reduce((a, s) => a + s[1], 0); });
+
+  /* ---------- the sequencer ---------- */
+  // the songs run on the clock too, so moving to another page carries on where the music was
+  const stepLen = T => 60 / T.bpm / 4, songLen = T => T.bars * 16 * stepLen(T);
+  const listFor = st => { const i = TRACKS.findIndex(T => T.id === st); return i >= 0 ? [i] : [0, 1, 2]; };
+  function getOff() { try { return +sessionStorage.getItem('mc-music-off') || 0; } catch (e) { return 0; } }
+  function setOff(v) { try { sessionStorage.setItem('mc-music-off', String(v)); } catch (e) {} }
+  function syncClock() {
+    const list = listFor(cfg.style || 'mix'), cycle = list.reduce((a, i) => a + songLen(TRACKS[i]), 0);
+    let pos = (Date.now() / 1000 + getOff()) % cycle;
+    for (const i of list) { const T = TRACKS[i]; if (pos < songLen(T)) { setTrack(i); step = Math.floor(pos / stepLen(T)); return; } pos -= songLen(T); }
+    setTrack(list[0]);
+  }
+  function setTrack(i) { trackIdx = (i + TRACKS.length) % TRACKS.length; track = TRACKS[trackIdx]; step = 0; barsInTrack = 0; listeners.forEach(f => f(info())); }
+  function where(bar) {
+    let b = bar % track.bars;
+    for (const [name, n] of track.sections) { if (b < n) return [name, b]; b -= n; }
+    return [track.sections[0][0], 0];
+  }
+  function tick() {
+    if (!ctx || !track) return;
+    const L = stepLen(track);
+    // a hidden tab only gets its timer about once a second, so plan further ahead there
+    const ahead = document.hidden ? 1.6 : 0.2;
+    if (nextT < ctx.currentTime) nextT = ctx.currentTime + 0.05;
+    while (nextT < ctx.currentTime + ahead) {
+      const bar = Math.floor(step / 16), s = step % 16, [sec, b] = where(bar);
+      if (s === 0 && b === 0) onSection(sec, bar);
+      try { track.play(nextT, s, b, sec, track.chords[bar % track.chords.length], L, bar); } catch (e) { console.error(e); }
+      step++; nextT += L;
+      // mix mode: after one full song move on to the next one, on a clean bar line
+      if (step % (16 * track.bars) === 0 && (cfg.style || 'mix') === 'mix') { const T = nextT; setTrack((trackIdx + 1) % 3); nextT = T; return; }
+    }
+  }
+  function onSection(sec, bar) {
+    // the DJ shouts something now and then when the beat drops
+    if ((sec === 'chorus' || sec === 'drop') && bar > 0 && window.CasinoVoice) CasinoVoice.dj();
+  }
+  const radioOn = () => !!(window.CasinoRadio && CasinoRadio.active());
+  const wantMusic = () => cfg.music && cfg.on && !radioOn();
+  function level() { return wantMusic() ? cfg.mvol * 0.75 * voiceDuck : 0; }
+  function stop() { if (out && ctx) out.gain.setTargetAtTime(0, ctx.currentTime, 0.15); if (timer) { clearInterval(timer); timer = null; } }
+  function update(c) {
+    cfg = c || CasinoSound.get();
+    if (window.CasinoRadio) CasinoRadio.update();
+    if (!wantMusic()) return stop();
+    if (!build()) return;
+    if (ctx.state === 'suspended') ctx.resume().then(() => { if (!timer) update(); }).catch(() => {});
+    out.gain.setTargetAtTime(level(), ctx.currentTime, 0.2);
+    const st = cfg.style || 'mix';
+    if (!track || (st !== 'mix' && track.id !== st) || (st === 'mix' && trackIdx > 2)) syncClock();
+    if (!timer && ctx.state === 'running') { syncClock(); nextT = ctx.currentTime + 0.1; timer = setInterval(tick, 30); }
+  }
+  // music gets quieter while the announcer talks
+  function duck(on) { voiceDuck = on ? 0.35 : 1; if (window.CasinoRadio) CasinoRadio.duck(on); if (out && ctx && wantMusic()) out.gain.setTargetAtTime(level(), ctx.currentTime, on ? 0.05 : 0.4); }
+  // a short fanfare on a big moment, even when the music is off
+  function fanfare(big) {
+    if (!cfg.on || !build()) return;
+    if (ctx.state === 'suspended') { ctx.resume().catch(() => {}); return; }
+    const t = ctx.currentTime + 0.03;
+    if (!wantMusic()) { out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(0.75 * cfg.vol, t); out.gain.setTargetAtTime(0, t + 2.6, 0.3); }
+    const notes = big ? [60, 64, 67, 72, 76, 79, 84] : [64, 67, 72, 76];
+    notes.forEach((n, i) => I.stab(t + i * 0.07, [n, n + 7], 0.3, 0.06, 'sawtooth', 3200));
+    I.stab(t + notes.length * 0.07, [72, 76, 79, 84], 1.1, 0.07, 'sawtooth', 3600);
+    I.crash(t + notes.length * 0.07, 0.25);
+    I.hey(t + notes.length * 0.07 + 0.05, 0.22);
+    if (big) I.vox(t + notes.length * 0.07, 79, 1.4, 'a', 0.07, 'o', { choir: true, wet: 0.8 });
+  }
+  const info = () => ({ playing: !!timer, track: track ? track.name : '', id: track ? track.id : '', style: cfg.style || 'mix', pos: track ? (step % (16 * track.bars)) * stepLen(track) : 0, len: track ? songLen(track) : 0 });
+  // skip: move this device's clock on to the start of the next song
+  function next() {
+    if (!build() || !track) return;
+    setOff(getOff() + songLen(track) - step * stepLen(track));
+    setTrack((trackIdx + 1) % 3); nextT = ctx.currentTime + 0.2;
+  }
+  // browsers only allow sound after a tap: try right away (some allow it), and again on the first tap
+  const unlock = () => { if (ctx && ctx.state === 'suspended') ctx.resume().then(() => update()).catch(() => {}); else if (!timer) update(); };
+  document.addEventListener('pointerdown', unlock); document.addEventListener('keydown', unlock); document.addEventListener('touchend', unlock);
+  // the music keeps playing when you switch to another tab or app
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && ctx && ctx.state !== 'running' && wantMusic()) ctx.resume().then(() => update()).catch(() => {}); });
+  return { update, duck, fanfare, next, info, onChange: f => listeners.add(f), TRACKS: TRACKS.map(T => ({ id: T.id, name: T.name })), _I: I, _ctx: () => ctx, _comp: () => comp };
+})();
+
+/* Casino Radio: the MP3s Miguel uploads in the admin room, played for everyone like a radio station.
+   The playlist runs on the casino's clock, so every page and every player is at the same spot in the same song.
+   It plays through a normal audio element, which keeps going in the background, also on phones. */
+window.CasinoRadio = (() => {
+  let R = null, audio = null, cur = null, skew = 0, duckV = 1, endT = null, lastErr = 0;
+  const listeners = new Set();
+  const active = () => !!(R && R.on && R.songs && R.songs.length);
+  const locked = () => !!(R && R.lock);
+  // with "everyone has to listen" on, the player can only turn it down, not off
+  const allowed = () => { const c = CasinoSound.get(); return locked() || (c.music && c.on); };
+  function at() {
+    const total = R.songs.reduce((a, s) => a + s.dur, 0);
+    let pos = ((Date.now() + skew - R.epoch) / 1000) % total; if (pos < 0) pos += total;
+    for (let i = 0; i < R.songs.length; i++) { const s = R.songs[i]; if (pos < s.dur) return { i, id: s.id, name: s.name, offset: pos, dur: s.dur, next: R.songs[(i + 1) % R.songs.length].name }; pos -= s.dur; }
+    const s = R.songs[0]; return { i: 0, id: s.id, name: s.name, offset: 0, dur: s.dur, next: s.name };
+  }
+  function vol() { const c = CasinoSound.get(); return Math.max(0, Math.min(1, c.mvol * 1.4)) * duckV; }
+  function el() {
+    if (audio) return audio;
+    audio = new Audio(); audio.preload = 'auto'; audio.setAttribute('playsinline', '');
+    audio.addEventListener('ended', () => {
+      // the clock may say the song still has a moment left: wait for it, then go to the next one
+      const np = active() ? at() : null;
+      clearTimeout(endT);
+      if (np && cur && np.id === cur.id) endT = setTimeout(() => sync(), Math.max(50, (np.dur - np.offset) * 1000 + 60)); else sync();
+    });
+    audio.addEventListener('error', () => { if (Date.now() - lastErr > 5000) { lastErr = Date.now(); setTimeout(() => { cur = null; sync(); }, 2000); } });
+    audio.addEventListener('playing', paint);
+    audio.addEventListener('pause', paint);
+    return audio;
+  }
+  function media(np) {
+    if (!('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: np.name, artist: 'Casino Radio', album: 'Miguel’s Casino' });
+      navigator.mediaSession.setActionHandler('play', () => { sync(); });
+      navigator.mediaSession.setActionHandler('pause', () => { if (!locked()) { CasinoSound.set('music', false); } else sync(); });
+    } catch (e) {}
+  }
+  function sync() {
+    if (!active() || !allowed()) { if (audio && !audio.paused) audio.pause(); paint(); return; }
+    const np = at(), a = el();
+    a.volume = vol();
+    if (!cur || cur.id !== np.id || !a.src) {
+      cur = np;
+      a.src = 'api/radio/song/' + np.id + '.mp3';
+      a.addEventListener('loadedmetadata', () => { try { a.currentTime = Math.min(at().offset, Math.max(0, (a.duration || np.dur) - 0.5)); } catch (e) {} }, { once: true });
+      media(np);
+    } else if (a.readyState >= 1 && Math.abs(a.currentTime - np.offset) > 2.5 && np.offset < (a.duration || np.dur) - 1) {
+      try { a.currentTime = np.offset; } catch (e) {}   // drifted: back in step with the station
+    }
+    if (a.paused) a.play().catch(() => {});             // may need a tap first; the next tap tries again
+    paint();
+  }
+  async function fetchR() {
+    try {
+      const t0 = Date.now(), r = await fetch('api/radio', { cache: 'no-store' }); if (!r.ok) return;
+      const j = await r.json(), t1 = Date.now();
+      skew = j.now - (t0 + t1) / 2;
+      const was = active(), changed = !R || R.v !== j.v;
+      R = j;
+      if (changed) { cur = cur && active() && R.songs.some(s => s.id === cur.id) ? cur : null; CasinoMusic.update(); if (was && !active() && audio) audio.pause(); sync(); }
+    } catch (e) {}
+  }
+  function update() { if (R) sync(); }
+  function duck(on) { duckV = on ? 0.3 : 1; if (audio) audio.volume = vol(); }
+  function paint() { listeners.forEach(f => { try { f(); } catch (e) {} }); }
+  const info = () => (active() ? Object.assign({ playing: !!(audio && !audio.paused), locked: locked() }, at()) : null);
+  const tap = () => { if (active() && allowed() && (!audio || audio.paused)) sync(); };
+  document.addEventListener('pointerdown', tap); document.addEventListener('keydown', tap); document.addEventListener('touchend', tap);
+  setInterval(() => { if (R) sync(); }, 5000);          // keep in step, and pick up again after an interruption
+  setInterval(fetchR, 20000);                           // new songs from the admin room
+  fetchR();
+  return { active, locked, update, duck, info, onChange: f => listeners.add(f), refresh: fetchR, _audio: () => audio };
+})();
+
+/* The announcer: a voice that calls out big wins, bonuses, level ups and the Casino Wheel. */
+window.CasinoVoice = (() => {
+  const synth = window.speechSynthesis;
+  let voice = null, lastAt = 0, lastDj = Date.now(), unlocked = false;
+  const recent = [];
+  function pickVoice() {
+    if (!synth) return null;
+    const vs = synth.getVoices().filter(v => /^en/i.test(v.lang));
+    if (!vs.length) return null;
+    const like = [/Google UK English Male/i, /Microsoft (Guy|Andrew|Christopher|Davis|Ryan|Brian|Eric)/i, /\b(Daniel|Aaron|Alex|Arthur|Fred|Rishi|Oliver)\b/i, /Google US English/i, /male/i];
+    for (const re of like) { const v = vs.find(x => re.test(x.name)); if (v) return v; }
+    return vs.find(v => /en-US|en-GB/i.test(v.lang)) || vs[0];
+  }
+  if (synth) { voice = pickVoice(); synth.addEventListener && synth.addEventListener('voiceschanged', () => { voice = pickVoice(); }); }
+  const enabled = () => { const c = CasinoSound.get(); return !!synth && c.on && c.voice !== false; };
+  const pickLine = list => { const fresh = list.filter(l => !recent.includes(l)); const l = (fresh.length ? fresh : list)[Math.floor(Math.random() * (fresh.length || list.length))]; recent.push(l); if (recent.length > 6) recent.shift(); return l; };
+  function say(text, o = {}) {
+    if (!enabled() || !text) return false;
+    const now = Date.now();
+    if (!o.force && now - lastAt < 2500) return false;
+    lastAt = now;
+    try {
+      if (o.force) synth.cancel();
+      const u = new SpeechSynthesisUtterance(text), c = CasinoSound.get();
+      if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = 'en-US';
+      u.rate = o.rate || 1.06; u.pitch = o.pitch || 0.92; u.volume = Math.max(0, Math.min(1, (c.vvol ?? 0.9) * Math.max(0.4, c.vol)));
+      u.onstart = () => CasinoMusic.duck(true); u.onend = u.onerror = () => CasinoMusic.duck(false);
+      synth.speak(u);
+      return true;
+    } catch (e) { return false; }
+  }
+  const L = {
+    jackpot: ['Jackpot! Unbelievable!', 'Jackpot! What a hit!', 'Jackpot! Ladies and gentlemen, we have a jackpot!'],
+    epic: ['Epic win!', 'Absolutely legendary!', 'Off the charts!'],
+    mega: ['Mega win!', 'Massive win!', 'Oh, that is huge!'],
+    big: ['Big win!', 'Big win, let’s go!', 'Now that’s a win!'],
+    nice: ['Nice win!', 'Nice one!', 'Winner!'],
+    blackjack: ['Blackjack!', 'Blackjack! Twenty one!'],
+    freespins: ['Free spins!', 'Bonus time! Free spins!'],
+    bonus: ['Bonus!', 'Bonus round!'],
+    grand: ['The Grand! Incredible!'],
+    lightning: ['Lightning strikes!'],
+    level: ['Level up!', 'Level up! Nice!'],
+    badge: ['Badge unlocked!'],
+    wheel: ['Spin the wheel! Everybody gets a spin!', 'It’s wheel time! Spin to win!'],
+    wheelTop: ['The top prize! Unbelievable!'],
+    trophy: ['Congratulations, champion!'],
+    welcome: ['Welcome to Miguel’s Casino!', 'Welcome back to Miguel’s Casino!'],
+    dj: ['Miguel’s Casino!', 'Let’s go!', 'Turn it up!', 'Here we go!', 'Feel the vibe!', 'Make some noise!'],
+    wizard: ['You win! All hail the Archmage!', 'Victory! Well played!'],
+    tableWin: ['Winner!', 'Nice hand!', 'You got it!'],
+  };
+  function line(kind, o) { const l = L[kind]; if (!l) return false; return say(pickLine(l), o); }
+  // a result came in: x = paid ÷ staked
+  function win(x, tags = []) {
+    let kind = null, big = false;
+    if (tags.includes('grand')) { kind = 'grand'; big = true; }
+    else if (tags.includes('lightning-500')) kind = 'lightning';
+    else if (x >= 100) { kind = 'epic'; big = true; }
+    else if (x >= 25) { kind = 'mega'; big = true; }
+    else if (x >= 10) kind = 'big';
+    else if (tags.includes('free-spins')) kind = 'freespins';
+    else if (tags.includes('natural')) kind = 'blackjack';
+    else if (tags.includes('hold-blast') || tags.includes('bonus')) kind = 'bonus';
+    else if (x >= 5) kind = 'nice';
+    if (!kind) return;
+    if (x >= 10 || big) CasinoMusic.fanfare(big);
+    line(kind, { force: x >= 10 || big });
+  }
+  // the casino's little corner cards
+  function pops(list) {
+    for (const p of list) {
+      if (p.type === 'ach' && /jackpot/i.test(p.title)) { CasinoMusic.fanfare(true); return line('jackpot', { force: true }); }
+      if (p.type === 'level') return line('level');
+      if (p.type === 'trophy') return line('trophy');
+      if (p.type === 'ach') return line('badge');
+    }
+  }
+  function dj() {
+    const c = CasinoSound.get();
+    if (!c.music || Date.now() - lastDj < 100000 || Math.random() > 0.6) return;
+    lastDj = Date.now(); line('dj', { rate: 1.12, pitch: 0.85 });
+  }
+  // browsers only allow speech after a tap; say hello on the first one in the lobby
+  function unlock() {
+    if (unlocked || !synth) return; unlocked = true;
+    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } catch (e) {}
+    let seen = false; try { seen = sessionStorage.getItem('mc-welcomed') === '1'; sessionStorage.setItem('mc-welcomed', '1'); } catch (e) {}
+    if (!seen && window.CASINO_CTX === 'lobby') setTimeout(() => line('welcome'), 300);
+  }
+  document.addEventListener('pointerdown', unlock, { once: false }); document.addEventListener('keydown', unlock);
+  return { say, line, win, pops, dj, available: !!synth };
+})();
+
+/* The music player: a record on the left edge of every page that opens into a small player. */
+(() => {
+  const css = `
+  .mcm-tab{position:fixed;left:0;top:calc(50% + 56px);z-index:9990;width:42px;height:50px;border:0;padding:0 0 0 4px;border-radius:0 25px 25px 0;cursor:pointer;display:grid;place-items:center;
+    background:linear-gradient(90deg,#1E120B,#2C1B10);box-shadow:0 0 0 1px rgba(232,193,112,.38),0 10px 24px rgba(0,0,0,.45);transition:width .2s ease}
+  .mcm-tab:hover{width:48px}
+  .mcm-disc{--hue:40;width:32px;height:32px;border-radius:50%;flex:none;position:relative;
+    background:radial-gradient(circle,hsl(var(--hue) 75% 62%) 0 17%,#0E0907 18% 21%,transparent 22%),repeating-radial-gradient(circle,#15100C 0 1.5px,#221812 1.5px 3px);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),0 2px 6px rgba(0,0,0,.5)}
+  .mcm-disc::after{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 210deg,transparent 0 12%,rgba(255,255,255,.16) 16%,transparent 22% 62%,rgba(255,255,255,.1) 66%,transparent 72%)}
+  .spin .mcm-disc,.mcm-disc.spin{animation:mcmSpin 3.2s linear infinite}
+  @keyframes mcmSpin{to{transform:rotate(360deg)}}
+  .mcm{position:fixed;left:12px;top:50%;transform:translateY(-50%);z-index:9991;width:min(318px,calc(100vw - 24px));padding:16px;border-radius:22px;color:#F6EBDB;
+    font:500 13.5px/1.4 "DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:radial-gradient(120% 70% at 0% 0%,rgba(232,193,112,.13),transparent 60%),linear-gradient(180deg,#24150D,#140B07);
+    box-shadow:0 0 0 1px rgba(232,193,112,.42),0 0 0 6px rgba(20,11,7,.6),0 30px 70px rgba(0,0,0,.65);animation:mcmIn .22s cubic-bezier(.2,1,.4,1)}
+  @keyframes mcmIn{from{opacity:0;transform:translate(-14px,-50%) scale(.97)}}
+  .mcm [hidden]{display:none!important}
+  .mcm .top{display:flex;gap:14px;align-items:center;padding-right:26px}
+  .mcm .top .mcm-disc{width:70px;height:70px}
+  .mcm .meta{min-width:0;flex:1}
+  .mcm .src{display:flex;align-items:center;gap:6px;font-size:12px;color:#CDB48C}
+  .mcm .src i{width:7px;height:7px;border-radius:50%;background:#5BD08A;box-shadow:0 0 8px #5BD08A}
+  .mcm.off .src i{background:#7A6A5A;box-shadow:none}
+  .mcm .tn{margin:2px 0 1px;font:400 21px/1.15 "Limelight","Didot","Georgia",serif;color:#F7DFA3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+  .mcm .sub{font-size:12px;color:#B9A386;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mcm .bar{margin:14px 0 4px;height:4px;border-radius:9px;background:rgba(247,223,163,.14);overflow:hidden}
+  .mcm .bar b{display:block;height:100%;width:0;border-radius:9px;background:linear-gradient(90deg,#C99A4A,#F7DFA3);transition:width 1s linear}
+  .mcm .times{display:flex;justify-content:space-between;font:500 11px "DM Mono",ui-monospace,monospace;color:#9C8A72;font-variant-numeric:tabular-nums}
+  .mcm .ctl{display:flex;align-items:center;justify-content:center;gap:14px;margin:10px 0 14px}
+  .mcm .ctl button{border:0;cursor:pointer;display:grid;place-items:center;color:#F7DFA3;background:rgba(247,223,163,.08);box-shadow:inset 0 0 0 1px rgba(247,223,163,.22);width:42px;height:42px;border-radius:50%}
+  .mcm .ctl button:hover{background:rgba(247,223,163,.16)}
+  .mcm .ctl .pp{width:56px;height:56px;color:#24130A;background:linear-gradient(180deg,#FBE7B0,#D8A851);box-shadow:0 6px 18px rgba(216,168,81,.35),inset 0 -2px 0 rgba(0,0,0,.18)}
+  .mcm .ctl .pp:hover{background:linear-gradient(180deg,#FFEFC4,#E2B45E)}
+  .mcm .ctl svg{width:20px;height:20px;fill:currentColor}
+  .mcm .styles{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .mcm .styles button{border:0;cursor:pointer;padding:6px 11px;border-radius:999px;font:600 12.5px "DM Sans",system-ui,sans-serif;color:#E9D7BC;background:rgba(247,223,163,.07);box-shadow:inset 0 0 0 1px rgba(247,223,163,.18)}
+  .mcm .styles button[aria-pressed=true]{color:#24130A;background:#F2CE84;box-shadow:none}
+  .mcm .vol{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .mcm .vol svg{width:18px;height:18px;flex:none;stroke:#CDB48C;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .mcm .vol input{flex:1;accent-color:#E8C170;min-width:0}
+  .mcm .row2{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px;border-top:1px solid rgba(247,223,163,.12)}
+  .mcm .row2 span{display:block;font-size:13px;color:#F6EBDB} .mcm .row2 small{display:block;font-size:11.5px;color:#9C8A72}
+  .mcm .sw{position:relative;width:42px;height:24px;flex:none;border-radius:99px;border:0;cursor:pointer;background:#3A2A1D;box-shadow:inset 0 0 0 1px rgba(247,223,163,.2);transition:background .2s}
+  .mcm .sw::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#CDB48C;transition:transform .2s,background .2s}
+  .mcm .sw[aria-checked=true]{background:#B8862F}
+  .mcm .sw[aria-checked=true]::after{transform:translateX(18px);background:#FFF1CC}
+  .mcm .x{position:absolute;right:10px;top:10px;width:28px;height:28px;border:0;border-radius:50%;cursor:pointer;color:#E9D7BC;background:rgba(247,223,163,.08);font:600 16px/1 system-ui}
+  .mcm .note{margin:0 0 12px;font-size:12px;color:#B9A386}
+  @media (prefers-reduced-motion:reduce){.spin .mcm-disc,.mcm-disc.spin{animation:none}.mcm{animation:none}}`;
+  const ICON = {
+    play: '<svg viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>',
+    pause: '<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"/></svg>',
+    next: '<svg viewBox="0 0 24 24"><path d="M5 6.2v11.6a.9.9 0 0 0 1.4.75L15 12.75a.9.9 0 0 0 0-1.5L6.4 5.45A.9.9 0 0 0 5 6.2z"/><rect x="16.5" y="5" width="2.8" height="14" rx="1"/></svg>',
+    lo: '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/></svg>',
+    hi: '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+  };
+  const STYLE_NAMES = { mix: 'Party mix', vegas: 'Vegas Nights', house: 'High Roller', synth: 'Neon Drive', lounge: 'Velvet Lounge' };
+  const HUE = { vegas: 330, house: 265, synth: 190, lounge: 30 };
+  const hueOf = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+  const mmss = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  let tab = null, panel = null;
+  function init() {
+    if (tab || !document.body) return;
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    tab = document.createElement('button'); tab.className = 'mcm-tab'; tab.type = 'button'; tab.setAttribute('aria-label', 'Music player'); tab.setAttribute('aria-expanded', 'false');
+    tab.innerHTML = '<span class="mcm-disc"></span>';
+    tab.onclick = () => (panel ? close() : open());
+    document.body.appendChild(tab); paint();
+  }
+  function state() {
+    const c = CasinoSound.get(), i = CasinoMusic.info(), r = CasinoRadio.info();
+    const on = r ? (r.locked || (c.music && c.on)) : (c.music && c.on);
+    const playing = !!(on && (r ? r.playing : i.playing));
+    return { c, i, r, on, playing };
+  }
+  function paint() {
+    if (!tab) return;
+    const { c, i, r, on, playing } = state();
+    const hue = r ? hueOf(r.name) : (HUE[i.id] ?? 40);
+    tab.classList.toggle('spin', playing);
+    tab.querySelector('.mcm-disc').style.setProperty('--hue', hue);
+    tab.title = playing ? (r ? r.name : i.track) : 'Music';
+    if (!panel) return;
+    const q = s => panel.querySelector(s);
+    panel.classList.toggle('off', !playing);
+    q('.top .mcm-disc').style.setProperty('--hue', hue);
+    q('.top .mcm-disc').classList.toggle('spin', playing);
+    q('.src span').textContent = r ? 'Casino Radio' : 'Built-in music';
+    q('.tn').textContent = !on ? 'Music is off' : r ? (playing ? r.name : 'Tap anywhere to tune in') : (i.track || 'Tap play to start');
+    q('.sub').textContent = r ? `Up next: ${r.next}` : (on ? STYLE_NAMES[c.style || 'mix'] : 'Press play for music on every page');
+    const pos = r ? r.offset : i.pos, len = r ? r.dur : i.len;
+    q('.bar b').style.width = len ? Math.min(100, pos / len * 100) + '%' : '0';
+    q('.times').innerHTML = len && on ? `<span>${mmss(pos)}</span><span>${mmss(len)}</span>` : '<span></span><span></span>';
+    q('.pp').innerHTML = on ? ICON.pause : ICON.play;
+    q('.pp').setAttribute('aria-label', on ? 'Pause music' : 'Play music');
+    q('.pp').hidden = !!(r && r.locked);
+    q('.nx').hidden = !!r;
+    q('.styles').hidden = !!r;
+    q('.note').hidden = !(r && r.locked);
+    panel.querySelectorAll('.styles button').forEach(b => b.setAttribute('aria-pressed', String((c.style || 'mix') === b.dataset.s)));
+    q('.sw').setAttribute('aria-checked', String(c.voice !== false));
+  }
+  function open() {
+    const c = CasinoSound.get();
+    panel = document.createElement('div'); panel.className = 'mcm'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Music player');
+    panel.innerHTML = `<button class="x" aria-label="Close">×</button>
+      <div class="top"><span class="mcm-disc"></span><div class="meta"><div class="src"><i></i><span></span></div><div class="tn"></div><div class="sub"></div></div></div>
+      <div class="bar"><b></b></div><div class="times"></div>
+      <div class="ctl"><button class="pp" type="button"></button><button class="nx" type="button" aria-label="Next song">${ICON.next}</button></div>
+      <p class="note">The casino has the radio on for everyone. You can turn it down.</p>
+      <div class="styles" role="group" aria-label="Music style">${Object.entries(STYLE_NAMES).map(([k, v]) => `<button type="button" data-s="${k}">${v}</button>`).join('')}</div>
+      <div class="vol">${ICON.lo}<input type="range" min="0" max="1" step="0.05" value="${c.mvol}" aria-label="Music volume">${ICON.hi}</div>
+      <div class="row2"><div><span>Announcer</span><small>Calls out big wins and bonuses</small></div><button class="sw" type="button" role="switch" aria-label="Announcer"></button></div>`;
+    document.body.appendChild(panel); tab.setAttribute('aria-expanded', 'true');
+    const q = s => panel.querySelector(s);
+    q('.x').onclick = close;
+    q('.pp').onclick = () => { const k = CasinoSound.get(); if (!k.on) CasinoSound.set('on', true); CasinoSound.set('music', !(k.music && k.on)); setTimeout(paint, 120); };
+    q('.nx').onclick = () => { const k = CasinoSound.get(); if (!k.music) CasinoSound.set('music', true); if ((k.style || 'mix') !== 'mix') CasinoSound.set('style', 'mix'); CasinoMusic.next(); setTimeout(paint, 120); };
+    panel.querySelectorAll('.styles button').forEach(b => { b.onclick = () => { CasinoSound.set('style', b.dataset.s); if (!CasinoSound.get().music) CasinoSound.set('music', true); setTimeout(paint, 120); }; });
+    q('.vol input').oninput = e => CasinoSound.set('mvol', +e.target.value);
+    q('.sw').onclick = () => { const on = CasinoSound.get().voice === false; CasinoSound.set('voice', on); paint(); if (on) CasinoVoice.say('Announcer on!', { force: true }); };
+    paint();
+  }
+  function close() { if (panel) { panel.remove(); panel = null; tab.setAttribute('aria-expanded', 'false'); tab.focus({ preventScroll: true }); } }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && panel) close(); });
+  document.addEventListener('pointerdown', e => { if (panel && !panel.contains(e.target) && !tab.contains(e.target)) close(); });
+  CasinoMusic.onChange(paint); CasinoRadio.onChange(paint); setInterval(paint, 1000);
+  if (document.body) init(); else addEventListener('DOMContentLoaded', init);
+})();
+CasinoMusic.update();
+
+/* Finishing touches shared by every page: smooth page changes, brass scrollbars,
+   and a win plaque that drops in for big wins. */
+window.CasinoPolish = (() => {
+  const css = `
+  @view-transition{navigation:auto}
+  ::view-transition-old(root),::view-transition-new(root){animation-duration:.24s;animation-timing-function:ease}
+  html{scrollbar-color:rgba(232,193,112,.42) transparent}
+  ::selection{background:rgba(232,193,112,.35);color:inherit}
+  .mcw-win{position:fixed;left:50%;top:14%;z-index:9995;transform:translateX(-50%);pointer-events:none;text-align:center;
+    padding:18px 34px 16px;border-radius:22px;min-width:240px;
+    background:radial-gradient(120% 90% at 50% 0%,#4A2A10,#1E0F07 70%);
+    box-shadow:0 0 0 2px #C99A4A,0 0 0 7px rgba(30,15,7,.85),0 0 0 9px #7A5320,0 30px 80px rgba(0,0,0,.6),0 0 80px rgba(247,200,110,.35);
+    animation:mcwIn .55s cubic-bezier(.2,1.4,.4,1) both, mcwOut .45s ease 2.9s forwards}
+  .mcw-win small{display:block;font:600 13px "DM Sans",system-ui,sans-serif;color:#E9C98F;letter-spacing:.04em}
+  .mcw-win b{display:block;font:400 clamp(34px,7vw,54px)/1.05 "Limelight","Didot","Georgia",serif;color:#FFE7A8;text-shadow:0 0 18px rgba(255,210,120,.6),0 3px 0 #6b4a22}
+  .mcw-win span{display:block;margin-top:4px;font:500 clamp(18px,3.4vw,24px) "DM Mono",ui-monospace,monospace;color:#F7DFA3;font-variant-numeric:tabular-nums}
+  .mcw-win.epic{box-shadow:0 0 0 2px #FFE59A,0 0 0 7px rgba(30,15,7,.85),0 0 0 9px #C99A4A,0 30px 80px rgba(0,0,0,.6),0 0 120px rgba(255,214,120,.6)}
+  .mcw-coin{position:fixed;z-index:9994;top:-30px;width:18px;height:18px;border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle at 35% 30%,#FFF4C8,#F2C24E 45%,#9A6A16);box-shadow:inset 0 0 0 2px rgba(122,83,32,.6);
+    animation:mcwFall var(--t) cubic-bezier(.3,.1,.7,1) var(--d) forwards}
+  @keyframes mcwIn{from{opacity:0;transform:translate(-50%,-40px) scale(.8)}}
+  @keyframes mcwOut{to{opacity:0;transform:translate(-50%,-20px) scale(.96)}}
+  @keyframes mcwFall{to{transform:translate(var(--dx),110vh) rotate(var(--r))}}
+  @media (prefers-reduced-motion:reduce){
+    @view-transition{navigation:none}
+    .mcw-win{animation:mcwOut .3s ease 2.6s forwards}
+    .mcw-coin{display:none}
+  }`;
+  function style() { if (document.getElementById('mc-polish')) return; const s = document.createElement('style'); s.id = 'mc-polish'; s.textContent = css; (document.head || document.documentElement).appendChild(s); }
+  style();
+  const usd = c => '+$' + (Math.abs(c) / 100).toLocaleString('en-US', { minimumFractionDigits: Math.abs(c) % 100 ? 2 : 0, maximumFractionDigits: 2 });
+  // slot pages have their own big win screens
+  const ownScreens = /\/(slots|cascade|book)\.html/i.test(location.pathname);
+  let last = 0;
+  function bigWin(x, net, opts = {}) {
+    if (!document.body || (ownScreens && !opts.force) || !(x >= 10) || Date.now() - last < 3500) return;
+    last = Date.now();
+    const title = x >= 100 ? 'Epic win' : x >= 25 ? 'Mega win' : 'Big win';
+    const el = document.createElement('div'); el.className = 'mcw-win' + (x >= 25 ? ' epic' : ''); el.setAttribute('role', 'status');
+    el.innerHTML = `<small>${(Math.round(x * 100) / 100).toLocaleString('en-US')}× your bet</small><b>${title}</b>${net > 0 ? `<span>${usd(net)}</span>` : ''}`;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 3500);
+    const n = x >= 25 ? 46 : 26;
+    for (let i = 0; i < n; i++) {
+      const c = document.createElement('i'); c.className = 'mcw-coin';
+      c.style.left = (Math.random() * 100) + 'vw';
+      c.style.setProperty('--dx', (Math.random() - 0.5) * 160 + 'px'); c.style.setProperty('--r', (Math.random() * 1080 - 540) + 'deg');
+      c.style.setProperty('--t', (1.6 + Math.random() * 1.2) + 's'); c.style.setProperty('--d', (Math.random() * 0.7) + 's');
+      const s = 12 + Math.random() * 10; c.style.width = c.style.height = s + 'px';
+      document.body.appendChild(c); setTimeout(() => c.remove(), 3800);
+    }
+  }
+  return { bigWin };
+})();
+</script>
+
+<script>
+/* Big games: drawing match cards and schedule rows (shared by the lobby and the schedule page). */
+window.BigGames = (() => {
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const ICON = { football: '⚽', basketball: '🏀', 'american-football': '🏈', hockey: '🏒', baseball: '⚾', f1: '🏎️', tennis: '🎾' };
+  const SPORT = { football: 'Football', basketball: 'Basketball', 'american-football': 'American football', hockey: 'Ice hockey', baseball: 'Baseball', f1: 'Formula 1', tennis: 'Tennis' };
+  const tf = new Intl.DateTimeFormat([], { hour: '2-digit', minute: '2-digit' });
+  const df = new Intl.DateTimeFormat([], { weekday: 'short', day: 'numeric', month: 'short' });
+  const dayKey = t => { const d = new Date(t); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); };
+  function dayName(t) {
+    const today = new Date(), d = new Date(t);
+    const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000);
+    return diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : diff === -1 ? 'Yesterday' : df.format(d);
+  }
+  function when(e) {
+    if (e.state === 'in') return `<span class="bg-live"><i></i>Live${e.detail ? ' · ' + esc(e.detail) : ''}</span>`;
+    if (e.state === 'post') return `<span class="bg-ft">${esc(e.detail || 'Final')}</span>`;
+    const left = e.start - Date.now();
+    if (left > 0 && left < 3 * 3600000) { const m = Math.round(left / 60000); return `<span class="bg-soon">in ${m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + ' min'}</span>`; }
+    return `<span>${dayName(e.start)}, ${tf.format(new Date(e.start))}</span>`;
+  }
+  const crest = t => t.logo ? `<img src="${esc(t.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">` : `<b class="bg-ini">${esc((t.abbr || t.short || '?').slice(0, 3))}</b>`;
+  const showScore = e => e.state !== 'pre' && e.home && e.home.score !== '';
+  // a big card for the featured strip
+  function card(e) {
+    if (e.kind === 'race') {
+      return `<article class="bg-card race"><header><span>${ICON.f1} ${esc(e.league)}</span>${when(e)}</header>
+        <div class="bg-race"><b>${esc(e.session)}</b><span>${esc(e.title)}</span></div>
+        ${e.podium && e.podium.length ? `<ol class="bg-pod">${e.podium.map(p => `<li>${crest(p)}${esc(p.short)}</li>`).join('')}</ol>` : `<p class="bg-venue">${esc(e.venue)}</p>`}</article>`;
+    }
+    const sc = showScore(e);
+    return `<article class="bg-card${e.state === 'in' ? ' is-live' : ''}"><header><span>${ICON[e.sport] || ''} ${esc(e.league)}</span>${when(e)}</header>
+      <div class="bg-vs">
+        <div class="bg-t${e.state === 'post' && e.home.winner ? ' won' : ''}">${crest(e.home)}<span>${esc(e.home.short)}</span></div>
+        <div class="bg-mid">${sc ? `<b>${esc(e.home.score)}</b><i>–</i><b>${esc(e.away.score)}</b>` : `<i>vs</i>`}</div>
+        <div class="bg-t${e.state === 'post' && e.away.winner ? ' won' : ''}">${crest(e.away)}<span>${esc(e.away.short)}</span></div>
+      </div>
+      <p class="bg-venue">${esc(e.round || e.note || e.venue || '')}</p></article>`;
+  }
+  // a line in the full schedule
+  function row(e) {
+    if (e.kind === 'race') {
+      return `<li class="bg-row race${e.state === 'in' ? ' is-live' : ''}"><span class="bg-time">${e.state === 'pre' ? tf.format(new Date(e.start)) : when(e)}</span>
+        <span class="bg-rname"><b>${esc(e.session)}</b> ${esc(e.title)}</span><span class="bg-rpod">${(e.podium || []).map((p, i) => `${['🥇', '🥈', '🥉'][i]} ${esc(p.short)}`).join(' ')}</span></li>`;
+    }
+    const sc = showScore(e);
+    const nm = t => `<span class="nm"><span class="f">${esc(t.name)}</span><span class="sh">${esc(t.short)}</span></span>`;
+    const time = e.state === 'pre' ? tf.format(new Date(e.start)) : e.state === 'in' ? `<span class="bg-live"><i></i>${esc(e.detail || 'Live')}</span>` : esc(e.detail || 'Final');
+    return `<li class="bg-row${e.state === 'in' ? ' is-live' : ''}"><span class="bg-time">${time}</span>
+      <span class="bg-h${e.state === 'post' && e.home.winner ? ' won' : ''}">${nm(e.home)}${crest(e.home)}</span>
+      <span class="bg-s">${sc ? `${esc(e.home.score)}<i>–</i>${esc(e.away.score)}` : '<i>vs</i>'}</span>
+      <span class="bg-a${e.state === 'post' && e.away.winner ? ' won' : ''}">${crest(e.away)}${nm(e.away)}</span>
+      <span class="bg-extra">${esc(e.round || (e.tv && e.tv.length ? e.tv.join(', ') : ''))}</span></li>`;
+  }
+  const css = `
+  .bg-card{flex:none;width:250px;scroll-snap-align:start;display:flex;flex-direction:column;gap:12px;padding:14px 16px;border-radius:18px;color:var(--ivory,#F5EBDD);
+    background:radial-gradient(120% 80% at 50% 0%,rgba(255,240,200,.07),transparent 60%),linear-gradient(180deg,#1F0C15,#160810);box-shadow:0 0 0 1px rgba(232,193,112,.2),0 14px 30px rgba(0,0,0,.4)}
+  .bg-card.is-live{box-shadow:0 0 0 1px rgba(91,208,138,.55),0 14px 30px rgba(0,0,0,.4),0 0 28px rgba(91,208,138,.12)}
+  .bg-card header{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted,#B69C9F)}
+  .bg-card header>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bg-card header>span:last-child{flex:none;color:var(--gold,#E8C170)}
+  .bg-vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px}
+  .bg-t{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-weight:600;font-size:13.5px;line-height:1.2;min-width:0}
+  .bg-t span{overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .bg-t.won span{color:var(--gold-2,#F7DFA3)}
+  .bg-t img,.bg-t .bg-ini{width:44px;height:44px;object-fit:contain}
+  .bg-ini{display:inline-grid;place-items:center;border-radius:50%;background:rgba(232,193,112,.12);color:var(--gold-2,#F7DFA3);font:700 12px var(--body,system-ui)}
+  .bg-mid{display:flex;align-items:center;gap:6px;font:500 26px var(--mono,ui-monospace,monospace);color:var(--gold-2,#F7DFA3);font-variant-numeric:tabular-nums}
+  .bg-mid i{font-style:normal;color:var(--muted,#B69C9F);font-size:15px}
+  .bg-venue{margin:0;font-size:12px;color:var(--muted,#B69C9F);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:1.2em}
+  .bg-live{display:inline-flex;align-items:center;gap:6px;color:#7FE3A8!important;font-weight:600}
+  .bg-live i{width:7px;height:7px;border-radius:50%;background:#5BD08A;box-shadow:0 0 8px #5BD08A;animation:bgPulse 1.4s ease-in-out infinite}
+  @keyframes bgPulse{50%{opacity:.35}}
+  .bg-ft{color:var(--muted,#B69C9F)!important}
+  .bg-soon{color:#FFD58A!important;font-weight:600}
+  .bg-race b{display:block;font:400 22px/1.1 var(--display,Georgia,serif);color:var(--gold-2,#F7DFA3)}
+  .bg-race span{font-size:13.5px}
+  .bg-pod{margin:0;padding:0;list-style:none;display:grid;gap:4px;font-size:13px}
+  .bg-pod li{display:flex;align-items:center;gap:8px}
+  .bg-pod img,.bg-pod .bg-ini{width:18px;height:18px;object-fit:contain}
+  .bg-row{display:grid;grid-template-columns:90px minmax(0,1fr) 64px minmax(0,1fr) 140px;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid rgba(232,193,112,.1);font-size:14.5px}
+  .bg-row.is-live{background:linear-gradient(90deg,rgba(91,208,138,.08),transparent 70%)}
+  .bg-time{font:500 13px var(--mono,ui-monospace,monospace);color:var(--muted,#B69C9F)}
+  .bg-h,.bg-a{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;white-space:nowrap}
+  .bg-h{justify-content:flex-end;text-align:right}
+  .bg-row .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bg-row .nm .sh{display:none}
+  .bg-h img,.bg-a img,.bg-row .bg-ini{width:24px;height:24px;object-fit:contain;flex:none}
+  .bg-row .bg-ini{font-size:9px}
+  .bg-h.won,.bg-a.won{color:var(--gold-2,#F7DFA3);font-weight:600}
+  .bg-s{text-align:center;font:500 16px var(--mono,ui-monospace,monospace);color:var(--gold-2,#F7DFA3);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .bg-s i{font-style:normal;color:var(--muted,#B69C9F);margin:0 4px;font-size:13px}
+  .bg-extra{font-size:12px;color:var(--muted,#B69C9F);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bg-row.race{grid-template-columns:90px minmax(0,1fr) auto}
+  .bg-rname b{color:var(--gold-2,#F7DFA3);font-weight:600;margin-right:6px}
+  .bg-rpod{font-size:13px;color:var(--muted,#B69C9F);white-space:nowrap}
+  @media (max-width:640px){
+    .bg-row{grid-template-columns:52px minmax(0,1fr) 50px minmax(0,1fr);font-size:13.5px;gap:6px}
+    .bg-extra{display:none}
+    .bg-row .nm .f{display:none} .bg-row .nm .sh{display:inline}
+    .bg-time{font-size:11.5px}
+    .bg-row.race{grid-template-columns:52px minmax(0,1fr)}
+    .bg-rpod{grid-column:2}
+  }
+  @media (prefers-reduced-motion:reduce){.bg-live i{animation:none}}`;
+  function style() { if (document.getElementById('bg-css')) return; const s = document.createElement('style'); s.id = 'bg-css'; s.textContent = css; document.head.appendChild(s); }
+  async function load() { const r = await fetch('api/fixtures', { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+  return { card, row, load, style, dayKey, dayName, ICON, SPORT, esc };
+})();
+
+</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const B = window.BigGames; B.style();
+  let V = null, sport = 'all', timer = null;
+  try { sport = sessionStorage.getItem('mc-bg-sport') || 'all'; } catch (e) {}
+  function draw() {
+    if (!V) return;
+    const evs = V.events.filter(e => sport === 'all' || e.sport === sport);
+    // sports chips with counts
+    const counts = {}; V.events.forEach(e => { counts[e.sport] = (counts[e.sport] || 0) + 1; });
+    const sports = Object.keys(B.SPORT).filter(s => counts[s]);
+    if (sport !== 'all' && !counts[sport]) sport = 'all';
+    $('chips').innerHTML = `<button type="button" data-s="all" aria-pressed="${sport === 'all'}">All sports<small>${V.events.length}</small></button>` +
+      sports.map(s => `<button type="button" data-s="${s}" aria-pressed="${sport === s}">${B.ICON[s]} ${B.SPORT[s]}<small>${counts[s]}</small></button>`).join('');
+    $('chips').querySelectorAll('button').forEach(b => { b.onclick = () => { sport = b.dataset.s; try { sessionStorage.setItem('mc-bg-sport', sport); } catch (e) {} draw(); }; });
+    const feat = V.featured.filter(e => sport === 'all' || e.sport === sport);
+    $('rail').innerHTML = feat.map(B.card).join(''); $('rail').hidden = !feat.length;
+    // the schedule, one day at a time, each league together
+    const days = new Map();
+    for (const e of evs) { const k = B.dayKey(e.start); if (!days.has(k)) days.set(k, []); days.get(k).push(e); }
+    $('list').innerHTML = [...days.values()].map(list => {
+      const lgs = new Map(); list.forEach(e => { if (!lgs.has(e.league)) lgs.set(e.league, []); lgs.get(e.league).push(e); });
+      return `<section class="day"><h3>${B.dayName(list[0].start)}</h3>${[...lgs.entries()].map(([name, es]) => `<div class="lg"><h4>${B.ICON[es[0].sport] || ''} ${B.esc(name)}</h4><ul>${es.map(B.row).join('')}</ul></div>`).join('')}</section>`;
+    }).join('');
+    $('empty').hidden = evs.length > 0;
+    $('empty').textContent = V.ok ? 'No games on the schedule for this sport in the next week.' : 'The schedule is loading. Check back in a minute.';
+    $('upd').textContent = V.updated ? 'Updated ' + new Date(V.updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  }
+  async function load() {
+    try { V = await B.load(); draw(); } catch (e) { $('empty').hidden = false; $('empty').textContent = 'Couldn’t load the schedule. Check your connection.'; }
+    clearTimeout(timer);
+    const live = V && V.events.some(e => e.state === 'in');
+    timer = setTimeout(() => { if (!document.hidden) load(); else timer = setTimeout(load, 30000); }, live ? 30000 : 120000);
+  }
+  load();
+  setInterval(() => { if (V) draw(); }, 60000);   // keeps "in 12 min" counting down
+})();
+</script>
+</body>
+</html>
