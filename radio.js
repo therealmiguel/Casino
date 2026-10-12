@@ -84,7 +84,35 @@ module.exports = function createRadio({ redis, useRedis, dataDir, headers = {} }
     pending.set(id, p);
     return p;
   }
-  const isMp3 = b => b.length > 1024 && ((b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) || (b[0] === 0xFF && (b[1] & 0xE0) === 0xE0));
+  // what kind of audio file this really is (converters often name AAC or M4A files ".mp3", or put junk in front)
+  function sniff(b) {
+    if (b.length < 1024) return null;
+    const at = (o, str) => b.toString('latin1', o, o + str.length) === str;
+    if (at(0, 'ID3')) return 'audio/mpeg';
+    if (at(4, 'ftyp')) return 'audio/mp4';
+    if (at(0, 'OggS')) return 'audio/ogg';
+    if (at(0, 'RIFF') && at(8, 'WAVE')) return 'audio/wav';
+    if (at(0, 'fLaC')) return 'audio/flac';
+    if (b[0] === 0x1A && b[1] === 0x45 && b[2] === 0xDF && b[3] === 0xA3) return 'audio/webm';
+    // look for real audio frames in the first 256 KB: three in a row, each where the one before says it ends
+    const BR1 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320], BR2 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
+    const SR = { 3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000] };
+    const mp3Len = i => {
+      if (b[i] !== 0xFF || (b[i + 1] & 0xE0) !== 0xE0) return 0;
+      const v = (b[i + 1] >> 3) & 3, layer = (b[i + 1] >> 1) & 3, br = b[i + 2] >> 4, sr = (b[i + 2] >> 2) & 3, pad = (b[i + 2] >> 1) & 1;
+      if (v === 1 || layer !== 1 || br === 0 || br === 15 || sr === 3) return 0;
+      return Math.floor((v === 3 ? 144 : 72) * (v === 3 ? BR1 : BR2)[br] * 1000 / SR[v][sr]) + pad;
+    };
+    const aacLen = i => (b[i] === 0xFF && (b[i + 1] & 0xF6) === 0xF0 ? ((b[i + 3] & 3) << 11) | (b[i + 4] << 3) | (b[i + 5] >> 5) : 0);
+    const chain = (i, len) => { for (let k = 0; k < 3; k++) { const n = len(i); if (n < 7 || i + n > b.length) return false; i += n; } return true; };
+    const end = Math.min(b.length - 8, 262144);
+    for (let i = 0; i < end; i++) {
+      if (b[i] !== 0xFF) continue;
+      if (chain(i, mp3Len)) return 'audio/mpeg';
+      if (chain(i, aacLen)) return 'audio/aac';
+    }
+    return null;
+  }
   function readRaw(req, limit) {
     return new Promise((resolve, reject) => {
       let size = 0; const chunks = [];
@@ -97,10 +125,10 @@ module.exports = function createRadio({ redis, useRedis, dataDir, headers = {} }
   /* ---------- for every page ---------- */
   const publicView = () => ({ on: !!R.on, lock: !!R.lock, epoch: R.epoch, now: Date.now(), v: R.v, songs: R.songs.map(s => ({ id: s.id, name: s.name, dur: s.dur })) });
   async function serveSong(req, res, id) {
-    let buf;
+    let buf; const song = R.songs.find(x => x.id === id);
     try { buf = await getSong(id); } catch (e) { console.error('Radio:', e.message); }
     if (!buf) { res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, headers)); return res.end('Not found'); }
-    const base = Object.assign({ 'Content-Type': 'audio/mpeg', 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=31536000, immutable' }, headers);
+    const base = Object.assign({ 'Content-Type': (song && song.type) || 'audio/mpeg', 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=31536000, immutable' }, headers);
     const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ''));
     if (m && (m[1] || m[2])) {
       let start = m[1] ? +m[1] : buf.length - +m[2], end = m[1] && m[2] ? Math.min(+m[2], buf.length - 1) : buf.length - 1;
@@ -121,19 +149,20 @@ module.exports = function createRadio({ redis, useRedis, dataDir, headers = {} }
   };
   async function upload(req) {
     const name = (() => { try { return decodeURIComponent(String(req.headers['x-name'] || '')); } catch (e) { return ''; } })()
-      .replace(/\.mp3$/i, '').replace(/[\u0000-\u001f<>]/g, '').replace(/[_]+/g, ' ').trim().slice(0, 80) || 'Untitled';
+      .replace(/\.(mp3|m4a|aac|wav|ogg|opus|flac|webm|mp4)$/i, '').replace(/[\u0000-\u001f<>]/g, '').replace(/[_]+/g, ' ').trim().slice(0, 80) || 'Untitled';
     const dur = Number(req.headers['x-dur']);
     if (!(dur >= 3 && dur <= 3 * 3600)) return { code: 400, body: { error: 'Could not read how long the song is.' } };
     if (R.songs.length >= MAX_SONGS) return { code: 400, body: { error: `The radio holds ${MAX_SONGS} songs at most. Delete some first.` } };
     let buf;
     try { buf = await readRaw(req, MAX_SONG); } catch (e) { return { code: 413, body: { error: `That file is too big. Songs can be up to ${MAX_SONG / 1048576} MB.` } }; }
-    if (!isMp3(buf)) return { code: 400, body: { error: 'That isn’t an MP3 file.' } };
+    const type = sniff(buf);
+    if (!type) return { code: 400, body: { error: 'That isn’t a music file the casino can play. Try converting it to MP3.' } };
     const used = R.songs.reduce((a, s) => a + s.size, 0);
     if (used + buf.length > MAX_TOTAL) return { code: 400, body: { error: `Not enough room: the radio can hold ${MAX_TOTAL / 1048576} MB of songs. Delete some first.` } };
     const id = crypto.randomBytes(8).toString('hex');
     const chunks = await putSong(id, buf);
     remember(id, buf);
-    keepPlace(() => { R.songs.push({ id, name, dur: Math.round(dur * 100) / 100, size: buf.length, chunks, added: Date.now() }); });
+    keepPlace(() => { R.songs.push({ id, name, dur: Math.round(dur * 100) / 100, size: buf.length, type, chunks, added: Date.now() }); });
     await save();
     return { code: 200, body: { ok: true, id, name } };
   }

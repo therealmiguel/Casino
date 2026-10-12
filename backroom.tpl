@@ -219,7 +219,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
             <div class="drop" id="rdDrop" tabindex="0" role="button" aria-label="Add MP3 files">
               <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
               <b>Drag MP3 files here</b><span>or click to choose · up to 20 MB each</span>
-              <input type="file" id="rdFile" accept=".mp3,audio/mpeg" multiple hidden>
+              <input type="file" id="rdFile" accept=".mp3,.m4a,.aac,.wav,.ogg,.flac,audio/*" multiple hidden>
             </div>
             <ul class="rdup" id="rdUp"></ul>
             <div class="row" style="margin:10px 0 4px">
@@ -615,7 +615,7 @@ const rdQueue = []; let rdBusy = false;
 function addFiles(list) {
   for (const f of list) {
     const li = document.createElement('li'); li.innerHTML = `<span>${esc(f.name)}</span><span class="mono st">waiting</span><i><b></b></i>`; $('rdUp').appendChild(li);
-    if (!/\.mp3$/i.test(f.name) && f.type !== 'audio/mpeg') { li.classList.add('err'); li.querySelector('.st').textContent = 'not an MP3'; continue; }
+    if (!/\.(mp3|m4a|aac|wav|ogg|opus|flac)$/i.test(f.name) && !/^audio\//.test(f.type)) { li.classList.add('err'); li.querySelector('.st').textContent = 'not a music file'; continue; }
     if (RD && f.size > RD.maxSong) { li.classList.add('err'); li.querySelector('.st').textContent = 'too big (max ' + mb(RD.maxSong) + ')'; continue; }
     rdQueue.push({ f, li });
   }
@@ -631,7 +631,7 @@ async function pump() {
       if (!(dur > 2)) throw new Error('This file can’t be played.');
       await new Promise((ok, no) => {
         const x = new XMLHttpRequest(); x.open('POST', BASE + 'radio/upload');
-        x.setRequestHeader('X-Backroom', '1'); x.setRequestHeader('Content-Type', 'audio/mpeg');
+        x.setRequestHeader('X-Backroom', '1'); x.setRequestHeader('Content-Type', 'application/octet-stream');
         x.setRequestHeader('X-Name', encodeURIComponent(f.name)); x.setRequestHeader('X-Dur', String(dur));
         x.upload.onprogress = e => { if (e.lengthComputable) { bar.style.width = (e.loaded / e.total * 100) + '%'; st.textContent = Math.round(e.loaded / e.total * 100) + '%'; } };
         x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch (e) {} if (x.status === 200) ok(j); else no(new Error(j.error || 'Upload failed (' + x.status + ')')); };
