@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Back Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Limelight&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@500&display=swap">
 <style>
 :root{
   color-scheme: dark;
@@ -112,13 +115,74 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
 .rdlist li .mono{color:var(--muted);font-size:12px}
 .rdlist li button{padding:4px 8px;border-radius:8px;border:1px solid var(--line-2);background:var(--panel-2);cursor:pointer;color:inherit;font-size:12px}
 .sw2{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;text-transform:none;letter-spacing:0;font-weight:600;color:var(--text)}
+/* ---------- the back room: walnut, brass and a banker's lamp ---------- */
+:root{
+  --bg:#110C09; --panel:#1A130E; --panel-2:#241A12; --line:rgba(232,193,112,.11); --line-2:rgba(232,193,112,.2);
+  --text:#F3E9DA; --muted:#AE9A82; --dim:#7D6C5A; --gold:#E2B65E; --gold-2:#F6DDA0;
+  --good:#62CC8F; --warn:#F0B35A; --bad:#EE7B6B; --info:#86B9E8; --lamp:#2F7A4F;
+  --mono:"DM Mono",ui-monospace,Menlo,Consolas,monospace; --body:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --display:"Limelight","Didot","Georgia",serif;
+}
+html,body{background:var(--bg);min-height:100vh}
+body{background:radial-gradient(70% 380px at 50% -120px,rgba(47,122,79,.28),transparent 70%),radial-gradient(50% 50% at 100% 100%,rgba(120,70,30,.12),transparent 70%),var(--bg) fixed}
+label{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600}
+input[type=text],input[type=password],input[type=number],input[type=search],select,textarea{background:#0D0907;border-color:var(--line-2)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(226,182,94,.18)}
+.btn{background:var(--panel-2);border-color:var(--line-2);font-weight:600}
+.btn:hover:not(:disabled){background:#2F2218}
+.btn.gold{background:linear-gradient(180deg,#FBE3A6,#D9A64C);color:#25150A;box-shadow:0 4px 14px rgba(217,166,76,.22)}
+.btn.gold:hover:not(:disabled){background:linear-gradient(180deg,#FFEBBB,#E3B159)}
+.lcard{background:linear-gradient(180deg,#22180F,#150F0B);border-color:var(--line-2);box-shadow:0 0 0 6px rgba(17,12,9,.7),0 0 0 7px rgba(232,193,112,.18),0 40px 90px rgba(0,0,0,.6)}
+.lcard h1{font:400 34px/1 var(--display);color:var(--gold-2);margin-bottom:8px}
+.lcard .lamp{width:56px;height:30px;margin:0 0 16px;border-radius:30px 30px 6px 6px;background:linear-gradient(180deg,#3E9A66,#1F5A39);box-shadow:0 18px 40px rgba(98,204,143,.25),inset 0 2px 0 rgba(255,255,255,.2)}
+.top{background:rgba(17,12,9,.9);border-bottom-color:var(--line)}
+.top h1{font:400 22px/1 var(--display);color:var(--gold-2);gap:10px}
+.top h1 small{font:500 13px var(--body);color:var(--muted)}
+.tab{font-weight:600;border-radius:999px;padding:7px 14px}
+.tab[aria-selected=true]{background:rgba(226,182,94,.14);color:var(--gold-2);box-shadow:inset 0 0 0 1px rgba(226,182,94,.3)}
+.tile{position:relative;overflow:hidden;background:linear-gradient(180deg,#1E1610,#17110C);border-color:var(--line);border-radius:16px;padding:16px 18px}
+.tile::after{content:"";position:absolute;inset:0 0 auto 0;height:2px;background:linear-gradient(90deg,transparent,rgba(226,182,94,.55),transparent)}
+.tile .k{font-weight:600}
+.tile .v{font:500 30px/1.15 var(--mono);color:var(--gold-2)}
+.tile .v.pos{color:var(--good)} .tile .v.neg{color:var(--bad)}
+.card{background:linear-gradient(180deg,#1C140F,#18110C);border-color:var(--line);border-radius:18px;padding:18px 18px 16px}
+.card h2{font:400 21px/1.15 var(--display);color:var(--gold-2);letter-spacing:.01em}
+.card h2 small{font-family:var(--body)}
+th{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600}
+tr.click:hover td{background:rgba(226,182,94,.05)}
+.drawer{background:linear-gradient(180deg,#1E1610,#150F0B);border-left-color:var(--line-2)}
+.drawer h2{font:400 26px/1.1 var(--display);color:var(--gold-2)}
+.drawer h3{text-transform:none;letter-spacing:0;font-size:13px;font-weight:600;color:var(--gold)}
+.kv div,.act{background:rgba(226,182,94,.05);box-shadow:inset 0 0 0 1px var(--line)}
+.toast{background:#2A1E14;border-color:var(--line-2)}
+.chip{border-color:var(--line-2)}
+.live-t{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.live-t div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:12px;background:rgba(226,182,94,.05);box-shadow:inset 0 0 0 1px var(--line)}
+.live-t b{font-weight:600}
+.live-t span{font:500 12.5px var(--mono);color:var(--muted)}
+.live-t .busy{box-shadow:inset 0 0 0 1px rgba(98,204,143,.4);background:rgba(98,204,143,.07)}
+.live-t .busy span{color:var(--good)}
+/* radio card */
+.drop{border-color:rgba(226,182,94,.3);border-radius:16px;background:repeating-linear-gradient(135deg,rgba(226,182,94,.03) 0 10px,transparent 10px 20px)}
+.drop svg{width:34px;height:34px}
+.rdlist li{border-color:var(--line);border-radius:12px;padding:8px 10px;background:rgba(255,255,255,.01)}
+.rdlist li .disc{width:30px;height:30px;border-radius:50%;flex:none;background:radial-gradient(circle,hsl(var(--h) 70% 60%) 0 18%,#0E0907 19% 22%,transparent 23%),repeating-radial-gradient(circle,#15100C 0 1.5px,#221812 1.5px 3px)}
+.rdlist li.now .disc{animation:rdSpin 3s linear infinite}
+@keyframes rdSpin{to{transform:rotate(360deg)}}
+.rdlist li .pg{display:block;height:3px;margin-top:5px;border-radius:9px;background:rgba(226,182,94,.15);overflow:hidden}
+.rdlist li .pg b{display:block;height:100%;background:var(--gold)}
+.rdlist li .nmw{flex:1;min-width:0}
+.rdlist li button{border-radius:999px;padding:5px 10px;border-color:var(--line-2);background:rgba(226,182,94,.06)}
+.rdlist li button:hover:not(:disabled){background:rgba(226,182,94,.14)}
+.rdlist li button:disabled{opacity:.35;cursor:default}
+@media (prefers-reduced-motion:reduce){.rdlist li.now .disc{animation:none}}
 </style>
 </head>
 <body>
 <section class="login" id="login" hidden>
   <form class="lcard" id="lform" autocomplete="on">
+    <div class="lamp" aria-hidden="true"></div>
     <h1>Back room</h1>
-    <p>Staff only.</p>
+    <p>Miguel's Casino, staff only.</p>
     <label for="lu">Username</label><input type="text" id="lu" autocomplete="username" required>
     <label for="lp">Password</label><input type="password" id="lp" autocomplete="current-password" required>
     <div class="err" id="lerr" role="alert"></div>
@@ -128,7 +192,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
 
 <div id="app" hidden>
   <header class="top">
-    <h1><i></i>Miguel's Casino · Back room</h1>
+    <h1><i></i>Back room <small>Miguel's Casino</small></h1>
     <nav class="tabs" role="tablist">
       <button class="tab" role="tab" data-tab="overview" aria-selected="true">Overview</button>
       <button class="tab" role="tab" data-tab="players" aria-selected="false">Players</button>
@@ -385,10 +449,14 @@ function renderOverview() {
   $('wins').innerHTML = `<thead><tr><th>Player</th><th>Game</th><th class="num">Won</th><th class="num hide-sm">When</th></tr></thead><tbody>` +
     (OV.bigWins.length ? OV.bigWins.map(w => `<tr class="click" data-id="${esc(w.id)}"><td>${esc(w.name || '(no name)')}</td><td>${esc(GAMES[w.game] || w.game)}</td><td class="num pos">${usd(w.amount)}</td><td class="num hide-sm dim">${ago(w.t)}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No payouts over $500 this week.</td></tr>') + '</tbody>';
   const L = OV.live;
-  $('liveBox').innerHTML = `<table><tbody>
-    <tr><td>Live blackjack</td><td class="num">${L.bj.seated} of 5 seats</td><td class="muted">${esc(L.bj.phase)}</td></tr>
-    <tr><td>Live roulette</td><td class="num">${L.rl.players} at the wheel</td><td class="muted">${esc(L.rl.phase)}</td></tr>
-    <tr><td>Hold’em</td><td class="num">${L.pk.seated} of 6 seats</td><td class="muted">${esc(L.pk.street)}</td></tr></tbody></table>
+  const LT = [
+    ['Live blackjack', `${L.bj.seated} of 5 seats`, L.bj.phase, L.bj.seated],
+    ['Live roulette', `${L.rl.players} at the wheel`, L.rl.phase, L.rl.players],
+    ['Hold’em', `${L.pk.seated} of 6 seats`, L.pk.street, L.pk.seated],
+    ...(L.cr ? [['Rocket Crash', `${L.cr.players} watching`, L.cr.phase, L.cr.players], ['Baccarat', `${L.bc.players} at the table`, L.bc.phase, L.bc.players], ['Dice City', `${L.dc.players} at the table`, L.dc.phase, L.dc.players]] : []),
+    ...(L.wz ? [['Wizard', `${L.wz.tables} table${L.wz.tables === 1 ? '' : 's'}`, L.wz.playing ? `${L.wz.playing} playing` : 'quiet', L.wz.playing]] : []),
+  ];
+  $('liveBox').innerHTML = `<div class="live-t">${LT.map(([n, a, ph, busy]) => `<div class="${busy ? 'busy' : ''}"><b>${esc(n)}</b><span>${esc(a)}${ph ? ' · ' + esc(ph) : ''}</span></div>`).join('')}</div>
     <p class="help" style="margin:10px 0 0">Server up since ${when(OV.startedAt)} · saved in ${esc(OV.storage)}</p>`;
   $('alerts').innerHTML = logItems(OV.security.filter(e => e.kind !== 'legacy').slice(0, 6)) || '<li class="empty" style="display:block">All quiet.</li>';
 }
@@ -595,8 +663,9 @@ function renderRadio() {
   const np = RD.playing, now = np && RD.songs.find(s => s.id === np.id);
   $('rdNow').innerHTML = !RD.songs.length ? 'No songs yet. Until you add some, players hear the built-in music.'
     : `${RD.on ? (now ? `<b>On air:</b> ${esc(now.name)} (${mmss(np.offset)} of ${mmss(np.dur)})` : '') : '<b>Radio is off</b>: players hear the built-in music.'} · ${RD.songs.length} song${RD.songs.length === 1 ? '' : 's'}, ${mmss(total)} in a loop · ${mb(RD.bytes)} of ${mb(RD.maxBytes)} used`;
-  $('rdList').innerHTML = RD.songs.map((s, i) => `<li class="${np && np.id === s.id && RD.on ? 'now' : ''}"><span class="mono">${i + 1}</span><span class="nm" title="${esc(s.name)}">${np && np.id === s.id && RD.on ? '▶ ' : ''}${esc(s.name)}</span><span class="mono">${mmss(s.dur)}</span>
-    <button data-rp="${s.id}" title="Play this now for everyone">Play</button><button data-ru="${s.id}" title="Move up" ${i ? '' : 'disabled'}>▲</button><button data-rd="${s.id}" title="Move down" ${i < RD.songs.length - 1 ? '' : 'disabled'}>▼</button><button data-rx="${s.id}" title="Delete">✕</button></li>`).join('');
+  const hue = n => { let h = 0; for (const c of String(n)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+  $('rdList').innerHTML = RD.songs.map((s, i) => { const on = np && np.id === s.id && RD.on; return `<li class="${on ? 'now' : ''}"><span class="disc" style="--h:${hue(s.name)}"></span><span class="nmw"><span class="nm" title="${esc(s.name)}" style="display:block">${esc(s.name)}</span>${on ? `<span class="pg"><b style="width:${Math.min(100, np.offset / np.dur * 100)}%"></b></span>` : ''}</span><span class="mono">${mmss(s.dur)}</span>
+    <button data-rp="${s.id}" title="Play this now for everyone">Play</button><button data-ru="${s.id}" title="Move up" ${i ? '' : 'disabled'}>▲</button><button data-rd="${s.id}" title="Move down" ${i < RD.songs.length - 1 ? '' : 'disabled'}>▼</button><button data-rx="${s.id}" title="Delete" aria-label="Delete">✕</button></li>`; }).join('');
   $('rdList').querySelectorAll('[data-rp]').forEach(b => { b.onclick = () => rdPost('radio/play', { id: b.dataset.rp }, 'Playing it now for everyone'); });
   $('rdList').querySelectorAll('[data-ru]').forEach(b => { b.onclick = () => rdPost('radio/move', { id: b.dataset.ru, dir: -1 }); });
   $('rdList').querySelectorAll('[data-rd]').forEach(b => { b.onclick = () => rdPost('radio/move', { id: b.dataset.rd, dir: 1 }); });

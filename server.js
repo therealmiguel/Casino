@@ -210,7 +210,7 @@ function hype(id, game, e) {
   const x = (e.paid || 0) / e.staked, tags = (e.tags || []).filter(t => HYPE_TAGS.has(t));
   if (x < 5 && !tags.length) return;
   const rec = A.get(id); if (!rec) return;
-  rec.pop = rec.pop || []; rec.pop.push({ type: 'hype', x: Math.round(x * 100) / 100, tags }); if (rec.pop.length > 12) rec.pop.shift();
+  rec.pop = rec.pop || []; rec.pop.push({ type: 'hype', x: Math.round(x * 100) / 100, net: (e.paid || 0) - e.staked, tags }); if (rec.pop.length > 12) rec.pop.shift();
 }
 // Wizard, the card game: played for points, not chips
 const radio = require('./radio')({ redis, useRedis: USE_REDIS, dataDir: DATA_DIR, headers: { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' } });
@@ -438,7 +438,7 @@ async function adminApi(req, res, sub, ip) {
     for (const [id, r] of A.players) for (const e of r.log) if (e[2] >= 50000 && Date.now() - e[0] < 7 * 86400000 && !['reset', 'admin', 'import', 'table', 'join'].includes(e[1])) bigWins.push({ t: e[0], id, name: r.name, game: e[1], amount: e[2] });
     bigWins.sort((a, b) => b.amount - a.amount);
     return send(res, 200, {
-      players: A.players.size, named, banned, online, money, house: A.house, live: live.summary(), settings: META.settings,
+      players: A.players.size, named, banned, online, money, house: A.house, live: Object.assign(live.summary(), live2.summary(), { wz: (() => { const l = wizard.list(); return { tables: l.length, playing: l.filter(t => !['waiting', 'over'].includes(t.phase)).length }; })() }), settings: META.settings,
       security: META.security.slice(-80).reverse(), audit: META.audit.slice(-40).reverse(), bigWins: bigWins.slice(0, 12),
       startedAt: STARTED, storage: USE_REDIS ? 'upstash' : 'file',
       chat: live2.chatRecent(), rig: META.rig || {},
