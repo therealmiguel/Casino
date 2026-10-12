@@ -868,12 +868,16 @@ window.CasinoMusic = (() => {
   TRACKS.forEach(T => { T.bars = T.sections.reduce((a, s) => a + s[1], 0); });
 
   /* ---------- the sequencer ---------- */
-  function pickTrack() {
-    const st = cfg.style || 'mix';
-    const i = TRACKS.findIndex(T => T.id === st);
-    if (i >= 0) return i;
-    // mix: start with a random party track
-    return Math.floor(Math.random() * 3);
+  // the songs run on the clock too, so moving to another page carries on where the music was
+  const stepLen = T => 60 / T.bpm / 4, songLen = T => T.bars * 16 * stepLen(T);
+  const listFor = st => { const i = TRACKS.findIndex(T => T.id === st); return i >= 0 ? [i] : [0, 1, 2]; };
+  function getOff() { try { return +sessionStorage.getItem('mc-music-off') || 0; } catch (e) { return 0; } }
+  function setOff(v) { try { sessionStorage.setItem('mc-music-off', String(v)); } catch (e) {} }
+  function syncClock() {
+    const list = listFor(cfg.style || 'mix'), cycle = list.reduce((a, i) => a + songLen(TRACKS[i]), 0);
+    let pos = (Date.now() / 1000 + getOff()) % cycle;
+    for (const i of list) { const T = TRACKS[i]; if (pos < songLen(T)) { setTrack(i); step = Math.floor(pos / stepLen(T)); return; } pos -= songLen(T); }
+    setTrack(list[0]);
   }
   function setTrack(i) { trackIdx = (i + TRACKS.length) % TRACKS.length; track = TRACKS[trackIdx]; step = 0; barsInTrack = 0; listeners.forEach(f => f(info())); }
   function where(bar) {
@@ -883,57 +887,142 @@ window.CasinoMusic = (() => {
   }
   function tick() {
     if (!ctx || !track) return;
-    const L = 60 / track.bpm / 4;
+    const L = stepLen(track);
+    // a hidden tab only gets its timer about once a second, so plan further ahead there
+    const ahead = document.hidden ? 1.6 : 0.2;
     if (nextT < ctx.currentTime) nextT = ctx.currentTime + 0.05;
-    while (nextT < ctx.currentTime + 0.18) {
+    while (nextT < ctx.currentTime + ahead) {
       const bar = Math.floor(step / 16), s = step % 16, [sec, b] = where(bar);
       if (s === 0 && b === 0) onSection(sec, bar);
       try { track.play(nextT, s, b, sec, track.chords[bar % track.chords.length], L, bar); } catch (e) { console.error(e); }
       step++; nextT += L;
       // mix mode: after one full song move on to the next one, on a clean bar line
-      if (step % (16 * track.bars) === 0 && (cfg.style || 'mix') === 'mix') { const T = nextT; setTrack(trackIdx + 1 === 3 ? 0 : (trackIdx + 1) % 3); nextT = T + 0.4; return; }
+      if (step % (16 * track.bars) === 0 && (cfg.style || 'mix') === 'mix') { const T = nextT; setTrack((trackIdx + 1) % 3); nextT = T; return; }
     }
   }
   function onSection(sec, bar) {
     // the DJ shouts something now and then when the beat drops
     if ((sec === 'chorus' || sec === 'drop') && bar > 0 && window.CasinoVoice) CasinoVoice.dj();
   }
-  function level() { return cfg.music && cfg.on ? cfg.mvol * 0.75 * voiceDuck : 0; }
+  const radioOn = () => !!(window.CasinoRadio && CasinoRadio.active());
+  const wantMusic = () => cfg.music && cfg.on && !radioOn();
+  function level() { return wantMusic() ? cfg.mvol * 0.75 * voiceDuck : 0; }
+  function stop() { if (out && ctx) out.gain.setTargetAtTime(0, ctx.currentTime, 0.15); if (timer) { clearInterval(timer); timer = null; } }
   function update(c) {
     cfg = c || CasinoSound.get();
-    const want = cfg.music && cfg.on;
-    if (!want) { if (out) out.gain.setTargetAtTime(0, ctx.currentTime, 0.15); if (timer) { clearInterval(timer); timer = null; } return; }
-    if (!gestured && !ctx) return;               // browsers only allow sound after a tap
+    if (window.CasinoRadio) CasinoRadio.update();
+    if (!wantMusic()) return stop();
     if (!build()) return;
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx.state === 'suspended') ctx.resume().then(() => { if (!timer) update(); }).catch(() => {});
     out.gain.setTargetAtTime(level(), ctx.currentTime, 0.2);
     const st = cfg.style || 'mix';
-    if (!track || (st !== 'mix' && track.id !== st)) setTrack(pickTrack());
-    if (!timer && ctx.state === 'running') { nextT = ctx.currentTime + 0.1; timer = setInterval(tick, 30); }
+    if (!track || (st !== 'mix' && track.id !== st) || (st === 'mix' && trackIdx > 2)) syncClock();
+    if (!timer && ctx.state === 'running') { syncClock(); nextT = ctx.currentTime + 0.1; timer = setInterval(tick, 30); }
   }
   // music gets quieter while the announcer talks
-  function duck(on) { voiceDuck = on ? 0.35 : 1; if (out && ctx && cfg.music && cfg.on) out.gain.setTargetAtTime(level(), ctx.currentTime, on ? 0.05 : 0.4); }
+  function duck(on) { voiceDuck = on ? 0.35 : 1; if (window.CasinoRadio) CasinoRadio.duck(on); if (out && ctx && wantMusic()) out.gain.setTargetAtTime(level(), ctx.currentTime, on ? 0.05 : 0.4); }
   // a short fanfare on a big moment, even when the music is off
   function fanfare(big) {
-    if (!cfg.on || (!gestured && !ctx) || !build()) return;
+    if (!cfg.on || !build()) return;
     if (ctx.state === 'suspended') { ctx.resume().catch(() => {}); return; }
-    const t = ctx.currentTime + 0.03, prev = out.gain.value;
-    if (!(cfg.music && cfg.on)) { out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(0.75 * cfg.vol, t); out.gain.setTargetAtTime(0, t + 2.6, 0.3); }
+    const t = ctx.currentTime + 0.03;
+    if (!wantMusic()) { out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(0.75 * cfg.vol, t); out.gain.setTargetAtTime(0, t + 2.6, 0.3); }
     const notes = big ? [60, 64, 67, 72, 76, 79, 84] : [64, 67, 72, 76];
     notes.forEach((n, i) => I.stab(t + i * 0.07, [n, n + 7], 0.3, 0.06, 'sawtooth', 3200));
     I.stab(t + notes.length * 0.07, [72, 76, 79, 84], 1.1, 0.07, 'sawtooth', 3600);
     I.crash(t + notes.length * 0.07, 0.25);
     I.hey(t + notes.length * 0.07 + 0.05, 0.22);
     if (big) I.vox(t + notes.length * 0.07, 79, 1.4, 'a', 0.07, 'o', { choir: true, wet: 0.8 });
-    void prev;
   }
   const info = () => ({ playing: !!timer, track: track ? track.name : '', id: track ? track.id : '', style: cfg.style || 'mix' });
-  function next() { if (!build()) return; setTrack(trackIdx + 1); nextT = ctx.currentTime + 0.2; }
-  let gestured = false;
-  const unlock = () => { gestured = true; if (ctx && ctx.state === 'suspended') ctx.resume().then(() => update()).catch(() => {}); else if (!timer) update(); };
-  document.addEventListener('pointerdown', unlock); document.addEventListener('keydown', unlock);
-  document.addEventListener('visibilitychange', () => { if (!ctx) return; if (document.hidden) ctx.suspend().catch(() => {}); else if (cfg.music && cfg.on) ctx.resume().then(() => update()).catch(() => {}); });
+  // skip: move this device's clock on to the start of the next song
+  function next() {
+    if (!build() || !track) return;
+    setOff(getOff() + songLen(track) - step * stepLen(track));
+    setTrack((trackIdx + 1) % 3); nextT = ctx.currentTime + 0.2;
+  }
+  // browsers only allow sound after a tap: try right away (some allow it), and again on the first tap
+  const unlock = () => { if (ctx && ctx.state === 'suspended') ctx.resume().then(() => update()).catch(() => {}); else if (!timer) update(); };
+  document.addEventListener('pointerdown', unlock); document.addEventListener('keydown', unlock); document.addEventListener('touchend', unlock);
+  // the music keeps playing when you switch to another tab or app
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && ctx && ctx.state !== 'running' && wantMusic()) ctx.resume().then(() => update()).catch(() => {}); });
   return { update, duck, fanfare, next, info, onChange: f => listeners.add(f), TRACKS: TRACKS.map(T => ({ id: T.id, name: T.name })), _I: I, _ctx: () => ctx, _comp: () => comp };
+})();
+
+/* Casino Radio: the MP3s Miguel uploads in the admin room, played for everyone like a radio station.
+   The playlist runs on the casino's clock, so every page and every player is at the same spot in the same song.
+   It plays through a normal audio element, which keeps going in the background, also on phones. */
+window.CasinoRadio = (() => {
+  let R = null, audio = null, cur = null, skew = 0, duckV = 1, endT = null, lastErr = 0;
+  const listeners = new Set();
+  const active = () => !!(R && R.on && R.songs && R.songs.length);
+  const locked = () => !!(R && R.lock);
+  // with "everyone has to listen" on, the player can only turn it down, not off
+  const allowed = () => { const c = CasinoSound.get(); return locked() || (c.music && c.on); };
+  function at() {
+    const total = R.songs.reduce((a, s) => a + s.dur, 0);
+    let pos = ((Date.now() + skew - R.epoch) / 1000) % total; if (pos < 0) pos += total;
+    for (let i = 0; i < R.songs.length; i++) { const s = R.songs[i]; if (pos < s.dur) return { i, id: s.id, name: s.name, offset: pos, dur: s.dur, next: R.songs[(i + 1) % R.songs.length].name }; pos -= s.dur; }
+    const s = R.songs[0]; return { i: 0, id: s.id, name: s.name, offset: 0, dur: s.dur, next: s.name };
+  }
+  function vol() { const c = CasinoSound.get(); return Math.max(0, Math.min(1, c.mvol * 1.4)) * duckV; }
+  function el() {
+    if (audio) return audio;
+    audio = new Audio(); audio.preload = 'auto'; audio.setAttribute('playsinline', '');
+    audio.addEventListener('ended', () => {
+      // the clock may say the song still has a moment left: wait for it, then go to the next one
+      const np = active() ? at() : null;
+      clearTimeout(endT);
+      if (np && cur && np.id === cur.id) endT = setTimeout(() => sync(), Math.max(50, (np.dur - np.offset) * 1000 + 60)); else sync();
+    });
+    audio.addEventListener('error', () => { if (Date.now() - lastErr > 5000) { lastErr = Date.now(); setTimeout(() => { cur = null; sync(); }, 2000); } });
+    audio.addEventListener('playing', paint);
+    audio.addEventListener('pause', paint);
+    return audio;
+  }
+  function media(np) {
+    if (!('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: np.name, artist: 'Casino Radio', album: 'Miguel’s Casino' });
+      navigator.mediaSession.setActionHandler('play', () => { sync(); });
+      navigator.mediaSession.setActionHandler('pause', () => { if (!locked()) { CasinoSound.set('music', false); } else sync(); });
+    } catch (e) {}
+  }
+  function sync() {
+    if (!active() || !allowed()) { if (audio && !audio.paused) audio.pause(); paint(); return; }
+    const np = at(), a = el();
+    a.volume = vol();
+    if (!cur || cur.id !== np.id || !a.src) {
+      cur = np;
+      a.src = 'api/radio/song/' + np.id + '.mp3';
+      a.addEventListener('loadedmetadata', () => { try { a.currentTime = Math.min(at().offset, Math.max(0, (a.duration || np.dur) - 0.5)); } catch (e) {} }, { once: true });
+      media(np);
+    } else if (a.readyState >= 1 && Math.abs(a.currentTime - np.offset) > 2.5 && np.offset < (a.duration || np.dur) - 1) {
+      try { a.currentTime = np.offset; } catch (e) {}   // drifted: back in step with the station
+    }
+    if (a.paused) a.play().catch(() => {});             // may need a tap first; the next tap tries again
+    paint();
+  }
+  async function fetchR() {
+    try {
+      const t0 = Date.now(), r = await fetch('api/radio', { cache: 'no-store' }); if (!r.ok) return;
+      const j = await r.json(), t1 = Date.now();
+      skew = j.now - (t0 + t1) / 2;
+      const was = active(), changed = !R || R.v !== j.v;
+      R = j;
+      if (changed) { cur = cur && active() && R.songs.some(s => s.id === cur.id) ? cur : null; CasinoMusic.update(); if (was && !active() && audio) audio.pause(); sync(); }
+    } catch (e) {}
+  }
+  function update() { if (R) sync(); }
+  function duck(on) { duckV = on ? 0.3 : 1; if (audio) audio.volume = vol(); }
+  function paint() { listeners.forEach(f => { try { f(); } catch (e) {} }); }
+  const info = () => (active() ? Object.assign({ playing: !!(audio && !audio.paused), locked: locked() }, at()) : null);
+  const tap = () => { if (active() && allowed() && (!audio || audio.paused)) sync(); };
+  document.addEventListener('pointerdown', tap); document.addEventListener('keydown', tap); document.addEventListener('touchend', tap);
+  setInterval(() => { if (R) sync(); }, 5000);          // keep in step, and pick up again after an interruption
+  setInterval(fetchR, 20000);                           // new songs from the admin room
+  fetchR();
+  return { active, locked, update, duck, info, onChange: f => listeners.add(f), refresh: fetchR, _audio: () => audio };
 })();
 
 /* The announcer: a voice that calls out big wins, bonuses, level ups and the Casino Wheel. */
@@ -1038,7 +1127,9 @@ window.CasinoVoice = (() => {
   @keyframes mcmB{to{transform:scale(1.15)}}
   .mcm{position:fixed;left:10px;top:calc(50% - 90px);z-index:9991;width:min(270px,calc(100vw - 20px));padding:14px;border-radius:16px;background:linear-gradient(180deg,#2A1B10,#170E08);color:#FFF4DA;box-shadow:0 0 0 1px rgba(247,223,163,.45),0 20px 50px rgba(0,0,0,.6);font:600 13.5px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif}
   .mcm h4{margin:0 0 2px;font:800 11px system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#D8C8A8}
-  .mcm .mcm-now{font-weight:800;font-size:16px;color:#F7DFA3;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .mcm .mcm-now{font-weight:800;font-size:16px;color:#F7DFA3;margin-bottom:4px;display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}
+  .mcm .mcm-sub{color:#D8C8A8;font-size:12px;margin-bottom:10px;min-height:2px}
+  .mcm [hidden]{display:none!important}
   .mcm .eq{display:inline-flex;gap:2px;align-items:flex-end;height:14px}.mcm .eq i{width:3px;background:#F7DFA3;animation:mcmE .6s ease-in-out infinite alternate}.mcm .eq i:nth-child(2){animation-delay:.2s}.mcm .eq i:nth-child(3){animation-delay:.4s}
   .mcm.off .eq i{animation:none;height:3px}
   @keyframes mcmE{from{height:3px}to{height:14px}}
@@ -1061,20 +1152,27 @@ window.CasinoVoice = (() => {
   }
   function paint() {
     if (!tab) return;
-    const c = CasinoSound.get(), i = CasinoMusic.info();
-    tab.classList.toggle('on', !!(c.music && c.on && i.playing));
+    const c = CasinoSound.get(), i = CasinoMusic.info(), r = CasinoRadio.info();
+    const on = r ? (r.locked || (c.music && c.on)) : (c.music && c.on), playing = r ? r.playing : i.playing;
+    tab.classList.toggle('on', !!(on && playing));
+    tab.title = r ? 'Casino Radio' : 'Music';
     if (!panel) return;
-    panel.classList.toggle('off', !(c.music && c.on && i.playing));
-    panel.querySelector('.tn').textContent = c.music && c.on ? (i.track || 'Tap play') : 'Music is off';
-    panel.querySelector('#mcmPlay').textContent = c.music && c.on ? '❚❚ Pause' : '▶ Play';
-    panel.querySelector('#mcmPlay').classList.toggle('act', !(c.music && c.on));
+    panel.classList.toggle('off', !(on && playing));
+    panel.querySelector('h4').textContent = r ? '📻 Casino Radio' : 'Now playing';
+    panel.querySelector('.tn').textContent = !on ? 'Music is off' : r ? (playing ? r.name : 'Tap anywhere to tune in') : (i.track || 'Tap play');
+    panel.querySelector('.mcm-sub').textContent = r ? `Up next: ${r.next}${r.locked ? ' · the casino picks the music' : ''}` : '';
+    panel.querySelector('#mcmPlay').textContent = on ? '❚❚ Pause' : '▶ Play';
+    panel.querySelector('#mcmPlay').classList.toggle('act', !on);
+    panel.querySelector('#mcmPlay').hidden = !!(r && r.locked);
+    panel.querySelector('#mcmNext').hidden = !!r;
+    panel.querySelector('#mcmStyleL').hidden = !!r;
   }
   function open() {
     const c = CasinoSound.get();
     panel = document.createElement('div'); panel.className = 'mcm'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Music');
-    panel.innerHTML = `<button class="mcm-x" aria-label="Close">×</button><h4>Now playing</h4><div class="mcm-now"><span class="eq"><i></i><i></i><i></i></span><span class="tn"></span></div>
+    panel.innerHTML = `<button class="mcm-x" aria-label="Close">×</button><h4>Now playing</h4><div class="mcm-now"><span class="eq"><i></i><i></i><i></i></span><span class="tn"></span></div><div class="mcm-sub"></div>
       <div class="mcm-row"><button class="mcm-b" id="mcmPlay"></button><button class="mcm-b" id="mcmNext">⏭ Next</button></div>
-      <label>Style<select id="mcmStyle"><option value="mix">Party mix (all songs)</option>${CasinoMusic.TRACKS.map(T => `<option value="${T.id}">${T.name}</option>`).join('')}</select></label>
+      <label id="mcmStyleL">Style<select id="mcmStyle"><option value="mix">Party mix (all songs)</option>${CasinoMusic.TRACKS.map(T => `<option value="${T.id}">${T.name}</option>`).join('')}</select></label>
       <label>Music volume<input type="range" id="mcmVol" min="0" max="1" step="0.05" value="${c.mvol}"></label>
       <div class="mcm-sw"><span>Announcer voice</span><input type="checkbox" id="mcmVoice" ${c.voice !== false ? 'checked' : ''}></div>
       ${CasinoVoice.available ? '' : '<label>This browser has no voice for the announcer.</label>'}`;
@@ -1091,7 +1189,7 @@ window.CasinoVoice = (() => {
   function close() { if (panel) { panel.remove(); panel = null; } }
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
   document.addEventListener('pointerdown', e => { if (panel && !panel.contains(e.target) && e.target !== tab && !tab.contains(e.target)) close(); });
-  CasinoMusic.onChange(paint); setInterval(paint, 2000);
+  CasinoMusic.onChange(paint); CasinoRadio.onChange(paint); setInterval(paint, 2000);
   if (document.body) init(); else addEventListener('DOMContentLoaded', init);
 })();
 CasinoMusic.update();

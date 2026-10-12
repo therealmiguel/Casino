@@ -97,6 +97,21 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
 .switch b{display:block}
 .switch span{color:var(--muted);font-size:13px}
 @media (max-width:640px){main{padding:14px}.top{padding:10px 14px;flex-wrap:wrap}.acts{grid-template-columns:minmax(0,1fr)}.kv{grid-template-columns:repeat(2,minmax(0,1fr))}.hide-sm{display:none}}
+.drop{display:flex;flex-direction:column;align-items:center;gap:4px;padding:22px 14px;border:2px dashed var(--line-2);border-radius:14px;text-align:center;color:var(--muted);cursor:pointer;transition:background .15s,border-color .15s}
+.drop b{color:var(--text)} .drop svg{color:var(--gold)}
+.drop.over,.drop:hover{border-color:var(--gold);background:rgba(233,196,106,.07)}
+.rdup{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}
+.rdup li{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:13px;padding:8px 10px;border-radius:10px;background:var(--panel-2)}
+.rdup li i{grid-column:1/-1;height:4px;border-radius:9px;background:var(--line-2);overflow:hidden;font-style:normal}
+.rdup li i b{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+.rdup li.err{color:var(--bad)}
+.rdlist{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:4px;max-height:340px;overflow:auto}
+.rdlist li{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:10px;border:1px solid var(--line)}
+.rdlist li.now{border-color:var(--gold);background:rgba(233,196,106,.08)}
+.rdlist li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rdlist li .mono{color:var(--muted);font-size:12px}
+.rdlist li button{padding:4px 8px;border-radius:8px;border:1px solid var(--line-2);background:var(--panel-2);cursor:pointer;color:inherit;font-size:12px}
+.sw2{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;text-transform:none;letter-spacing:0;font-weight:600;color:var(--text)}
 </style>
 </head>
 <body>
@@ -197,6 +212,23 @@ tr.click{cursor:pointer} tr.click:hover td{background:rgba(255,255,255,.03)}
             </div>
             <p class="help" id="whNow" style="margin-top:10px"></p>
             <ul class="log" id="whList" style="max-height:200px;overflow:auto"></ul>
+          </div>
+          <div class="card">
+            <h2>📻 Casino Radio</h2>
+            <p class="help">Drop MP3s here and every player hears them on every page, like a radio station: everyone is at the same spot in the same song, and it keeps going when they change page or switch to another app. While the radio has songs, it replaces the built-in music.</p>
+            <div class="drop" id="rdDrop" tabindex="0" role="button" aria-label="Add MP3 files">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              <b>Drag MP3 files here</b><span>or click to choose · up to 20 MB each</span>
+              <input type="file" id="rdFile" accept=".mp3,audio/mpeg" multiple hidden>
+            </div>
+            <ul class="rdup" id="rdUp"></ul>
+            <div class="row" style="margin:10px 0 4px">
+              <label class="sw2"><input type="checkbox" id="rdOn"> Radio on</label>
+              <label class="sw2"><input type="checkbox" id="rdLock"> Everyone has to listen <span class="dim">(players can only turn it down)</span></label>
+              <button class="btn small" id="rdNext">⏭ Next song for everyone</button>
+            </div>
+            <p class="help" id="rdNow" style="margin-top:8px"></p>
+            <ol class="rdlist" id="rdList"></ol>
           </div>
           <div class="card">
             <h2>Free spins</h2>
@@ -316,6 +348,7 @@ let OV = null, PL = [], sortKey = 'cash', sortDir = -1, secSeen = +(localStorage
 async function load() {
   try {
     OV = await api('overview');
+    loadRadio();
     if (tab === 'players' || !PL.length) PL = await api('players');
     render();
   } catch (e) { if (e.message !== 'Signed out') toast(e.message); }
@@ -549,6 +582,79 @@ $('export').onclick = async () => {
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 };
 $('refresh').onclick = load;
+
+/* ---------- Casino Radio ---------- */
+let RD = null;
+const mmss = s => { s = Math.round(s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const mb = b => (b / 1048576).toFixed(1) + ' MB';
+async function loadRadio() { try { RD = await api('radio'); renderRadio(); } catch (e) {} }
+function renderRadio() {
+  if (!RD) return;
+  $('rdOn').checked = RD.on; $('rdLock').checked = RD.lock;
+  const total = RD.songs.reduce((a, s) => a + s.dur, 0);
+  const np = RD.playing, now = np && RD.songs.find(s => s.id === np.id);
+  $('rdNow').innerHTML = !RD.songs.length ? 'No songs yet. Until you add some, players hear the built-in music.'
+    : `${RD.on ? (now ? `<b>On air:</b> ${esc(now.name)} (${mmss(np.offset)} of ${mmss(np.dur)})` : '') : '<b>Radio is off</b>: players hear the built-in music.'} · ${RD.songs.length} song${RD.songs.length === 1 ? '' : 's'}, ${mmss(total)} in a loop · ${mb(RD.bytes)} of ${mb(RD.maxBytes)} used`;
+  $('rdList').innerHTML = RD.songs.map((s, i) => `<li class="${np && np.id === s.id && RD.on ? 'now' : ''}"><span class="mono">${i + 1}</span><span class="nm" title="${esc(s.name)}">${np && np.id === s.id && RD.on ? '▶ ' : ''}${esc(s.name)}</span><span class="mono">${mmss(s.dur)}</span>
+    <button data-rp="${s.id}" title="Play this now for everyone">Play</button><button data-ru="${s.id}" title="Move up" ${i ? '' : 'disabled'}>▲</button><button data-rd="${s.id}" title="Move down" ${i < RD.songs.length - 1 ? '' : 'disabled'}>▼</button><button data-rx="${s.id}" title="Delete">✕</button></li>`).join('');
+  $('rdList').querySelectorAll('[data-rp]').forEach(b => { b.onclick = () => rdPost('radio/play', { id: b.dataset.rp }, 'Playing it now for everyone'); });
+  $('rdList').querySelectorAll('[data-ru]').forEach(b => { b.onclick = () => rdPost('radio/move', { id: b.dataset.ru, dir: -1 }); });
+  $('rdList').querySelectorAll('[data-rd]').forEach(b => { b.onclick = () => rdPost('radio/move', { id: b.dataset.rd, dir: 1 }); });
+  $('rdList').querySelectorAll('[data-rx]').forEach(b => { b.onclick = () => { const s = RD.songs.find(x => x.id === b.dataset.rx); if (s && confirm(`Delete “${s.name}” from the radio?`)) rdPost('radio/delete', { id: s.id }, 'Song deleted'); }; });
+}
+async function rdPost(path, body, msg) { try { RD = await api(path, body); renderRadio(); if (msg) toast(msg); } catch (x) { toast(x.message); } }
+$('rdOn').onchange = e => rdPost('radio/set', { on: e.target.checked }, e.target.checked ? 'Radio on' : 'Radio off');
+$('rdLock').onchange = e => rdPost('radio/set', { lock: e.target.checked }, e.target.checked ? 'Everyone has to listen now' : 'Players can switch the radio off again');
+$('rdNext').onclick = () => rdPost('radio/play', {}, 'Next song for everyone');
+// how long a song is, read from the file itself so every player stays in step
+async function songLength(file) {
+  try { const ac = new (window.AudioContext || window.webkitAudioContext)(); const buf = await ac.decodeAudioData(await file.arrayBuffer()); ac.close(); return buf.duration; }
+  catch (e) { return new Promise((ok, no) => { const a = new Audio(); a.preload = 'metadata'; a.onloadedmetadata = () => { ok(a.duration); URL.revokeObjectURL(a.src); }; a.onerror = () => no(new Error('This file can’t be played.')); a.src = URL.createObjectURL(file); }); }
+}
+const rdQueue = []; let rdBusy = false;
+function addFiles(list) {
+  for (const f of list) {
+    const li = document.createElement('li'); li.innerHTML = `<span>${esc(f.name)}</span><span class="mono st">waiting</span><i><b></b></i>`; $('rdUp').appendChild(li);
+    if (!/\.mp3$/i.test(f.name) && f.type !== 'audio/mpeg') { li.classList.add('err'); li.querySelector('.st').textContent = 'not an MP3'; continue; }
+    if (RD && f.size > RD.maxSong) { li.classList.add('err'); li.querySelector('.st').textContent = 'too big (max ' + mb(RD.maxSong) + ')'; continue; }
+    rdQueue.push({ f, li });
+  }
+  pump();
+}
+async function pump() {
+  if (rdBusy) return; rdBusy = true;
+  while (rdQueue.length) {
+    const { f, li } = rdQueue.shift(), st = li.querySelector('.st'), bar = li.querySelector('i b');
+    try {
+      st.textContent = 'reading…';
+      const dur = await songLength(f);
+      if (!(dur > 2)) throw new Error('This file can’t be played.');
+      await new Promise((ok, no) => {
+        const x = new XMLHttpRequest(); x.open('POST', BASE + 'radio/upload');
+        x.setRequestHeader('X-Backroom', '1'); x.setRequestHeader('Content-Type', 'audio/mpeg');
+        x.setRequestHeader('X-Name', encodeURIComponent(f.name)); x.setRequestHeader('X-Dur', String(dur));
+        x.upload.onprogress = e => { if (e.lengthComputable) { bar.style.width = (e.loaded / e.total * 100) + '%'; st.textContent = Math.round(e.loaded / e.total * 100) + '%'; } };
+        x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch (e) {} if (x.status === 200) ok(j); else no(new Error(j.error || 'Upload failed (' + x.status + ')')); };
+        x.onerror = () => no(new Error('Upload failed. Check your connection.'));
+        x.send(f);
+      });
+      bar.style.width = '100%'; st.textContent = 'added ✓ ' + mmss(dur);
+      setTimeout(() => li.remove(), 6000);
+      await loadRadio();
+    } catch (e) { li.classList.add('err'); st.textContent = e.message; }
+  }
+  rdBusy = false;
+}
+const drop = $('rdDrop');
+drop.onclick = () => $('rdFile').click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('rdFile').click(); } };
+$('rdFile').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => addFiles([...e.dataTransfer.files]));
+// a file dropped anywhere else on the page shouldn't open in the browser
+['dragover', 'drop'].forEach(ev => addEventListener(ev, e => { if (!drop.contains(e.target)) e.preventDefault(); }));
+
 
 /* ---------- start ---------- */
 let poll = null;

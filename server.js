@@ -213,6 +213,7 @@ function hype(id, game, e) {
   rec.pop = rec.pop || []; rec.pop.push({ type: 'hype', x: Math.round(x * 100) / 100, tags }); if (rec.pop.length > 12) rec.pop.shift();
 }
 // Wizard, the card game: played for points, not chips
+const radio = require('./radio')({ redis, useRedis: USE_REDIS, dataDir: DATA_DIR, headers: { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' } });
 const wizard = require('./wizard')({
   A, cleanName: A.cleanName,
   auth: (id, token, ip) => authPlayer(id, token, ip),
@@ -420,6 +421,13 @@ async function adminApi(req, res, sub, ip) {
   if (!s || req.headers['x-backroom'] !== '1') return sub === '/api/session' ? send(res, 200, { ok: false }) : notFound();
   if (!ready) return send(res, 503, { error: 'Still loading.' });
   if (sub === '/api/session') return send(res, 200, { ok: true });
+  if (sub.startsWith('/api/radio')) {
+    const body = req.method === 'POST' && sub !== '/api/radio/upload' ? await jsonBody(req) : null;
+    let r; try { r = await radio.admin(req, sub, body); } catch (e) { console.error('Radio:', e.message); return send(res, 500, { error: 'Could not save that. Try again.' }); }
+    if (!r) return notFound();
+    if (r.audit) audit('radio', r.audit, ip);
+    return send(res, r.code, r.body);
+  }
   if (sub === '/api/logout' && req.method === 'POST') { sessions.delete(cookies(req).mc_bk); return send(res, 200, { ok: true }, 'application/json', { 'Set-Cookie': 'mc_bk=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' }); }
   const onlineMap = live.onlineNow();
   const recent = r => Date.now() - Math.max(r.lastPlay || 0, r.seen || 0) < 180000;
@@ -653,6 +661,8 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/live/stream') { if (!ready) return send(res, 503, { error: 'Opening.' }); return live.stream(req, res, url, ip); }
     if (p === '/api/live/summary') return send(res, 200, live.summary());
+    if (p === '/api/radio' && req.method === 'GET') return send(res, 200, radio.publicView());
+    { const m = /^\/api\/radio\/song\/([a-f0-9]{16})\.mp3$/.exec(p); if (m && (req.method === 'GET' || req.method === 'HEAD')) return radio.serveSong(req, res, m[1]); }
     if (p === '/api/wz/stream') { if (!ready) return send(res, 503, { error: 'Opening.' }); return wizard.stream(req, res, url, ip); }
     if (p === '/api/wz' && req.method === 'POST') {
       if (!ready) return send(res, 503, { error: 'The casino is opening. Try again in a few seconds.' });
@@ -706,6 +716,7 @@ server.listen(PORT, '0.0.0.0', () => {
 (async function start(attempt = 1) {
   try {
     const liveSaved = await load();
+    await radio.load();
     ready = true; loadError = '';
     live.restore(liveSaved);
     boardChanged();
