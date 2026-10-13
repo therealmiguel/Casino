@@ -349,16 +349,31 @@ module.exports = function createProgress(A, opts) {
       if (i === 0) unlock(p.id, rec, 'champion');
     });
     for (const [id, r] of A.players) {
-      r.bal = A.START; r.peak = A.START; r.resets = 0;
+      r.bal = A.start(); r.peak = A.start(); r.resets = 0;
       r.st = { hands: 0, spins: 0, rolls: 0, bigWin: 0, blackjacks: 0, bestMult: 0, pointsMade: 0, wagered: 0, paid: 0, rounds: 0 };
       if (r.games) { delete r.games.craps; if (r.games.bj) r.games.bj.round = null; delete r.games.mines; delete r.games.chick; }
-      r.hist = [[Date.now(), A.START]];
+      r.hist = [[Date.now(), A.start()]];
       A.logTx(r, 'season', 0, `Season ${S.n + 1} begins: everyone starts fresh with $1,000`);
       pop(r, { type: 'season', icon: '🌅', title: `Season ${S.n + 1} has begun`, text: 'Everyone starts again with $1,000. Your level, badges and trophies stay.' });
       A.touch(id);
     }
     M.season = { n: S.n + 1, start: Date.now(), end: nextMonthStart() };
     announce(`🌅 Season ${S.n} is over${board[0] ? ` and ${board[0].name} is the champion` : ''}! Season ${S.n + 1} starts now: everyone has $1,000 again.`);
+    save();
+  }
+
+  // the great reset: everyone's bankroll back to the same amount (levels, badges and trophies stay)
+  function greatReset(amount, title, text) {
+    if (opts.beforeSeasonReset) opts.beforeSeasonReset();
+    for (const [id, r] of A.players) {
+      r.bal = amount; r.peak = amount; r.resets = 0;
+      r.st = { hands: 0, spins: 0, rolls: 0, bigWin: 0, blackjacks: 0, bestMult: 0, pointsMade: 0, wagered: 0, paid: 0, rounds: 0 };
+      if (r.games) { delete r.games.craps; if (r.games.bj) r.games.bj.round = null; delete r.games.mines; delete r.games.chick; }
+      r.hist = [[Date.now(), amount]];
+      A.logTx(r, 'reset', 0, title);
+      pop(r, { type: 'season', icon: '🇵🇹', title, text });
+      A.touch(id);
+    }
     save();
   }
 
@@ -413,7 +428,7 @@ module.exports = function createProgress(A, opts) {
   const vipOf = rec => levelOf(life(rec).xp) >= VIP_LEVEL;
   const tourActive = rec => rec.mode === 'tour' && !!tourOf(rec);
   return {
-    onRound, claimDaily, claimChallenge, jackpotSpin, tip, tourAction, tourBoard, endTournament: () => { const T = M.tour; if (T) { endTournament(T); M.tour = null; tourNow(); } }, endSeason, tick, hub, profile, boardExtras, vipOf, tourActive,
+    onRound, greatReset, claimDaily, claimChallenge, jackpotSpin, tip, tourAction, tourBoard, endTournament: () => { const T = M.tour; if (T) { endTournament(T); M.tour = null; tourNow(); } }, endSeason, tick, hub, profile, boardExtras, vipOf, tourActive,
     jackpot: () => M.jackpot, jpTake: () => { const c = jpChanged; jpChanged = false; return c; }, levelOf, ACH, sample, life, pop, dayKey, weekOf, nextMonthStart, TOUR_START,
   };
 };

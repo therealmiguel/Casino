@@ -1231,6 +1231,16 @@ window.CasinoHigh = (() => {
   }
   return { HIGH, isHigh, button };
 })();
+
+/* Lisbon prep: refills give what the casino says ($100), so the refill messages say so too. */
+(() => {
+  setInterval(() => {
+    const me = window.CasinoBoard && CasinoBoard.me;
+    if (!me || !me.start || me.start === 100000 || !document.body) return;
+    const amt = '$' + (me.start / 100).toLocaleString('en-US');
+    document.querySelectorAll('b').forEach(b => { if (b.textContent === '$1,000' && /fresh|top up/i.test(b.parentElement ? b.parentElement.textContent : '')) b.textContent = amt; });
+  }, 1500);
+})();
 </script>
 
 <script>

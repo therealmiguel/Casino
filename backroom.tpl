@@ -340,6 +340,12 @@ tr.click:hover td{background:rgba(226,182,94,.05)}
             <div class="row" style="margin-top:10px"><button class="btn small bad" id="chatClear">Clear every table's chat</button></div>
           </div>
           <div class="card">
+            <h2>🇵🇹 Lisbon prep</h2>
+            <p class="help">The great reset: every player's bankroll goes to <b>$100</b> at once, to practise for Casino Lisboa. Live tables are cleared first and bets on them are given back. While Lisbon prep is on, refills and new players also get $100. Levels, badges and trophies stay.</p>
+            <p class="help" id="lisNow"></p>
+            <div class="row"><button class="btn bad" id="lisGo">Reset everyone to $100</button><button class="btn" id="lisEnd">End Lisbon prep</button></div>
+          </div>
+          <div class="card">
             <h2>Season</h2>
             <p class="help" id="seasonNow"></p>
             <div class="row"><button class="btn bad" id="seasonEnd">End the season now</button></div>
@@ -594,6 +600,9 @@ function renderControls() {
   const st = OV.settings;
   const ev = OV.events || {}, live_ = e => e && e.until > Date.now();
   $('evNow').textContent = [live_(ev.boost) ? `Happy hour ×${ev.boost.mult} on ${ev.boost.game} until ${when(ev.boost.until)}.` : 'No happy hour running.', live_(ev.xp) ? `Double XP until ${when(ev.xp.until)}.` : ''].join(' ');
+  const LS = OV.settings.lisbon;
+  $('lisNow').innerHTML = LS && LS.on ? `<b style="color:var(--good)">On</b> since ${when(LS.at)}. Refills and new players get $100.` : LS && LS.at ? `Off since ${when(LS.at)}. Refills are $1,000.` : 'Not used yet.';
+  $('lisEnd').disabled = !(LS && LS.on);
   $('seasonNow').textContent = `Season ${OV.season.n} started ${when(OV.season.start)} and ends ${when(OV.season.end)}. When it ends, the top 3 go into the hall of fame and everyone restarts with $1,000 (levels and badges stay).`;
   const T = OV.tour || {};
   $('tourNow').innerHTML = `Week ${esc(T.week || '')} ends ${T.end ? when(T.end) : ''}. ${T.board && T.board.length ? 'Leading: ' + T.board.slice(0, 3).map((r, i) => `${['🥇', '🥈', '🥉'][i]} ${esc(r.name)} ${usd(r.bal)}`).join(' · ') : 'Nobody has joined yet.'} Prizes now: ${(T.prizes || []).map(usd).join(' / ')}. Players need 10 rounds to win a prize.`;
@@ -631,6 +640,11 @@ document.querySelectorAll('[data-rig]').forEach(b => b.onclick = () => { const g
 $('rigNow').addEventListener('click', e => { const a = e.target.closest('[data-unrig]'); if (a) { e.preventDefault(); post('rig', { game: a.dataset.unrig, value: null }, 'Rig cancelled'); } });
 $('whGo').onclick = () => { if (confirm('Start the Casino Wheel for everyone online?')) post('wheel', { minutes: +$('whMin').value, chance: +$('whChance').value }, 'The wheel is spinning'); };
 $('whStop').onclick = () => post('wheel', { action: 'end' }, 'Wheel stopped');
+$('lisGo').onclick = () => {
+  if (prompt(`Reset EVERY player's bankroll to $100 for Lisbon prep? This can't be undone, so download a backup first if you want one.\n\nType LISBON to confirm.`) !== 'LISBON') return;
+  post('lisbon', { action: 'start' }, 'Everyone is at $100. Lisbon prep is on.');
+};
+$('lisEnd').onclick = () => post('lisbon', { action: 'end' }, 'Lisbon prep ended. Refills are $1,000 again.');
 $('chatClear').onclick = () => { if (confirm('Clear the chat at every live table?')) post('chatclear', { room: 'all' }, 'Chat cleared'); };
 $('chatList').addEventListener('click', e => { const b = e.target.closest('[data-chatdel]'); if (b) post('chatdel', { msg: +b.dataset.chatdel }, 'Message removed'); });
 $('hhGo').onclick = () => post('event', { boost: { game: $('hhGame').value, mult: +$('hhMult').value, hours: +$('hhHours').value } }, 'Happy hour started');

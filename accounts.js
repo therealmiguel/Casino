@@ -22,6 +22,7 @@ module.exports = function createAccounts(hooks = {}) {
   const setProgress = p => { P = p; };
   // which wallet a bet uses: tournament chips for the solo games while the player is in tournament mode
   const HIGH = 10000000;      // $100,000: high rollers play without table limits
+  let startAmt = START;      // what new players and refills get ($100 during Lisbon prep)
   const TOUR_GAMES = new Set(['slots', 'slots2', 'book', 'roulette', 'blackjack', 'plinko', 'mines', 'chicken']);
   const inTour = (rec, game) => !!(P && TOUR_GAMES.has(game) && P.tourActive(rec));
   const wal = (rec, game) => (inTour(rec, game) ? rec.tour : rec);
@@ -30,7 +31,7 @@ module.exports = function createAccounts(hooks = {}) {
   function touch(id) { dirty.add(id); onChange(id); }
   function blank(id, token, ip) {
     return {
-      v: 2, tokenHash: hash(token), name: '', bal: START, peak: START, resets: 0,
+      v: 2, tokenHash: hash(token), name: '', bal: startAmt, peak: startAmt, resets: 0,
       joined: Date.now(), seen: Date.now(), ip: ip || '', banned: null, st: blankStats(), log: [], games: {},
     };
   }
@@ -161,11 +162,11 @@ module.exports = function createAccounts(hooks = {}) {
     const rec = players.get(id);
     if (!rec) return { error: 'Unknown player.' };
     const have = cash(id);
-    if (have >= 500) return { error: `You still have ${usd(have)}. A fresh $1,000 is only for when you're out of chips.`, code: 409 };
+    if (have >= 500) return { error: `You still have ${usd(have)}. A fresh ${usd(startAmt)} is only for when you're out of chips.`, code: 409 };
     if (rec.games && rec.games.mines && rec.games.mines.live && !rec.games.mines.tour) return { error: 'Finish your Mines game first.', code: 409 };
     if (rec.games && rec.games.chick && rec.games.chick.live) return { error: 'Finish your crossing first.', code: 409 };
-    rec.bal += START; rec.resets++;
-    logTx(rec, 'reset', START, 'Fresh $1,000 stack');
+    rec.bal += startAmt; rec.resets++;
+    logTx(rec, 'reset', startAmt, `Fresh ${usd(startAmt)} stack`);
     touch(id);
     return { ok: true };
   }
@@ -182,7 +183,7 @@ module.exports = function createAccounts(hooks = {}) {
     const tour = !!(P && P.tourActive(rec));
     const lvl = P ? P.levelOf((rec.life || {}).xp || 0) : 0;
     return { id, name: rec.name, cents: ctx === 'solo' && tour ? rec.tour.bal : rec.bal, bank: rec.bal, cash: cash(id), peak: rec.peak, resets: rec.resets, stats: rec.st, banned: !!rec.banned,
-      level: lvl, vip: !!(P && P.vipOf(rec)), high: cash(id) >= HIGH, mode: tour ? 'tour' : 'main', tourBal: tour ? rec.tour.bal : null, free: rec.free && rec.free.n > 0 ? rec.free : null };
+      level: lvl, vip: !!(P && P.vipOf(rec)), high: cash(id) >= HIGH, start: startAmt, mode: tour ? 'tour' : 'main', tourBal: tour ? rec.tour.bal : null, free: rec.free && rec.free.n > 0 ? rec.free : null };
   }
   // popups waiting for this player (achievements, level ups, gifts)
   function takePop(id) { const rec = players.get(id); if (!rec || !rec.pop || !rec.pop.length) return null; const p = rec.pop; rec.pop = []; touch(id); return p; }
@@ -212,7 +213,7 @@ module.exports = function createAccounts(hooks = {}) {
     return o;
   }
   return {
-    START, HIGH, players, load, get, auth, debit, credit, refund, move, round, reset, setName, me, takePop, publicList, remove, takeDirty, putBack, setProgress, balOf, inTour, TOUR_GAMES,
+    START, HIGH, start: () => startAmt, setStart: c => { startAmt = Math.max(100, Math.round(c)); }, players, load, get, auth, debit, credit, refund, move, round, reset, setName, me, takePop, publicList, remove, takeDirty, putBack, setProgress, balOf, inTour, TOUR_GAMES,
     cash, tableMoney, logTx, touch, house, houseFor, extras, hash, cleanName, usd, all: () => players,
   };
 };

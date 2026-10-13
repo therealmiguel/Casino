@@ -2097,6 +2097,16 @@ window.CasinoHigh = (() => {
   }
   return { HIGH, isHigh, button };
 })();
+
+/* Lisbon prep: refills give what the casino says ($100), so the refill messages say so too. */
+(() => {
+  setInterval(() => {
+    const me = window.CasinoBoard && CasinoBoard.me;
+    if (!me || !me.start || me.start === 100000 || !document.body) return;
+    const amt = '$' + (me.start / 100).toLocaleString('en-US');
+    document.querySelectorAll('b').forEach(b => { if (b.textContent === '$1,000' && /fresh|top up/i.test(b.parentElement ? b.parentElement.textContent : '')) b.textContent = amt; });
+  }, 1500);
+})();
 </script>
 <script>
 (() => {
@@ -2665,6 +2675,8 @@ a.nm{text-decoration:none;color:inherit}
   .lives{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 .table[hidden]{display:none!important}
+.lisbon{margin:14px auto 0;display:inline-block;padding:7px 14px;border-radius:999px;font-size:13.5px;color:var(--ivory);background:linear-gradient(90deg,rgba(0,102,0,.35),rgba(255,0,0,.3));box-shadow:inset 0 0 0 1px rgba(232,193,112,.3)}
+.lisbon b{color:var(--gold-2);font-weight:600}
 /* a lone card on the last row lies down across the whole row */
 @media (min-width:901px){
   .table.wide{grid-column:1/-1;flex-direction:row}
@@ -2715,6 +2727,16 @@ a.nm{text-decoration:none;color:inherit}
   }
   addEventListener('resize', layout);
   layout();
+  // Lisbon prep: say so on the sign, and the refill button gives what the casino says
+  const pill = document.createElement('div'); pill.className = 'lisbon'; pill.hidden = true;
+  pill.innerHTML = '🇵🇹 <b>Lisbon prep</b> · everyone started over with $100. Make it last.';
+  const bank = document.querySelector('.sign .bank'); if (bank) bank.after(pill);
+  function lisbon() {
+    const me = window.CasinoBoard && CasinoBoard.me; if (!me || !me.start) return;
+    pill.hidden = me.start >= 100000;
+    const t = document.getElementById('topup'); if (t) t.textContent = `Get $${(me.start / 100).toLocaleString('en-US')} in chips`;
+  }
+  setInterval(lisbon, 2000); lisbon();
   let saved = 'all'; try { saved = sessionStorage.getItem('mc-floor') || 'all'; } catch (e) {}
   if (saved !== 'all' && count(saved)) pick(saved);
 })();

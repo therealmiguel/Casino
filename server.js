@@ -579,6 +579,23 @@ async function adminApi(req, res, sub, ip) {
     audit('free spins', `${n} × ${A.usd(bet)} to ${count} players`, ip);
     return send(res, 200, { ok: true, count });
   }
+  if (sub === '/api/lisbon') {
+    // Lisbon prep: everyone back to $100, and refills and new players get $100 until it's switched off
+    if (b.action === 'start') {
+      const amount = 10000;
+      A.setStart(amount); META.settings.lisbon = { on: true, at: Date.now(), amount }; saveMeta();
+      P.greatReset(amount, 'Lisbon prep: everyone starts with $100', 'Every bankroll is back to $100. Make it last: refills are $100 too.');
+      META.settings.notice = { text: '🇵🇹 Lisbon prep is on: everyone starts over with $100. Make it last!', kind: 'party', t: Date.now(), until: Date.now() + 86400000 }; sendNotice();
+      audit('lisbon', `Great reset: every bankroll set to ${A.usd(amount)} (${A.players.size} players)`, ip); boardChanged();
+      return send(res, 200, { ok: true, count: A.players.size });
+    }
+    if (b.action === 'end') {
+      A.setStart(A.START); META.settings.lisbon = { on: false, at: Date.now() }; saveMeta();
+      audit('lisbon', 'Lisbon prep ended: refills and new players get $1,000 again', ip);
+      return send(res, 200, { ok: true });
+    }
+    return send(res, 400, { error: 'Unknown action.' });
+  }
   if (sub === '/api/season') {
     if (b.action !== 'end') return send(res, 400, { error: 'Unknown action.' });
     P.endSeason(true); audit('season', `Season ended early; season ${META.season.n} started`, ip); boardChanged();
@@ -724,6 +741,7 @@ server.listen(PORT, '0.0.0.0', () => {
   try {
     const liveSaved = await load();
     await radio.load();
+    A.setStart(META.settings.lisbon && META.settings.lisbon.on ? META.settings.lisbon.amount || 10000 : A.START);
     fixtures.start();
     ready = true; loadError = '';
     live.restore(liveSaved);
